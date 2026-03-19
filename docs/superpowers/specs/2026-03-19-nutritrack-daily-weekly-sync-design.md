@@ -1,7 +1,7 @@
 # NutriTrack — Daily Diet & Weekly Plan Synchronization
 
 **Date:** 2026-03-19
-**Status:** Approved
+**Status:** In Review
 
 ## Problem
 
@@ -121,6 +121,22 @@ session = {
 }
 ```
 
+### `WeeklyHistorySummary` shape
+
+```python
+{
+    "week_start": "2026-03-10",      # ISO date of Monday of the recorded week
+    "avg_adherence": 0.82,           # 0.0–1.0, ratio of checked meals/targets
+    "total_exercise_kcal": 1540,     # sum of all exercise_adj extra_kcal for the week
+    "weight_start": 74.2,            # kg at start of week (optional, None if not recorded)
+    "weight_end": 73.8,              # kg at end of week (optional, None if not recorded)
+    "weight_delta": -0.4,            # weight_end - weight_start (None if either missing)
+    "days_logged": 6                 # number of days with any adherence data
+}
+```
+
+`weekly_history` is a list of these summaries, ordered newest-first, capped at 12 weeks.
+
 ## Backend Changes
 
 | Function | Change |
@@ -132,11 +148,29 @@ session = {
 | `/diet/weekly/regenerate` | Now receives `apply_from` ("today" or "tomorrow"), regenerates with history |
 | `/diet/today/swap` (modified) | Generates replacement meal and writes it back to `week_plan.days[today].meals[id]` in session. Preserves `exercise_adj[today]`. Returns updated `PlanDay` for today. |
 
+Swap return: the frontend updates its local state by merging the returned `PlanDay` into the current day slot. No full re-fetch needed. `exercise_adj` for today is included in the returned `PlanDay.exerciseAdj` field.
+
+**`generate_week_plan()` signature:** accepts an optional `history: list[WeeklyHistorySummary] | None` parameter. When `None` (new user), the function generates based on user profile only with no adjustments. The same code path handles both cases.
+
 ### `get_day_from_plan(date)` contract
 
 - **Input:** ISO date string (e.g., `"2026-03-19"`)
 - **Date not in current plan:** Returns HTTP 404 with `{ "error": "date_not_in_plan" }`. Frontend falls back to triggering plan regeneration.
 - **Computed fields:** `adjustedKcal` and `portionScale` are computed server-side and returned in the `Meal` objects. Frontend displays them directly.
+
+### Portion scaling formula
+
+When `exercise_adj[date].extra_kcal > 0`, extra calories are distributed proportionally across meals:
+
+```python
+portion_scale = 1 + (extra_kcal * meal_base_kcal / (total_daily_base_kcal * meal_base_kcal))
+# Simplifies to:
+portion_scale = 1 + (extra_kcal / total_daily_base_kcal)
+
+adjusted_kcal = round(meal_base_kcal * portion_scale)
+```
+
+The same `portion_scale` is applied uniformly to all meals of the day. Minimum scale: 1.0. Maximum scale: 1.5 (capped to avoid extreme portions).
 
 ### Regeneration rule
 
@@ -149,6 +183,16 @@ If apply_from == "tomorrow":
     week_plan[tomorrow...sunday] = new_plan[tomorrow...sunday]
     week_plan[today] unchanged
 ```
+
+### Stale plan detection
+
+A plan is stale when `week_plan.generated_at` (the Monday of the plan's week) is earlier than the Monday of the current week.
+
+Detection is done at request time in `/diet/today` and `/diet/weekly`. When stale:
+- The endpoint returns the stale plan data **plus** a `"stale": true` flag in the response root.
+- The frontend shows a non-blocking banner: "Tu plan es de la semana pasada. ¿Regenerar ahora?"
+- The user can dismiss the banner and continue using the stale plan.
+- The plan is NOT automatically regenerated — user action is required.
 
 ## Frontend Changes
 
@@ -191,6 +235,21 @@ If apply_from == "tomorrow":
 └─────────────────────────────────────────┘
 ```
 
+## API Response Contract
+
+All endpoints return JSON. Success responses wrap the payload directly (no envelope). Errors use:
+
+```json
+{ "error": "<error_code>", "detail": "<human-readable message>" }
+```
+
+| Endpoint | Success shape | Key error codes |
+|----------|--------------|-----------------|
+| `GET /diet/today` | `PlanDay` + `"stale": bool` | `date_not_in_plan` (404) |
+| `GET /diet/weekly` | `{ "days": PlanDay[], "summary": WeeklyHistorySummary \| null, "stale": bool }` | — |
+| `POST /diet/weekly/regenerate` | `{ "days": PlanDay[] }` | `no_history` (200, plan generated from profile only) |
+| `POST /diet/today/swap` | `PlanDay` (today's updated day) | `meal_not_found` (404) |
+
 ## Edge Cases
 
 | Case | Behavior |
@@ -203,3 +262,5 @@ If apply_from == "tomorrow":
 | "Swap dish" in today's diet | Updates current day's slot in `week_plan` + preserves `exercise_adj` |
 | Network failure during regeneration | Modal shows error, previous plan remains intact |
 | Timezone resolution | All dates use the user's local timezone, passed to the backend as a request header `X-User-Timezone` (IANA format, e.g. `"Europe/Madrid"`). Backend uses this to determine "today" for all date comparisons. |
+| Future `exercise_adj` on regeneration | `exercise_adj` entries for dates *after* today are discarded when `apply_from == "today"`. Entries for dates *before* today are always preserved. |
+| Missing `X-User-Timezone` header | Backend defaults to `UTC`. If the value is an unrecognized IANA string, backend also defaults to `UTC` and logs a warning. No error is returned to the client. |
