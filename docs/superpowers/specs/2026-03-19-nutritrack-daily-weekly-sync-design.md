@@ -77,6 +77,8 @@ interface Meal {
 }
 ```
 
+**Migration note:** Sessions storing daily meals with the old `tip` field are treated as stale and discarded on next load. No migration window — the first request after deploy triggers a fresh plan generation.
+
 ### `PlanDay` model
 
 ```typescript
@@ -90,9 +92,10 @@ interface PlanDay {
     source: string      // "Running 45min"
     adjustedTotal: number
   }
-  isToday: boolean      // computed in frontend
 }
 ```
+
+**Note:** `isToday` is frontend-derived UI state — computed by comparing `day.date === today's ISO date in the user's local timezone`. It is not sent by the backend.
 
 **Key change:** Days keyed by real date (`"2026-03-17"`) instead of day name (`"Lunes"`). This trivially solves today's concordance and handles mid-week regeneration correctly.
 
@@ -102,7 +105,7 @@ interface PlanDay {
 session = {
     "week_plan": {
         "days": [...],            # base meals (PlanDay[])
-        "generated_at": date,     # week this belongs to
+        "generated_at": "2026-03-17",  # ISO date of Monday of the plan's week
         "weekly_target_kcal": n,  # recalculated with history
         "weekly_summary": {       # previous week summary used
             "avg_adherence": 0.82,
@@ -127,6 +130,13 @@ session = {
 | `get_day_from_plan(date)` | **New** — returns meals for the day + applies `exercise_adj[date]` if exists |
 | `/diet/today` | Calls `get_day_from_plan(today)` instead of `generate_adaptive_day()` |
 | `/diet/weekly/regenerate` | Now receives `apply_from` ("today" or "tomorrow"), regenerates with history |
+| `/diet/today/swap` (modified) | Generates replacement meal and writes it back to `week_plan.days[today].meals[id]` in session. Preserves `exercise_adj[today]`. Returns updated `PlanDay` for today. |
+
+### `get_day_from_plan(date)` contract
+
+- **Input:** ISO date string (e.g., `"2026-03-19"`)
+- **Date not in current plan:** Returns HTTP 404 with `{ "error": "date_not_in_plan" }`. Frontend falls back to triggering plan regeneration.
+- **Computed fields:** `adjustedKcal` and `portionScale` are computed server-side and returned in the `Meal` objects. Frontend displays them directly.
 
 ### Regeneration rule
 
@@ -192,3 +202,4 @@ If apply_from == "tomorrow":
 | Exercise logged but no plan | Plan is created first, then adjustment applied |
 | "Swap dish" in today's diet | Updates current day's slot in `week_plan` + preserves `exercise_adj` |
 | Network failure during regeneration | Modal shows error, previous plan remains intact |
+| Timezone resolution | All dates use the user's local timezone, passed to the backend as a request header `X-User-Timezone` (IANA format, e.g. `"Europe/Madrid"`). Backend uses this to determine "today" for all date comparisons. |
