@@ -1,0 +1,34 @@
+# ── Frontend ──────────────────────────────────────────────────────────────────
+nutrition_frontend/node_modules/
+nutrition_frontend/.next/
+nutrition_frontend/.vercel/
+nutrition_frontend/out/
+nutrition_frontend/*.tsbuildinfo
+
+# ── Backend ───────────────────────────────────────────────────────────────────
+nutrition_assistant/__pycache__/
+nutrition_assistant/**/__pycache__/
+nutrition_assistant/*.pyc
+nutrition_assistant/*.pyo
+nutrition_assistant/.venv/
+nutrition_assistant/venv/
+
+# User data (generated at runtime, never commit personal data)
+nutrition_assistant/user_profile.json
+nutrition_assistant/session.json
+nutrition_assistant/preferences.json
+nutrition_assistant/adherence_log.json
+nutrition_assistant/exercise_history.json
+nutrition_assistant/survey_history.json
+nutrition_assistant/weight_history.json
+nutrition_assistant/macro_adjustments.json
+nutrition_assistant/dietas/
+nutrition_assistant/*.pdf
+
+# ── General ───────────────────────────────────────────────────────────────────
+.env
+.env.local
+.env*.local
+*.log
+.DS_Store
+Thumbs.db
