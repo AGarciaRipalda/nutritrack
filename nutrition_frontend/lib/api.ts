@@ -266,7 +266,7 @@ function transformPlanDay(d: any): PlanDay & { stale: boolean } {
     return {
       id:           m.id,
       type:         m.type,      // backend returns this directly
-      name:         m.name,      // backend returns this directly
+      name:         m.name ?? m.text ?? m.id,
       kcal:         m.kcal ?? 0,
       description:  m.text ?? m.description ?? "",
       note:         m.note ?? undefined,
@@ -277,14 +277,14 @@ function transformPlanDay(d: any): PlanDay & { stale: boolean } {
   })
   return {
     date:        d.date,
-    dayName:     d.day_name,
+    dayName:     d.dayName,
     meals,
-    totalKcal:   d.total_kcal ?? meals.reduce((s, m) => s + m.kcal, 0),
-    exerciseAdj: d.exercise_adj
+    totalKcal:   d.totalKcal ?? meals.reduce((s, m) => s + m.kcal, 0),
+    exerciseAdj: d.exerciseAdj
       ? {
-          extraKcal:     d.exercise_adj.extra_kcal,
-          source:        d.exercise_adj.source,
-          adjustedTotal: d.exercise_adj.adjusted_total,
+          extraKcal:     d.exerciseAdj.extraKcal,
+          source:        d.exerciseAdj.source,
+          adjustedTotal: d.exerciseAdj.adjustedTotal,
         }
       : undefined,
     stale: d.stale ?? false,

@@ -35,6 +35,20 @@ SNACK_TARGET_KCAL = 175
 MAIN_MEAL_SPLIT   = {"desayuno": 0.28, "almuerzo": 0.45, "cena": 0.27}
 DAY_NAMES_ES      = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
 MEAL_ID_ORDER     = ["desayuno", "media_manana", "almuerzo", "merienda", "cena"]
+MEAL_NAMES_ES = {
+    "desayuno":     "Desayuno",
+    "media_manana": "Media mañana",
+    "almuerzo":     "Almuerzo",
+    "merienda":     "Merienda",
+    "cena":         "Cena",
+}
+MEAL_TYPES_EN = {
+    "desayuno":     "breakfast",
+    "media_manana": "mid-morning",
+    "almuerzo":     "lunch",
+    "merienda":     "snack",
+    "cena":         "dinner",
+}
 MIN_CARB_G        = {"desayuno": 30, "almuerzo": 50, "cena": 20,
                      "media_manana": 5, "merienda": 5}
 
@@ -872,7 +886,7 @@ def generate_week_plan(
             "cena":         _scale_meal(random.choice(CENAS),        main_budget * MAIN_MEAL_SPLIT["cena"],     "cena"),
         }
         meals_list = [
-            {**v, "id": k}
+            {**v, "id": k, "name": MEAL_NAMES_ES.get(k, k), "type": MEAL_TYPES_EN.get(k, k)}
             for k, v in meals_raw.items()
         ]
         total_kcal = sum(m["kcal"] for m in meals_list)
