@@ -8,11 +8,12 @@ import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
 import {
   Shuffle, Coffee, Sun, Utensils, Cookie, Moon,
-  Lightbulb, CheckCircle2, Wheat, Scale,
+  Lightbulb, CheckCircle2, Wheat, Scale, Star, X,
 } from "lucide-react"
 import type { PlanDay } from "@/lib/api"
 import { fetchTodaysPlan, swapMeal, updateAdherence, fetchFavoriteCarbs } from "@/lib/api"
 import { useDietDay } from "@/context/DietDayContext"
+import { useCheatDay } from "@/context/CheatDayContext"
 
 const today = new Date().toISOString().slice(0, 10)
 const mockPlanDay: PlanDay = {
@@ -43,12 +44,14 @@ const mealIdIcons: Record<string, typeof Coffee> = {
 
 export default function DietPage() {
   const { state, derived, init, setMealCarb, setMealGrams } = useDietDay()
+  const { isCheatDay, finalizeExcess, setupCompensation, declineCompensation, record: cheatRecord } = useCheatDay()
 
-  const [planDay, setPlanDay]     = useState<(PlanDay & { stale?: boolean }) | null>(null)
-  const [stale, setStale]         = useState(false)
-  const [loading, setLoading]     = useState(true)
-  const [swapping, setSwapping]   = useState<string | null>(null)
+  const [planDay, setPlanDay]         = useState<(PlanDay & { stale?: boolean }) | null>(null)
+  const [stale, setStale]             = useState(false)
+  const [loading, setLoading]         = useState(true)
+  const [swapping, setSwapping]       = useState<string | null>(null)
   const [checkedMeals, setCheckedMeals] = useState<Record<string, boolean>>({})
+  const [showCompModal, setShowCompModal] = useState(false)
 
   useEffect(() => {
     Promise.all([fetchTodaysPlan(), fetchFavoriteCarbs()])
@@ -98,9 +101,13 @@ export default function DietPage() {
   }
 
   const day = planDay ?? mockPlanDay
+  const cheatActive = isCheatDay(day.date)
   const { totalEffective, remaining, exceeded, overLimit, rebalancedTargets, effectiveKcalPerMeal } = derived
-  const dailyTarget = state.dailyTarget || day.totalKcal
-  const pct = dailyTarget > 0 ? Math.min((totalEffective / dailyTarget) * 100, 110) : 0
+  // When comodín is active, suppress the over-limit red warning
+  const showOverLimit = overLimit && !cheatActive
+  const dailyTarget   = state.dailyTarget || day.totalKcal
+  const pct = dailyTarget > 0 ? Math.min((totalEffective / dailyTarget) * 100, cheatActive ? 130 : 110) : 0
+  const excessKcal = Math.max(totalEffective - dailyTarget, 0)
 
   return (
     <AppLayout>
@@ -139,14 +146,22 @@ export default function DietPage() {
           <div className="space-y-2">
             <div className="flex items-center justify-between text-sm">
               <span className="text-white/60">Consumido</span>
-              <span className={`font-semibold ${overLimit ? "text-red-400" : exceeded ? "text-amber-400" : "text-emerald-400"}`}>
+              <span className={`font-semibold ${
+                showOverLimit ? "text-red-400"
+                : cheatActive && exceeded ? "text-amber-300"
+                : exceeded ? "text-amber-400"
+                : "text-emerald-400"
+              }`}>
                 {state.initialized ? totalEffective : day.totalKcal} / {dailyTarget} kcal
               </span>
             </div>
             <div className="h-2 bg-white/10 rounded-full overflow-hidden">
               <div
                 className={`h-full rounded-full transition-all duration-300 ${
-                  overLimit ? "bg-red-400" : exceeded ? "bg-amber-400" : "bg-emerald-400"
+                  showOverLimit ? "bg-red-400"
+                  : cheatActive && exceeded ? "bg-amber-400"
+                  : exceeded ? "bg-amber-400"
+                  : "bg-emerald-400"
                 }`}
                 style={{ width: `${pct}%` }}
               />
@@ -159,12 +174,40 @@ export default function DietPage() {
                     : `Exceso: +${Math.abs(remaining)} kcal`
                   : ""}
               </span>
-              {overLimit && (
+              {showOverLimit && (
                 <span className="text-red-400 font-medium">⚠ Límite diario excedido</span>
+              )}
+              {cheatActive && exceeded && (
+                <span className="text-amber-300 font-medium">⭐ Comodín activo</span>
               )}
             </div>
           </div>
         </Card>
+
+        {/* Cheat day active banner */}
+        {cheatActive && (
+          <div className="bg-amber-500/10 border border-amber-400/20 rounded-2xl px-4 py-3 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <Star className="h-4 w-4 text-amber-400 fill-amber-400 shrink-0" />
+              <span className="text-amber-300 text-sm">
+                {excessKcal > 0
+                  ? `Comodín activo · ${excessKcal} kcal de exceso registradas`
+                  : "Comodín activo · sin límite estricto hoy"}
+              </span>
+            </div>
+            {excessKcal > 0 && !cheatRecord?.compensating && (
+              <button
+                onClick={() => { finalizeExcess(excessKcal); setShowCompModal(true) }}
+                className="text-amber-400 text-xs font-semibold hover:underline shrink-0"
+              >
+                Compensar →
+              </button>
+            )}
+            {cheatRecord?.compensating && (
+              <span className="text-emerald-400 text-xs font-medium shrink-0">✓ Compensando</span>
+            )}
+          </div>
+        )}
 
         {/* Compensation banner */}
         {Object.keys(rebalancedTargets).length > 0 && (
@@ -201,7 +244,7 @@ export default function DietPage() {
               ? Math.round(Math.max(meal.targetKcal - meal.fixedKcal, 0) / (selCarb.kcal / 100))
               : null
 
-            const isMealOverLimit = state.initialized && overLimit
+            const isMealOverLimit = state.initialized && showOverLimit
 
             // Rebalance hint for this meal
             const rebalHint = rebalancedTargets[meal.id]
@@ -355,6 +398,54 @@ export default function DietPage() {
         </Card>
 
       </div>
+
+      {/* Compensation modal */}
+      {showCompModal && cheatRecord && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-6 w-full max-w-sm">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <Star className="h-5 w-5 text-amber-400 fill-amber-400" />
+                <h3 className="text-white font-bold text-lg">Comodín detectado</h3>
+              </div>
+              <button onClick={() => setShowCompModal(false)} className="text-white/50 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="bg-amber-500/10 border border-amber-400/20 rounded-xl p-4 mb-4">
+              <p className="text-amber-300 text-sm font-medium mb-1">
+                Exceso de {cheatRecord.excess} kcal registrado
+              </p>
+              <p className="text-white/60 text-xs">
+                Distribuido en los próximos 3 días:
+                <span className="text-white font-semibold ml-1">
+                  -{Math.round(cheatRecord.excess / 3)} kcal/día
+                </span>
+              </p>
+            </div>
+
+            <p className="text-white/60 text-sm mb-5">
+              ¿Quieres compensar este exceso en los próximos 3 días para mantener tu meta semanal intacta?
+            </p>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => { declineCompensation(); setShowCompModal(false) }}
+                className="flex-1 px-4 py-2 border border-white/20 rounded-xl text-white/60 text-sm hover:bg-white/5"
+              >
+                No, gracias
+              </button>
+              <button
+                onClick={() => { setupCompensation(day.date); setShowCompModal(false) }}
+                className="flex-1 px-4 py-2 bg-amber-500 hover:bg-amber-600 rounded-xl text-white text-sm font-medium"
+              >
+                Compensar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </AppLayout>
   )
 }

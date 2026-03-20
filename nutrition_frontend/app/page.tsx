@@ -5,20 +5,13 @@ import { AppLayout } from "@/components/app-layout"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import {
-  Flame,
-  Dumbbell,
-  Bell,
-  Scale,
-  ClipboardList,
-  Calendar,
-  TrendingUp,
-  Beef,
-  Wheat,
-  Droplet,
+  Flame, Dumbbell, Bell, Scale, ClipboardList,
+  Calendar, TrendingUp, Beef, Wheat, Droplet, Star, X,
 } from "lucide-react"
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts"
 import type { DashboardData } from "@/lib/api"
 import { fetchDashboard } from "@/lib/api"
+import { useCheatDay } from "@/context/CheatDayContext"
 
 // Mock data for development when API is unavailable
 const mockDashboardData: DashboardData = {
@@ -41,9 +34,17 @@ const mockDashboardData: DashboardData = {
   ],
 }
 
+const todayISO = new Date().toISOString().slice(0, 10)
+
 export default function DashboardPage() {
-  const [data, setData] = useState<DashboardData | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [data, setData]         = useState<DashboardData | null>(null)
+  const [loading, setLoading]   = useState(true)
+  const [showConfirm, setShowConfirm] = useState(false)
+
+  const { record, isCheatDay, isWeeklyLimitReached, activateCheatDay } = useCheatDay()
+
+  const cheatActive  = isCheatDay(todayISO)
+  const weeklyUsed   = isWeeklyLimitReached(todayISO) && !cheatActive
 
   useEffect(() => {
     fetchDashboard()
@@ -102,23 +103,90 @@ export default function DashboardPage() {
       <div className="space-y-6">
         {/* Header */}
         <Card className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-6">
-          <div className="flex items-center justify-between flex-wrap gap-2">
+          <div className="flex items-center justify-between flex-wrap gap-3">
             <div>
               <h2 className="text-3xl font-bold text-white">Panel</h2>
               <p className="text-white/60">Sigue tu nutrición y objetivos de fitness</p>
             </div>
-            <div className="text-right">
-              <p className="text-white/60 text-sm">Hoy</p>
-              <p className="text-white font-medium">
-                {new Date().toLocaleDateString("es-ES", {
-                  weekday: "long",
-                  month: "short",
-                  day: "numeric",
-                })}
-              </p>
+            <div className="flex items-center gap-3 flex-wrap">
+              {/* Comodín button */}
+              {cheatActive ? (
+                <div className="flex items-center gap-2 px-4 py-2 bg-amber-500/20 border border-amber-400/30 rounded-xl">
+                  <Star className="h-4 w-4 text-amber-400 fill-amber-400" />
+                  <span className="text-amber-300 text-sm font-medium">Comodín activo hoy</span>
+                </div>
+              ) : weeklyUsed ? (
+                <div
+                  title="Tu metabolismo necesita estabilidad. ¡Reserva tu próximo comodín para la semana que viene!"
+                  className="flex items-center gap-2 px-4 py-2 bg-white/5 border border-white/10 rounded-xl cursor-not-allowed opacity-60"
+                >
+                  <Star className="h-4 w-4 text-white/40" />
+                  <span className="text-white/40 text-sm">Comodín usado</span>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setShowConfirm(true)}
+                  className="flex items-center gap-2 px-4 py-2 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-400/20 hover:border-amber-400/40 rounded-xl text-amber-300 text-sm font-medium transition-colors"
+                >
+                  <Star className="h-4 w-4" />
+                  Activar Comodín
+                </button>
+              )}
+              <div className="text-right">
+                <p className="text-white/60 text-sm">Hoy</p>
+                <p className="text-white font-medium">
+                  {new Date().toLocaleDateString("es-ES", { weekday: "long", month: "short", day: "numeric" })}
+                </p>
+              </div>
             </div>
           </div>
+
+          {/* Weekly limit tooltip shown inline when hovered */}
+          {weeklyUsed && (
+            <p className="mt-3 text-white/40 text-xs">
+              ⚠ Tu metabolismo necesita estabilidad. ¡Reserva tu próximo comodín para la semana que viene!
+            </p>
+          )}
         </Card>
+
+        {/* Comodín confirmation modal */}
+        {showConfirm && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-6 w-full max-w-sm">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <Star className="h-5 w-5 text-amber-400 fill-amber-400" />
+                  <h3 className="text-white font-bold text-lg">Activar Comodín</h3>
+                </div>
+                <button onClick={() => setShowConfirm(false)} className="text-white/50 hover:text-white">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <p className="text-white/70 text-sm mb-2">
+                El límite calórico de hoy se vuelve <span className="text-amber-300 font-medium">flexible</span>.
+                Los avisos en rojo desaparecen.
+              </p>
+              <p className="text-white/50 text-xs mb-5">
+                Al final del día podrás repartir el exceso en los próximos 3 días para mantener tu meta semanal intacta.
+                Solo puedes usar un comodín por semana.
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowConfirm(false)}
+                  className="flex-1 px-4 py-2 border border-white/20 rounded-xl text-white/60 text-sm hover:bg-white/5"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={() => { activateCheatDay(todayISO); setShowConfirm(false) }}
+                  className="flex-1 px-4 py-2 bg-amber-500 hover:bg-amber-600 rounded-xl text-white text-sm font-medium"
+                >
+                  Activar
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Calorie and Macro Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">

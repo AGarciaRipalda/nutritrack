@@ -1,8 +1,13 @@
 "use client"
 
 import { DietDayProvider } from "@/context/DietDayContext"
+import { CheatDayProvider } from "@/context/CheatDayContext"
 import type { ReactNode } from "react"
 
 export function Providers({ children }: { children: ReactNode }) {
-  return <DietDayProvider>{children}</DietDayProvider>
+  return (
+    <CheatDayProvider>
+      <DietDayProvider>{children}</DietDayProvider>
+    </CheatDayProvider>
+  )
 }

@@ -13,11 +13,12 @@ import {
 import { Badge } from "@/components/ui/badge"
 import {
   ShoppingCart, CalendarDays, Coffee, Sun, Utensils,
-  Cookie, Moon, FileDown, Lightbulb, RefreshCw, X,
+  Cookie, Moon, FileDown, Lightbulb, RefreshCw, X, Star,
 } from "lucide-react"
 import type { WeeklyPlanResponse, PlanDay, WeeklyHistorySummary } from "@/lib/api"
 import { fetchWeeklyPlan, regenerateWeeklyPlan } from "@/lib/api"
 import { loadDayFromStorage } from "@/context/DietDayContext"
+import { useCheatDay } from "@/context/CheatDayContext"
 
 const todayISO = new Date().toISOString().slice(0, 10)
 
@@ -442,6 +443,7 @@ function PrintShoppingList({ shoppingList }: { shoppingList: { category: string;
 
 // ── Page ────────────────────────────────────────────────────────────────────
 export default function WeeklyPlanPage() {
+  const { isCheatDay } = useCheatDay()
   const [data, setData] = useState<WeeklyPlanResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [stale, setStale] = useState(false)
@@ -576,17 +578,18 @@ export default function WeeklyPlanPage() {
           <Card className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-6">
             <Accordion type="single" collapsible className="space-y-2">
               {weeklyPlan.days.map((dayPlan) => {
-                const isToday     = dayPlan.date === todayISO
-                const displayKcal = dayPlan.exerciseAdj?.adjustedTotal ?? dayPlan.totalKcal
-                const dayLog      = loadDayFromStorage(dayPlan.date)
-                const nonCompliant = dayLog?.nonCompliant === true
-                const isPast      = dayPlan.date < todayISO
+                const isToday      = dayPlan.date === todayISO
+                const displayKcal  = dayPlan.exerciseAdj?.adjustedTotal ?? dayPlan.totalKcal
+                const dayLog       = loadDayFromStorage(dayPlan.date)
+                const cheatDay     = isCheatDay(dayPlan.date)
+                const nonCompliant = dayLog?.nonCompliant === true && !cheatDay
                 return (
                   <AccordionItem
                     key={dayPlan.date}
                     value={dayPlan.date}
                     className={`bg-white/5 rounded-xl border px-4 data-[state=open]:bg-white/10 ${
                       isToday       ? "border-emerald-400/50"
+                      : cheatDay    ? "border-amber-400/30"
                       : nonCompliant ? "border-red-400/30"
                       : "border-white/10"
                     }`}
@@ -598,6 +601,12 @@ export default function WeeklyPlanPage() {
                           {isToday && (
                             <span className="bg-emerald-500 text-white text-xs px-2 py-0.5 rounded-full font-medium">
                               HOY
+                            </span>
+                          )}
+                          {cheatDay && (
+                            <span className="bg-amber-500/20 text-amber-300 border border-amber-400/30 text-xs px-2 py-0.5 rounded-full flex items-center gap-1">
+                              <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
+                              Comodín
                             </span>
                           )}
                           {nonCompliant && (
