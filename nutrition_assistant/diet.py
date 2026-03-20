@@ -843,8 +843,8 @@ def generate_week_plan(
 
         # Exercise bonus: avg weekly exercise / 7 days
         daily_exercise_avg = total_exercise / 7
-        # Low adherence penalty: reduce by up to 100 kcal
-        adherence_factor   = 1.0 if avg_adherence >= 0.8 else (avg_adherence / 0.8)
+        # Low adherence penalty: reduce by up to 100 kcal (proportional to how far below 0.8)
+        adherence_penalty = 0 if avg_adherence >= 0.8 else round(100 * (1 - avg_adherence / 0.8))
         # Weight progress signal: if losing faster than expected (-0.5kg/wk) add calories
         weight_adj = 0
         if weight_delta is not None:
@@ -853,9 +853,7 @@ def generate_week_plan(
             elif weight_delta > 0.1:
                 weight_adj = -100   # gaining unintentionally → reduce calories
 
-        adjusted_target = round(
-            (daily_target + daily_exercise_avg + weight_adj) * adherence_factor
-        )
+        adjusted_target = round(daily_target + daily_exercise_avg + weight_adj - adherence_penalty)
         adjusted_target = max(adjusted_target, 1200)  # hard floor
 
     # ── 3. Generate each day ──────────────────────────────────────────────
