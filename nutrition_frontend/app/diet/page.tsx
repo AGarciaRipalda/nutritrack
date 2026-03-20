@@ -115,7 +115,7 @@ export default function DietPage() {
 
   const adherenceItems = (data?.meals ?? []).map((m) => ({
     id: m.id,
-    label: m.name,
+    label: mealLabels[m.type] ?? m.name,
     checked: checkedMeals[m.id] ?? false,
   }))
 
@@ -206,9 +206,8 @@ export default function DietPage() {
                     <div className="space-y-2">
                       <div>
                         <p className="text-white/60 text-sm">{mealLabels[meal.type]}</p>
-                        <h3 className="text-xl font-semibold text-white">{meal.name}</h3>
+                        <h3 className="text-xl font-semibold text-white">{meal.description}</h3>
                       </div>
-                      <p className="text-white/80">{meal.description}</p>
                       {meal.note && (
                         <div className="flex items-center gap-2 text-amber-400 text-sm">
                           <Lightbulb className="h-4 w-4" />
