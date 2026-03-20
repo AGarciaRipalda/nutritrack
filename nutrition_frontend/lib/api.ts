@@ -7,14 +7,19 @@ const API_BASE =
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 // Bypass ngrok browser-warning interstitial (no-op for non-ngrok URLs)
-const COMMON_HEADERS: Record<string, string> = {
-  "ngrok-skip-browser-warning": "true",
+// Also injects X-User-Timezone so the backend can resolve "today" correctly.
+function getHeaders(extra?: Record<string, string>): Record<string, string> {
+  return {
+    "ngrok-skip-browser-warning": "true",
+    "X-User-Timezone": Intl.DateTimeFormat().resolvedOptions().timeZone,
+    ...extra,
+  }
 }
 
 async function get<T>(path: string): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     cache: "no-store",
-    headers: COMMON_HEADERS,
+    headers: getHeaders(),
   })
   if (!res.ok) throw new Error(`GET ${path} failed: ${res.status}`)
   return res.json()
@@ -24,8 +29,8 @@ async function post<T>(path: string, body?: unknown): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     method: "POST",
     headers: body
-      ? { ...COMMON_HEADERS, "Content-Type": "application/json" }
-      : COMMON_HEADERS,
+      ? getHeaders({ "Content-Type": "application/json" })
+      : getHeaders(),
     body: body ? JSON.stringify(body) : undefined,
   })
   if (!res.ok) throw new Error(`POST ${path} failed: ${res.status}`)
@@ -35,7 +40,7 @@ async function post<T>(path: string, body?: unknown): Promise<T> {
 async function put<T>(path: string, body: unknown): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     method: "PUT",
-    headers: { ...COMMON_HEADERS, "Content-Type": "application/json" },
+    headers: getHeaders({ "Content-Type": "application/json" }),
     body: JSON.stringify(body),
   })
   if (!res.ok) throw new Error(`PUT ${path} failed: ${res.status}`)
@@ -43,7 +48,7 @@ async function put<T>(path: string, body: unknown): Promise<T> {
 }
 
 async function del(path: string): Promise<void> {
-  await fetch(`${API_BASE}${path}`, { method: "DELETE", headers: COMMON_HEADERS })
+  await fetch(`${API_BASE}${path}`, { method: "DELETE", headers: getHeaders() })
 }
 
 // ── Tipos públicos (usados por los componentes de v0) ─────────────────────────
@@ -70,41 +75,46 @@ export interface DashboardData {
 }
 
 export interface Meal {
-  id: string
-  type: string
-  name: string
-  kcal: number
-  description: string
-  tip: string
-  timingNote?: string
+  id: string            // "desayuno", "almuerzo", etc.
+  type: string          // "breakfast", "lunch", etc.
+  name: string          // dish name
+  kcal: number          // base calories
+  description: string   // dish description
+  note?: string         // nutritional note (replaces "tip")
+  timingNote?: string   // "Best before 10am", etc.
+  adjustedKcal?: number // kcal adjusted for exercise (if applicable)
+  portionScale?: number // portion scale factor, e.g. 1.15
 }
 
-export interface TodaysDiet {
+export interface PlanDay {
+  date: string          // "2026-03-17" — real date, not just "Monday"
+  dayName: string       // "Lunes"
   meals: Meal[]
-  totalKcal: number
-  targetKcal: number
-  eventMsg?: string
-  adherenceChecklist: { id: string; label: string; checked: boolean }[]
+  totalKcal: number     // base sum
+  exerciseAdj?: {
+    extraKcal: number
+    source: string      // "Running 45min"
+    adjustedTotal: number
+  }
+  // NOTE: `stale` is NOT a field on PlanDay. It is a response-root flag only.
+  // It lives on WeeklyPlanResponse.stale and on the fetchTodaysPlan() return type
+  // as PlanDay & { stale: boolean }. Do NOT add it here.
 }
 
-export interface WeeklyMeal {
-  text: string
-  kcal: number
-  note: string
+export interface WeeklyHistorySummary {
+  week_start: string            // "2026-03-10"
+  avg_adherence: number         // 0.0–1.0
+  total_exercise_kcal: number
+  weight_start: number | null
+  weight_end: number | null
+  weight_delta: number | null
+  days_logged: number
 }
 
-export interface WeeklyPlan {
-  days: {
-    day: string
-    meals: {
-      breakfast: WeeklyMeal
-      midMorning: WeeklyMeal
-      lunch: WeeklyMeal
-      snack: WeeklyMeal
-      dinner: WeeklyMeal
-    }
-  }[]
-  shoppingList: { category: string; items: string[] }[]
+export interface WeeklyPlanResponse {
+  days: PlanDay[]
+  summary: WeeklyHistorySummary | null
+  stale: boolean
 }
 
 export interface ExerciseLog {
@@ -198,6 +208,13 @@ export interface SettingsData {
   events: UpcomingEvent[]   // array para compatibilidad con el componente v0
 }
 
+// ── Deprecated aliases (kept so existing imports in other pages don't break) ──
+
+/** @deprecated Use PlanDay instead */
+export type TodaysDiet = PlanDay & { adherenceChecklist: { id: string; label: string; checked: boolean }[] }
+/** @deprecated Use WeeklyPlanResponse instead */
+export type WeeklyPlan = WeeklyPlanResponse & { shoppingList: { category: string; items: string[] }[] }
+
 // ── Transformadores (backend → frontend) ──────────────────────────────────────
 
 const MEAL_MAP: Record<string, { type: string; label: string }> = {
@@ -236,6 +253,40 @@ function trendLine(points: WeightEntry[]): WeightEntry[] {
   }))
 }
 
+// NOTE: The new backend returns `type` and `name` directly on each meal object
+// (per the unified spec model). MEAL_MAP lookup is therefore NOT used here —
+// using it would silently overwrite correct backend values with stale frontend data.
+// MEAL_MAP can be removed entirely once the backend migration is complete.
+function transformPlanDay(d: any): PlanDay & { stale: boolean } {
+  const meals: Meal[] = (d.meals ?? []).map((m: any) => {
+    return {
+      id:           m.id,
+      type:         m.type,      // backend returns this directly
+      name:         m.name,      // backend returns this directly
+      kcal:         m.kcal ?? 0,
+      description:  m.text ?? m.description ?? "",
+      note:         m.note ?? undefined,
+      timingNote:   m.timing_note ?? undefined,
+      adjustedKcal: m.adjusted_kcal ?? undefined,
+      portionScale: m.portion_scale ?? undefined,
+    }
+  })
+  return {
+    date:        d.date,
+    dayName:     d.day_name,
+    meals,
+    totalKcal:   d.total_kcal ?? meals.reduce((s, m) => s + m.kcal, 0),
+    exerciseAdj: d.exercise_adj
+      ? {
+          extraKcal:     d.exercise_adj.extra_kcal,
+          source:        d.exercise_adj.source,
+          adjustedTotal: d.exercise_adj.adjusted_total,
+        }
+      : undefined,
+    stale: d.stale ?? false,
+  }
+}
+
 // ── API Functions ─────────────────────────────────────────────────────────────
 
 export async function fetchDashboard(): Promise<DashboardData> {
@@ -266,111 +317,49 @@ export async function fetchDashboard(): Promise<DashboardData> {
   }
 }
 
-export async function fetchTodaysDiet(): Promise<TodaysDiet> {
+export async function fetchTodaysPlan(): Promise<PlanDay & { stale: boolean }> {
   const d = await get<any>("/diet/today")
-  // Las comidas pueden estar en d.meals (nuevo formato) o en el top-level (legado)
-  const mealsSource = d.meals ?? d
-  const meals: Meal[] = MEAL_ORDER
-    .filter(key => mealsSource[key])
-    .map(key => {
-      const m    = mealsSource[key]
-      const meta = MEAL_MAP[key] ?? { type: key, label: key }
-      return {
-        id:          key,
-        type:        meta.type,
-        name:        meta.label,
-        kcal:        m.kcal ?? 0,
-        description: m.text ?? "",
-        tip:         m.note ?? "",
-        timingNote:  m.timing_note ?? "",
-      }
-    })
-
-  const totalKcal = meals.reduce((s, m) => s + m.kcal, 0)
-
-  return {
-    meals,
-    totalKcal,
-    targetKcal:  d.daily_target ?? 0,
-    eventMsg:    d.event_msg ?? "",
-    adherenceChecklist: meals.map(m => ({
-      id:      m.id,
-      label:   m.name,
-      checked: false,
-    })),
-  }
+  return transformPlanDay(d)
 }
 
-export async function swapMeal(mealId: string): Promise<TodaysDiet> {
-  const d = await post<any>(`/diet/today/${mealId}/swap`)
-  return transformDayToTodaysDiet(d)
+export async function swapMeal(mealId: string): Promise<PlanDay> {
+  const d = await post<any>(`/diet/today/swap`, { meal_id: mealId })
+  return transformPlanDay(d)
 }
 
-export async function regenerateDay(): Promise<TodaysDiet> {
+export async function regenerateDay(): Promise<PlanDay & { stale: boolean }> {
   const d = await post<any>("/diet/today/regenerate")
-  return transformDayToTodaysDiet(d)
-}
-
-function transformDayToTodaysDiet(d: any): TodaysDiet {
-  const mealsSource = d.meals ?? d
-  const meals: Meal[] = MEAL_ORDER
-    .filter(key => mealsSource[key])
-    .map(key => {
-      const m    = mealsSource[key]
-      const meta = MEAL_MAP[key] ?? { type: key, label: key }
-      return {
-        id: key, type: meta.type, name: meta.label,
-        kcal: m.kcal ?? 0, description: m.text ?? "",
-        tip: m.note ?? "", timingNote: m.timing_note ?? "",
-      }
-    })
-  return {
-    meals,
-    totalKcal:   meals.reduce((s, m) => s + m.kcal, 0),
-    targetKcal:  d.daily_target ?? 0,
-    eventMsg:    d.event_msg ?? "",
-    adherenceChecklist: meals.map(m => ({ id: m.id, label: m.name, checked: false })),
-  }
+  return transformPlanDay(d)
 }
 
 export async function updateAdherence(meals: Record<string, boolean>): Promise<void> {
   await post("/adherence", { meals })
 }
 
-export async function fetchWeeklyPlan(): Promise<WeeklyPlan> {
-  const [planRaw, shoppingRaw] = await Promise.all([
-    get<any>("/diet/weekly"),
-    get<any>("/diet/shopping-list"),
-  ])
-
-  const toWeeklyMeal = (v: any): WeeklyMeal => {
-    if (!v) return { text: "—", kcal: 0, note: "" }
-    if (typeof v === "string") return { text: v, kcal: 0, note: "" }
-    return { text: v.text ?? "—", kcal: v.kcal ?? 0, note: v.note ?? "" }
+export async function fetchWeeklyPlan(): Promise<WeeklyPlanResponse> {
+  const d = await get<any>("/diet/weekly")
+  const days: PlanDay[] = (d.days ?? []).map(transformPlanDay)
+  return {
+    days,
+    summary: d.summary ?? null,
+    stale:   d.stale ?? false,
   }
+}
 
-  const days = Object.entries(planRaw).map(([key, val]: [string, any]) => ({
-    day: DAYS_ES[key] ?? key,
-    meals: {
-      breakfast:  toWeeklyMeal(val.desayuno),
-      midMorning: toWeeklyMeal(val.media_manana),
-      lunch:      toWeeklyMeal(val.almuerzo),
-      snack:      toWeeklyMeal(val.merienda),
-      dinner:     toWeeklyMeal(val.cena),
-    },
-  }))
-
-  const shoppingList = Object.entries(shoppingRaw).map(([cat, items]: [string, any]) => ({
+export async function fetchShoppingList(): Promise<{ category: string; items: string[] }[]> {
+  const shoppingRaw = await get<any>("/diet/shopping-list")
+  return Object.entries(shoppingRaw).map(([cat, items]: [string, any]) => ({
     category: CATEGORY_LABELS[cat] ?? cat,
     items:    items as string[],
   }))
-
-  return { days, shoppingList }
 }
 
-export async function regenerateWeeklyPlan(): Promise<WeeklyPlan> {
-  await post("/diet/weekly/regenerate")
-  return fetchWeeklyPlan()
+export async function regenerateWeeklyPlan(
+  applyFrom: "today" | "tomorrow" = "tomorrow"
+): Promise<WeeklyPlanResponse> {
+  const d = await post<any>("/diet/weekly/regenerate", { apply_from: applyFrom })
+  const days: PlanDay[] = (d.days ?? []).map(transformPlanDay)
+  return { days, summary: null, stale: false }
 }
 
 export async function fetchTraining(): Promise<TrainingData> {
