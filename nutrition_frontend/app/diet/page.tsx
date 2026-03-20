@@ -83,6 +83,14 @@ const mealLabels: Record<string, string> = {
   dinner: "Cena",
 }
 
+const mealIdLabels: Record<string, string> = {
+  desayuno:     "Desayuno",
+  media_manana: "Media mañana",
+  almuerzo:     "Almuerzo",
+  merienda:     "Merienda",
+  cena:         "Cena",
+}
+
 export default function DietPage() {
   const [data, setData] = useState<(PlanDay & { stale?: boolean }) | null>(null)
   const [stale, setStale] = useState(false)
@@ -190,54 +198,54 @@ export default function DietPage() {
         </Card>
 
         {/* Meal Cards */}
-        <div className="grid grid-cols-1 gap-4">
+        <div className="grid grid-cols-1 gap-3">
           {planDay.meals.map((meal) => {
             const MealIcon = mealIcons[meal.type] || Utensils
+            const label = mealLabels[meal.type] ?? mealIdLabels[meal.id]
             return (
               <Card
                 key={meal.id}
-                className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-6 transition-all duration-300 hover:bg-white/15"
+                className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-2xl p-4 transition-all duration-300 hover:bg-white/15"
               >
-                <div className="flex items-start justify-between">
-                  <div className="flex gap-4">
-                    <div className="p-3 bg-emerald-500/20 rounded-xl border border-emerald-400/30">
-                      <MealIcon className="h-6 w-6 text-emerald-400" />
-                    </div>
-                    <div className="space-y-2">
-                      <div>
-                        <p className="text-white/60 text-sm">{mealLabels[meal.type]}</p>
-                        <h3 className="text-xl font-semibold text-white">{meal.description}</h3>
-                      </div>
-                      {meal.note && (
-                        <div className="flex items-center gap-2 text-amber-400 text-sm">
-                          <Lightbulb className="h-4 w-4" />
-                          <span>{meal.note}</span>
-                        </div>
-                      )}
-                    </div>
+                {/* Header: icon + label + kcal */}
+                <div className="flex items-center gap-2 border-b border-white/10 pb-3 mb-3">
+                  <div className="p-2 bg-emerald-500/20 rounded-lg border border-emerald-400/30 shrink-0">
+                    <MealIcon className="h-4 w-4 text-emerald-400" />
                   </div>
-                  <div className="flex items-center gap-4">
-                    <div className="text-right">
-                      <p className="text-2xl font-bold text-white">
-                        {meal.adjustedKcal ?? meal.kcal}
-                      </p>
-                      {meal.portionScale && meal.portionScale > 1 && (
-                        <p className="text-yellow-300 text-xs">×{meal.portionScale.toFixed(2)}</p>
-                      )}
-                      <p className="text-white/60 text-sm">kcal</p>
-                    </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleSwap(meal.id)}
-                      disabled={swapping === meal.id}
-                      className="bg-white/5 border-white/20 text-white hover:bg-white/10 hover:border-white/30"
-                    >
-                      <Shuffle className={`mr-2 h-4 w-4 ${swapping === meal.id ? "animate-spin" : ""}`} />
-                      Cambiar plato
-                    </Button>
+                  <span className="text-white/60 text-sm font-medium flex-1">{label}</span>
+                  <div className="text-right shrink-0">
+                    <span className="text-white font-bold text-lg leading-none">
+                      {meal.adjustedKcal ?? meal.kcal}
+                    </span>
+                    <span className="text-white/60 text-sm ml-1">kcal</span>
+                    {meal.portionScale && meal.portionScale > 1 && (
+                      <p className="text-yellow-300 text-xs mt-0.5">×{meal.portionScale.toFixed(2)}</p>
+                    )}
                   </div>
                 </div>
+
+                {/* Dish description */}
+                <p className="text-white text-sm leading-snug mb-3">{meal.description}</p>
+
+                {/* Tip */}
+                {meal.note && (
+                  <div className="flex items-start gap-2 text-amber-400 text-sm mb-3">
+                    <Lightbulb className="h-4 w-4 shrink-0 mt-0.5" />
+                    <span className="leading-snug">{meal.note}</span>
+                  </div>
+                )}
+
+                {/* Swap button — full width on mobile */}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleSwap(meal.id)}
+                  disabled={swapping === meal.id}
+                  className="w-full bg-white/5 border-white/20 text-white hover:bg-white/10 hover:border-white/30"
+                >
+                  <Shuffle className={`mr-2 h-4 w-4 ${swapping === meal.id ? "animate-spin" : ""}`} />
+                  Cambiar plato
+                </Button>
               </Card>
             )
           })}
