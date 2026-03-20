@@ -62,7 +62,9 @@ grep -n "PlanDay\|WeeklyPlanResponse" nutrition_frontend/lib/api.ts
       source: string      // "Running 45min"
       adjustedTotal: number
     }
-    stale?: boolean       // present at top level in GET responses
+    // NOTE: `stale` is NOT a field on PlanDay. It is a response-root flag only.
+    // It lives on WeeklyPlanResponse.stale and on the fetchTodaysPlan() return type
+    // as PlanDay & { stale: boolean }. Do NOT add it here.
   }
   ```
 
@@ -116,13 +118,16 @@ grep -n "PlanDay\|WeeklyPlanResponse" nutrition_frontend/lib/api.ts
   Add `transformPlanDay` helper that maps backend snake_case to the `PlanDay` shape:
 
   ```typescript
+  // NOTE: The new backend returns `type` and `name` directly on each meal object
+  // (per the unified spec model). MEAL_MAP lookup is therefore NOT used here —
+  // using it would silently overwrite correct backend values with stale frontend data.
+  // MEAL_MAP can be removed entirely once the backend migration is complete.
   function transformPlanDay(d: any): PlanDay & { stale: boolean } {
     const meals: Meal[] = (d.meals ?? []).map((m: any) => {
-      const meta = MEAL_MAP[m.id] ?? { type: m.id, label: m.id }
       return {
         id:           m.id,
-        type:         meta.type,
-        name:         meta.label,
+        type:         m.type,      // backend returns this directly
+        name:         m.name,      // backend returns this directly
         kcal:         m.kcal ?? 0,
         description:  m.text ?? m.description ?? "",
         note:         m.note ?? undefined,
@@ -302,7 +307,9 @@ cd nutrition_assistant && python -m pytest tests/test_storage.py -v
   result["weekly_history"]  = session.get("weekly_history", [])
   ```
 
-- [ ] **2.2** Add `exercise_adj` and `weekly_history` parameters to `save_session()`:
+- [ ] **2.2** Add `exercise_adj` and `weekly_history` parameters to `save_session()`.
+
+  Replace the entire existing `save_session` function (copy-paste ready):
 
   ```python
   def save_session(exercise_data=_MISSING,
@@ -311,18 +318,34 @@ cd nutrition_assistant && python -m pytest tests/test_storage.py -v
                    today_training=_MISSING,
                    exercise_adj=_MISSING,
                    weekly_history=_MISSING) -> None:
-  ```
+      """
+      Persiste el estado de la sesión actual.
+      Solo actualiza los campos que se pasen explícitamente.
+      Pasar None limpia el campo (lo elimina de la sesión).
+      """
+      session = {}
+      if os.path.exists(SESSION_FILE):
+          with open(SESSION_FILE, "r", encoding="utf-8") as f:
+              session = json.load(f)
 
-  Add them to the loop:
-  ```python
-  for key, value in [
-      ("exercise_data",  exercise_data),
-      ("adaptive_day",   adaptive_day),
-      ("today_training", today_training),
-      ("week_plan",      week_plan),
-      ("exercise_adj",   exercise_adj),   # NEW
-      ("weekly_history", weekly_history), # NEW
-  ]:
+      session["saved_date"] = _today()
+      session["saved_week"] = _this_week()
+
+      for key, value in [("exercise_data",  exercise_data),
+                         ("adaptive_day",   adaptive_day),
+                         ("today_training", today_training),
+                         ("week_plan",      week_plan),
+                         ("exercise_adj",   exercise_adj),    # NEW
+                         ("weekly_history", weekly_history)]: # NEW
+          if value is _MISSING:
+              continue
+          if value is None:
+              session.pop(key, None)   # limpiar el campo
+          else:
+              session[key] = value
+
+      with open(SESSION_FILE, "w", encoding="utf-8") as f:
+          json.dump(session, f, indent=2, ensure_ascii=False)
   ```
 
 - [ ] **2.3** Add `save_exercise_adj(date_iso: str, extra_kcal: int, source: str)`:
@@ -482,15 +505,24 @@ cd nutrition_assistant && python -m pytest tests/test_diet.py -v
 
 - [ ] **3.4** Rewrite `generate_week_plan()` — new signature and return shape:
 
+  > **Note on timezone:** The caller (API endpoint) resolves the user timezone from the
+  > `X-User-Timezone` header and passes the resolved `reference_date` as a `date` object.
+  > `generate_week_plan()` itself does **not** read headers or call `date.today()` —
+  > it only computes Monday from whatever `reference_date` it receives.
+  > When `reference_date` is `None`, the API layer should pass `date.today()` as the fallback.
+
   ```python
   def generate_week_plan(
       excluded: list,
       favorites: list,
       daily_target: int = 1800,
       history: list | None = None,
+      reference_date: date | None = None,
   ) -> dict:
       """
       Generates a full weekly plan keyed by ISO date.
+      reference_date: the "today" date in the user's timezone, resolved by the caller.
+                      If None, falls back to date.today() (UTC).
       Returns:
         {
           "days": [PlanDay, ...],          # 7 items, Mon–Sun
@@ -500,7 +532,8 @@ cd nutrition_assistant && python -m pytest tests/test_diet.py -v
         }
       """
       # ── 1. Determine Monday of current week ──────────────────────────────
-      today = date.today()
+      # Use caller-provided reference_date (timezone-aware); fall back to UTC today.
+      today = reference_date if reference_date is not None else date.today()
       monday = today - timedelta(days=today.weekday())
 
       # ── 2. Adjust target based on history ────────────────────────────────
@@ -805,6 +838,31 @@ def test_swap_meal_returns_plan_day():
     body = r.json()
     assert "meals" in body
     assert "date" in body
+
+def test_exercise_logged_but_no_plan_auto_generates_and_applies_adj(tmp_path):
+    """Edge case: exercise_adj exists in session but no week_plan.
+    GET /diet/today must auto-generate the plan first, then apply the adjustment."""
+    import storage, json
+    from datetime import date
+    today = date.today().isoformat()
+    session = {
+        "saved_date": today,
+        "saved_week": __import__("storage")._this_week(),
+        # No week_plan key at all
+        "exercise_adj": {
+            today: {"extra_kcal": 400, "source": "running 30min"}
+        },
+    }
+    session_file = str(tmp_path / "session.json")
+    with open(session_file, "w") as f:
+        json.dump(session, f)
+    with patch.object(storage, "SESSION_FILE", session_file):
+        r = client.get("/diet/today", headers={"X-User-Timezone": "UTC"})
+    assert r.status_code == 200
+    body = r.json()
+    assert "exerciseAdj" in body, "exerciseAdj must be present when exercise_adj[today] is set"
+    assert body["exerciseAdj"]["extraKcal"] == 400
+    assert body["exerciseAdj"]["source"] == "running 30min"
 ```
 
 Run (expected: failures — endpoints return old shapes):
@@ -815,10 +873,16 @@ cd nutrition_assistant && python -m pytest tests/test_api.py -v
 
 ### Steps
 
-- [ ] **5.1** Add timezone parsing helper at top of `api.py` (after imports):
+- [ ] **5.1** Update the FastAPI import line and add timezone helper at top of `api.py`.
 
+  Find-and-replace (to avoid duplicate imports):
+  ```
+  FIND:    from fastapi import FastAPI, HTTPException
+  REPLACE: from fastapi import FastAPI, HTTPException, Request, Header
+  ```
+
+  Then add after the imports block:
   ```python
-  from fastapi import FastAPI, HTTPException, Request, Header
   from typing import Optional
   import zoneinfo
 
@@ -855,11 +919,13 @@ cd nutrition_assistant && python -m pytest tests/test_api.py -v
   ```python
   from diet import (
       generate_week_plan, get_day_from_plan,
-      regenerate_meal, DAYS, MEAL_LABELS,
+      regenerate_meal,
   )
   ```
 
-  Remove `generate_adaptive_day` from the import (it will still exist in diet.py as legacy, but we stop using it in new endpoints).
+  Remove `generate_adaptive_day`, `DAYS`, and `MEAL_LABELS` from the import.
+  `DAYS` and `MEAL_LABELS` were only used by `generate_adaptive_day` (which is being removed);
+  importing them in the new code would be unused and misleading.
 
 - [ ] **5.3** Add new Pydantic models for the updated endpoints:
 
@@ -1057,10 +1123,12 @@ cd nutrition_assistant && python -m pytest tests/test_api.py -v
               else:
                   merged_days.append(d)
 
-          # Discard future exercise_adj if apply_from == "today"
+          # Discard FUTURE exercise_adj if apply_from == "today".
+          # Use `k <= today` (not `k < today`) so that today's adjustment is preserved
+          # per the spec: "exercise_adj[today] is preserved when apply_from == 'today'".
           exercise_adj = session.get("exercise_adj", {})
           if apply_from == "today":
-              exercise_adj = {k: v for k, v in exercise_adj.items() if k < today}
+              exercise_adj = {k: v for k, v in exercise_adj.items() if k <= today}
               save_session(exercise_adj=exercise_adj)
 
           new_plan["days"] = merged_days
@@ -1162,7 +1230,38 @@ After implementing:
         description: "Yogur griego con frutos rojos, miel y copos de avena",
         note: "Añade semillas de chía para más fibra y omega-3",
       },
-      // ... keep remaining 4 meals, rename `tip` → `note`
+      {
+        id: "media_manana",
+        type: "mid-morning",
+        name: "Media mañana",
+        kcal: 220,
+        description: "Manzana en rodajas con 2 cucharadas de crema de almendras",
+        note: "Elige manzanas de temporada",
+      },
+      {
+        id: "almuerzo",
+        type: "lunch",
+        name: "Almuerzo",
+        kcal: 520,
+        description: "Pechuga de pollo a la plancha con ensalada mixta, aguacate y tomate cherry",
+        note: "Aliña con aceite de oliva virgen extra",
+      },
+      {
+        id: "merienda",
+        type: "snack",
+        name: "Merienda",
+        kcal: 280,
+        description: "Batido de proteínas con plátano, espinacas y leche de almendras",
+        note: "Añade hielo para una textura más espesa",
+      },
+      {
+        id: "cena",
+        type: "dinner",
+        name: "Cena",
+        kcal: 650,
+        description: "Filete de salmón al horno con quinoa y verduras asadas",
+        note: "Sazona el salmón con limón y eneldo",
+      },
     ],
     totalKcal: 2050,
   }
@@ -1338,6 +1437,7 @@ After implementing:
 6. Modal shows error message if fetch fails (plan remains intact).
 7. Stale banner appears when API returns `stale: true`.
 8. Adaptive summary card appears when `summary` is not null.
+9. **Network failure during regeneration:** disconnect the network (or stop the backend), click "Regenerar" and confirm. Verify that (a) an error message appears in the modal and (b) the existing plan data is **still displayed** — the accordion days must not be wiped or replaced with empty/loading state.
 
 ### Steps
 
@@ -1383,8 +1483,76 @@ After implementing:
   const todayISO = new Date().toISOString().slice(0, 10)
   const mockWeeklyPlanResponse: WeeklyPlanResponse = {
     days: [
-      // ... 7 PlanDay objects with date/dayName/meals/totalKcal
-      // Use static dates for the mock (Mon–Sun of some past week)
+      {
+        date: "2026-03-16", dayName: "Lunes", totalKcal: 1725,
+        meals: [
+          { id: "desayuno",     type: "breakfast",  name: "Desayuno",     kcal: 386, description: "80g de pan thins con 40g de jamón serrano y tomate + café", note: "4 rebanadas de pan thins. Tomate natural en rodajas." },
+          { id: "media_manana", type: "mid-morning", name: "Media mañana", kcal: 175, description: "Yogurt proteínas (200g) + 13g de frutos secos", note: "Frutos secos de la bolsa de Aldi." },
+          { id: "almuerzo",     type: "lunch",       name: "Almuerzo",     kcal: 645, description: "105g de espaguetis con 120g de carne picada de ternera, tomate frito sin azúcar y orégano", note: "Sofríe la carne con ajo y añade tomate al final." },
+          { id: "merienda",     type: "snack",       name: "Merienda",     kcal: 175, description: "2 tortitas de arroz con 50g de pavo y guacamole", note: "Crema de cacahuete opcional." },
+          { id: "cena",         type: "dinner",      name: "Cena",         kcal: 344, description: "2 huevos a la plancha con medio calabacín y tomate frito sin azúcar", note: "Espolvorea orégano sobre los huevos." },
+        ],
+      },
+      {
+        date: "2026-03-17", dayName: "Martes", totalKcal: 1620,
+        meals: [
+          { id: "desayuno",     type: "breakfast",  name: "Desayuno",     kcal: 325, description: "60g de cereales crunchy Mercadona con leche semidesnatada", note: "Corn flakes, espelta o crunchy Mercadona." },
+          { id: "media_manana", type: "mid-morning", name: "Media mañana", kcal: 175, description: "1 fruta de temporada + 3-4 nueces", note: "Manzana, pera o naranja." },
+          { id: "almuerzo",     type: "lunch",       name: "Almuerzo",     kcal: 570, description: "107g de arroz basmati con 140g de pechuga de pollo y brócoli al vapor", note: "Aliña el brócoli con limón y ajo." },
+          { id: "merienda",     type: "snack",       name: "Merienda",     kcal: 175, description: "Medio kefir con sandía + 13g de frutos secos", note: "Puedes cambiar kefir por yogurt proteínas." },
+          { id: "cena",         type: "dinner",      name: "Cena",         kcal: 375, description: "170g de merluza al horno con verduras al gusto", note: "Con limón, perejil y un hilo de aceite." },
+        ],
+      },
+      {
+        date: "2026-03-18", dayName: "Miércoles", totalKcal: 1532,
+        meals: [
+          { id: "desayuno",     type: "breakfast",  name: "Desayuno",     kcal: 362, description: "80g de pan centeno con 30g de jamón serrano y tomate + café", note: "Pan recomendado: Thins, Rustik, centeno." },
+          { id: "media_manana", type: "mid-morning", name: "Media mañana", kcal: 175, description: "Batido de proteínas con agua o leche vegetal", note: "Aporta ~25g de proteína." },
+          { id: "almuerzo",     type: "lunch",       name: "Almuerzo",     kcal: 460, description: "200g de ñoquis con 180g de gambas, cebollino y salsa de soja", note: "Salta los ñoquis hasta que doren." },
+          { id: "merienda",     type: "snack",       name: "Merienda",     kcal: 175, description: "Bowl: 40g de harina de avena + 1 huevo + leche + oncita de chocolate (45s micro)", note: "45 segundos al microondas." },
+          { id: "cena",         type: "dinner",      name: "Cena",         kcal: 360, description: "Ensalada de canónigos con 2 latas de atún, queso fresco y tomate", note: "Aliñar con aceite de oliva y vinagre." },
+        ],
+      },
+      {
+        date: "2026-03-19", dayName: "Jueves", totalKcal: 1697,
+        meals: [
+          { id: "desayuno",     type: "breakfast",  name: "Desayuno",     kcal: 410, description: "Tortita de avena: 30g de avena + 2 huevos + leche + 1 cdta cacahuete + onza chocolate negro", note: "Sartén antiadherente sin aceite." },
+          { id: "media_manana", type: "mid-morning", name: "Media mañana", kcal: 175, description: "50g de caña de lomo de pavo + 13g de frutos secos", note: "Opción fácil de llevar al trabajo." },
+          { id: "almuerzo",     type: "lunch",       name: "Almuerzo",     kcal: 488, description: "Papas aliñás: 250g de patata cocida con 2 latas de atún, 1 huevo, cebolla y perejil", note: "Sirve templado. La patata aliñada gana sabor al reposar." },
+          { id: "merienda",     type: "snack",       name: "Merienda",     kcal: 175, description: "Yogurt proteínas con 1 cda crema de cacahuete en polvo + fresas", note: "Endulza con stevia si lo necesitas." },
+          { id: "cena",         type: "dinner",      name: "Cena",         kcal: 449, description: "Fajita de pan thins con 130g de pollo, cebolla, pimiento y salsa de yogurt", note: "Salsa yogurt: yogurt griego + ajo + limón." },
+        ],
+      },
+      {
+        date: "2026-03-20", dayName: "Viernes", totalKcal: 1806,
+        meals: [
+          { id: "desayuno",     type: "breakfast",  name: "Desayuno",     kcal: 366, description: "80g de pan thins con 1 lata de atún y 4 rodajas de tomate + café", note: "Aliña el atún con limón." },
+          { id: "media_manana", type: "mid-morning", name: "Media mañana", kcal: 175, description: "70g de pechuga de pavo/pollo + 13g de frutos secos", note: "Frutos secos de Aldi." },
+          { id: "almuerzo",     type: "lunch",       name: "Almuerzo",     kcal: 700, description: "160g de salmón a la plancha con 107g de arroz basmati y brócoli", note: "Sin aceite extra — el salmón ya tiene grasa." },
+          { id: "merienda",     type: "snack",       name: "Merienda",     kcal: 175, description: "1 lata de piña al natural + 4 nueces", note: "Piña sin almíbar." },
+          { id: "cena",         type: "dinner",      name: "Cena",         kcal: 390, description: "2 hamburguesas de ternera (180g) con calabacín a la plancha", note: "Sin pan. Calabacín con ajo y sal." },
+        ],
+      },
+      {
+        date: "2026-03-21", dayName: "Sábado", totalKcal: 1407,
+        meals: [
+          { id: "desayuno",     type: "breakfast",  name: "Desayuno",     kcal: 325, description: "60g de cereales crunchy con leche semidesnatada", note: "Cereales crunchy Mercadona." },
+          { id: "media_manana", type: "mid-morning", name: "Media mañana", kcal: 175, description: "Bizcocho en taza: 30g de avena + levadura + 1 huevo + 2 onzas chocolate (4 min micro)", note: "4 minutos al microondas." },
+          { id: "almuerzo",     type: "lunch",       name: "Almuerzo",     kcal: 432, description: "Lentejas: 200g de lentejas cocidas con verduras y 120g de pollo troceado", note: "Sofrito base: cebolla, pimiento, zanahoria." },
+          { id: "merienda",     type: "snack",       name: "Merienda",     kcal: 175, description: "2 tajas de sandía + 13g de frutos secos", note: "Los frutos secos son muy saciantes." },
+          { id: "cena",         type: "dinner",      name: "Cena",         kcal: 300, description: "140g de salmón a la plancha con espárragos verdes", note: "El salmón no necesita aceite extra." },
+        ],
+      },
+      {
+        date: "2026-03-22", dayName: "Domingo", totalKcal: 1720,
+        meals: [
+          { id: "desayuno",     type: "breakfast",  name: "Desayuno",     kcal: 410, description: "Tortita de avena: 30g de avena + 2 huevos + leche + 1 cdta cacahuete + onza chocolate negro", note: "Desayuno especial del domingo." },
+          { id: "media_manana", type: "mid-morning", name: "Media mañana", kcal: 175, description: "Yogurt proteínas (200g) + 13g de frutos secos", note: "" },
+          { id: "almuerzo",     type: "lunch",       name: "Almuerzo",     kcal: 590, description: "Pechuga de pollo (160g) en salsa de curry con 107g de arroz basmati", note: "Salsa curry: yogurt griego, curry, limón, cebolla." },
+          { id: "merienda",     type: "snack",       name: "Merienda",     kcal: 175, description: "Helado casero de yogurt proteínas con crema de cacahuete y chocolate negro", note: "Congela el yogurt 2-3 horas." },
+          { id: "cena",         type: "dinner",      name: "Cena",         kcal: 370, description: "Salmorejo cordobés con 1 huevo cocido, 1 lata de atún y picatostes", note: "Salmorejo casero: tomates, pan, ajo, aceite." },
+        ],
+      },
     ],
     summary: null,
     stale: false,
@@ -1612,23 +1780,161 @@ After implementing:
   }
   ```
 
-- [ ] **7.10** Update `PrintDayCard` component to accept `PlanDay` instead of old `WeeklyPlan["days"][0]`:
+- [ ] **7.10** Update `PrintDayCard` component to accept `PlanDay` instead of old `WeeklyPlan["days"][0]`.
+
+  Replace the entire `PrintDayCard` function with the following (uses `dayPlan.dayName`, maps
+  `dayPlan.meals` as an array with `.map()`, and reads `meal.description` instead of `meal.text`):
 
   ```typescript
   function PrintDayCard({ dayPlan }: { dayPlan: PlanDay }) {
     const totalKcal = dayPlan.exerciseAdj?.adjustedTotal ?? dayPlan.totalKcal
+
     return (
-      // ... same structure but:
-      // Replace dayPlan.day → dayPlan.dayName
-      // Replace Object.entries(dayPlan.meals) → dayPlan.meals.map(...)
-      // Replace meal.text → meal.description
+      <div
+        style={{
+          breakInside: "avoid",
+          marginBottom: "14pt",
+          border: "1px solid #d1d5db",
+          borderRadius: "8px",
+          overflow: "hidden",
+          fontFamily: "system-ui, -apple-system, sans-serif",
+        }}
+      >
+        {/* Day header */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            backgroundColor: "#064e3b",
+            color: "white",
+            padding: "6pt 10pt",
+          }}
+        >
+          <span style={{ fontWeight: 700, fontSize: "12pt", letterSpacing: "0.02em" }}>
+            {dayPlan.dayName}
+          </span>
+          {totalKcal > 0 && (
+            <span
+              style={{
+                fontSize: "9pt",
+                backgroundColor: "rgba(255,255,255,0.15)",
+                padding: "2pt 8pt",
+                borderRadius: "20pt",
+                fontWeight: 600,
+              }}
+            >
+              {totalKcal} kcal totales
+            </span>
+          )}
+        </div>
+
+        {/* Meals row */}
+        <div style={{ display: "flex" }}>
+          {dayPlan.meals.map((meal, idx) => {
+            const color = mealTypeColor[meal.type] ?? mealTypeColor["breakfast"]
+            return (
+              <div
+                key={meal.id}
+                style={{
+                  flex: 1,
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "4pt",
+                  padding: "7pt 7pt",
+                  borderRight: idx < dayPlan.meals.length - 1 ? "1px solid #e5e7eb" : "none",
+                  backgroundColor: "white",
+                }}
+              >
+                {/* Meal type badge */}
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    flexWrap: "wrap",
+                    gap: "3pt",
+                    paddingBottom: "5pt",
+                    borderBottom: "1px solid #f3f4f6",
+                    marginBottom: "2pt",
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: "4pt" }}>
+                    <span style={{ fontSize: "11pt" }}>{mealTypeEmoji[meal.type]}</span>
+                    <span
+                      style={{
+                        fontSize: "6.5pt",
+                        fontWeight: 700,
+                        textTransform: "uppercase",
+                        letterSpacing: "0.05em",
+                        color: "#6b7280",
+                      }}
+                    >
+                      {mealTypeLabels[meal.type]}
+                    </span>
+                  </div>
+                  {meal.kcal > 0 && (
+                    <span
+                      style={{
+                        fontSize: "7pt",
+                        fontWeight: 700,
+                        color: color.text,
+                        backgroundColor: color.bg,
+                        border: `1px solid ${color.border}`,
+                        padding: "1pt 5pt",
+                        borderRadius: "20pt",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {meal.adjustedKcal ?? meal.kcal} kcal
+                    </span>
+                  )}
+                </div>
+
+                {/* Meal description */}
+                <p
+                  style={{
+                    fontSize: "8pt",
+                    color: "#1f2937",
+                    lineHeight: 1.45,
+                    margin: 0,
+                    flex: 1,
+                  }}
+                >
+                  {meal.description}
+                </p>
+
+                {/* Note */}
+                {meal.note && (
+                  <div
+                    style={{
+                      marginTop: "4pt",
+                      paddingTop: "4pt",
+                      borderTop: "1px solid #f3f4f6",
+                      fontSize: "7pt",
+                      color: "#92400e",
+                      backgroundColor: "#fffbeb",
+                      padding: "4pt 5pt",
+                      borderRadius: "4pt",
+                      lineHeight: 1.4,
+                    }}
+                  >
+                    💡 {meal.note}
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      </div>
     )
   }
   ```
 
-  Update `PrintShoppingList` call — shopping list is now separate. If the weekly plan no longer includes `shoppingList`, either fetch it separately:
+  Update `PrintShoppingList` call — shopping list is now separate. Fetch it independently and
+  use the explicit type (not the deprecated `WeeklyPlan["shoppingList"]`):
   ```typescript
-  const [shoppingList, setShoppingList] = useState<WeeklyPlan["shoppingList"]>([])
+  const [shoppingList, setShoppingList] = useState<{ category: string; items: string[] }[]>([])
   // In useEffect, add parallel fetch:
   get<any>("/diet/shopping-list").then(raw => setShoppingList(transformShoppingList(raw))).catch(() => {})
   ```
