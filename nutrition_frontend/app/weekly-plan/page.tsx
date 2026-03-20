@@ -113,6 +113,14 @@ const mealDisplayName: Record<string, string> = {
   cena:         "Cena",
 }
 
+const mealIdEmoji: Record<string, string> = {
+  desayuno:     "☕",
+  media_manana: "🌅",
+  almuerzo:     "🍽️",
+  merienda:     "🍎",
+  cena:         "🌙",
+}
+
 const mealTypeEmoji: Record<string, string> = {
   breakfast: "☕",
   "mid-morning": "🌅",
@@ -234,7 +242,7 @@ function PrintDayCard({ dayPlan }: { dayPlan: PlanDay }) {
                 }}
               >
                 <div style={{ display: "flex", alignItems: "center", gap: "4pt" }}>
-                  <span style={{ fontSize: "11pt" }}>{mealTypeEmoji[meal.type] ?? "🍽️"}</span>
+                  <span style={{ fontSize: "11pt" }}>{mealIdEmoji[meal.id] ?? mealTypeEmoji[meal.type] ?? "🍽️"}</span>
                   <span
                     style={{
                       fontSize: "6.5pt",
