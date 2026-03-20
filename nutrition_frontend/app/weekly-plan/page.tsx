@@ -17,6 +17,7 @@ import {
 } from "lucide-react"
 import type { WeeklyPlanResponse, PlanDay, WeeklyHistorySummary } from "@/lib/api"
 import { fetchWeeklyPlan, regenerateWeeklyPlan } from "@/lib/api"
+import { loadDayFromStorage } from "@/context/DietDayContext"
 
 const todayISO = new Date().toISOString().slice(0, 10)
 
@@ -575,14 +576,19 @@ export default function WeeklyPlanPage() {
           <Card className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-6">
             <Accordion type="single" collapsible className="space-y-2">
               {weeklyPlan.days.map((dayPlan) => {
-                const isToday = dayPlan.date === todayISO
+                const isToday     = dayPlan.date === todayISO
                 const displayKcal = dayPlan.exerciseAdj?.adjustedTotal ?? dayPlan.totalKcal
+                const dayLog      = loadDayFromStorage(dayPlan.date)
+                const nonCompliant = dayLog?.nonCompliant === true
+                const isPast      = dayPlan.date < todayISO
                 return (
                   <AccordionItem
                     key={dayPlan.date}
                     value={dayPlan.date}
                     className={`bg-white/5 rounded-xl border px-4 data-[state=open]:bg-white/10 ${
-                      isToday ? "border-emerald-400/50" : "border-white/10"
+                      isToday       ? "border-emerald-400/50"
+                      : nonCompliant ? "border-red-400/30"
+                      : "border-white/10"
                     }`}
                   >
                     <AccordionTrigger className="hover:no-underline py-4">
@@ -592,6 +598,11 @@ export default function WeeklyPlanPage() {
                           {isToday && (
                             <span className="bg-emerald-500 text-white text-xs px-2 py-0.5 rounded-full font-medium">
                               HOY
+                            </span>
+                          )}
+                          {nonCompliant && (
+                            <span className="bg-red-500/20 text-red-400 border border-red-400/30 text-xs px-2 py-0.5 rounded-full">
+                              No cumplido +{dayLog!.excessKcal} kcal
                             </span>
                           )}
                         </div>

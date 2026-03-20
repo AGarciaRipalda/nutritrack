@@ -2,6 +2,7 @@ import type React from "react"
 import type { Metadata } from "next"
 import { Figtree } from "next/font/google"
 import "./globals.css"
+import { Providers } from "./providers"
 
 const figtree = Figtree({
   subsets: ["latin"],
@@ -21,7 +22,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={`${figtree.variable} antialiased`}>
-      <body className="font-sans">{children}</body>
+      <body className="font-sans"><Providers>{children}</Providers></body>
     </html>
   )
 }
