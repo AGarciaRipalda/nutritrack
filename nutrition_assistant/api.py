@@ -19,7 +19,7 @@ from pydantic import BaseModel
 # ── Módulos del proyecto ──────────────────────────────────────────────────────
 from storage import (
     load_profile, save_profile, load_session, save_session,
-    load_weekly_history, save_weekly_history, save_exercise_adj,
+    load_weekly_history, save_weekly_history,
 )
 from calculator import (
     calculate_bmr, calculate_tdee, calculate_daily_target,
