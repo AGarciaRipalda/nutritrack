@@ -6,7 +6,6 @@ import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import {
-  RefreshCw,
   Shuffle,
   Coffee,
   Sun,
@@ -16,58 +15,56 @@ import {
   Lightbulb,
   CheckCircle2,
 } from "lucide-react"
-import type { TodaysDiet, Meal } from "@/lib/api"
-import { fetchTodaysDiet, swapMeal, regenerateDay, updateAdherence } from "@/lib/api"
+import type { PlanDay, Meal } from "@/lib/api"
+import { fetchTodaysPlan, swapMeal, updateAdherence } from "@/lib/api"
 
-const mockDietData: TodaysDiet = {
+const today = new Date().toISOString().slice(0, 10)
+const mockPlanDay: PlanDay = {
+  date: today,
+  dayName: new Date().toLocaleDateString("es-ES", { weekday: "long" }),
   meals: [
     {
-      id: "1",
+      id: "desayuno",
       type: "breakfast",
       name: "Desayuno",
       kcal: 380,
       description: "Yogur griego con frutos rojos, miel y copos de avena",
-      tip: "Añade semillas de chía para más fibra y omega-3",
+      note: "Añade semillas de chía para más fibra y omega-3",
     },
     {
-      id: "2",
+      id: "media_manana",
       type: "mid-morning",
       name: "Media mañana",
       kcal: 220,
       description: "Manzana en rodajas con 2 cucharadas de crema de almendras",
-      tip: "Elige manzanas de temporada",
+      note: "Elige manzanas de temporada",
     },
     {
-      id: "3",
+      id: "almuerzo",
       type: "lunch",
       name: "Almuerzo",
       kcal: 520,
       description: "Pechuga de pollo a la plancha con ensalada mixta, aguacate y tomate cherry",
-      tip: "Aliña con aceite de oliva virgen extra",
+      note: "Aliña con aceite de oliva virgen extra",
     },
     {
-      id: "4",
+      id: "merienda",
       type: "snack",
       name: "Merienda",
       kcal: 280,
       description: "Batido de proteínas con plátano, espinacas y leche de almendras",
-      tip: "Añade hielo para una textura más espesa",
+      note: "Añade hielo para una textura más espesa",
     },
     {
-      id: "5",
+      id: "cena",
       type: "dinner",
       name: "Cena",
       kcal: 650,
       description: "Filete de salmón al horno con quinoa y verduras asadas",
-      tip: "Sazona el salmón con limón y eneldo",
+      note: "Sazona el salmón con limón y eneldo",
     },
   ],
-  adherenceChecklist: [
-    { id: "a1", label: "Bebí 8 vasos de agua", checked: false },
-    { id: "a2", label: "Comí todas las comidas planificadas", checked: false },
-    { id: "a3", label: "Sin picar entre horas", checked: false },
-    { id: "a4", label: "Tomé vitaminas/suplementos", checked: false },
-  ],
+  totalKcal: 2050,
 }
 
 const mealIcons: Record<string, typeof Coffee> = {
@@ -87,15 +84,19 @@ const mealLabels: Record<string, string> = {
 }
 
 export default function DietPage() {
-  const [data, setData] = useState<TodaysDiet | null>(null)
+  const [data, setData] = useState<(PlanDay & { stale?: boolean }) | null>(null)
+  const [stale, setStale] = useState(false)
   const [loading, setLoading] = useState(true)
   const [swapping, setSwapping] = useState<string | null>(null)
-  const [regenerating, setRegenerating] = useState(false)
+  const [checkedMeals, setCheckedMeals] = useState<Record<string, boolean>>({})
 
   useEffect(() => {
-    fetchTodaysDiet()
-      .then(setData)
-      .catch(() => setData(mockDietData))
+    fetchTodaysPlan()
+      .then((d) => {
+        setStale(d.stale ?? false)
+        setData(d)
+      })
+      .catch(() => setData(mockPlanDay))
       .finally(() => setLoading(false))
   }, [])
 
@@ -103,95 +104,26 @@ export default function DietPage() {
     if (!data) return
     setSwapping(mealId)
     try {
-      // swapMeal devuelve TodaysDiet completo; preservamos el estado del checklist
-      const newData = await swapMeal(mealId)
-      setData((prev) => prev ? { ...newData, adherenceChecklist: prev.adherenceChecklist } : newData)
+      const updatedDay = await swapMeal(mealId)
+      // Merge: preserve local stale flag
+      setData((prev) => prev ? { ...updatedDay, stale: prev.stale } : updatedDay)
     } catch {
-      // Fallback en español cuando la API no está disponible
-      const mealIndex = data.meals.findIndex((m) => m.id === mealId)
-      if (mealIndex !== -1) {
-        const alternatives: Record<string, Meal> = {
-          breakfast: {
-            id: mealId,
-            type: "breakfast",
-            name: "Tostada con aguacate y huevo",
-            kcal: 370,
-            description: "Pan integral tostado con aguacate machacado, huevo pochado y tomate",
-            tip: "Añade semillas de cáñamo para más proteínas",
-          },
-          "mid-morning": {
-            id: mealId,
-            type: "mid-morning",
-            name: "Plátano con mantequilla de almendras",
-            kcal: 190,
-            description: "Plátano mediano con una cucharada de crema de almendras",
-            tip: "Aporta energía sostenida antes del almuerzo",
-          },
-          lunch: {
-            id: mealId,
-            type: "lunch",
-            name: "Bowl de atún con quinoa",
-            kcal: 490,
-            description: "Quinoa con atún al natural, tomate cherry, pepino y aceite de oliva",
-            tip: "Aliña con limón para potenciar el sabor",
-          },
-          snack: {
-            id: mealId,
-            type: "snack",
-            name: "Yogur griego con nueces",
-            kcal: 230,
-            description: "Yogur griego natural con nueces y un chorrito de miel",
-            tip: "Alto en proteínas, ideal para la recuperación muscular",
-          },
-          dinner: {
-            id: mealId,
-            type: "dinner",
-            name: "Merluza al horno con verduras",
-            kcal: 420,
-            description: "Lomos de merluza al horno con pimiento, cebolla y tomate",
-            tip: "Añade zumo de limón antes de servir",
-          },
-        }
-        const meal = data.meals[mealIndex]
-        const fallbackMeal = alternatives[meal.type] || meal
-        setData({
-          ...data,
-          meals: data.meals.map((m, i) => (i === mealIndex ? fallbackMeal : m)),
-        })
-      }
+      // Keep existing data on error (graceful degradation)
     }
     setSwapping(null)
   }
 
-  const handleRegenerate = async () => {
-    setRegenerating(true)
-    try {
-      const newData = await regenerateDay()
-      setData(newData)
-    } catch {
-      // Fallback: rotar las comidas del mock para simular regeneración
-      setData((prev) => {
-        if (!prev) return mockDietData
-        const rotated = [...prev.meals.slice(1), prev.meals[0]]
-        return { ...prev, meals: rotated }
-      })
-    }
-    setRegenerating(false)
-  }
+  const adherenceItems = (data?.meals ?? []).map((m) => ({
+    id: m.id,
+    label: m.name,
+    checked: checkedMeals[m.id] ?? false,
+  }))
 
   const handleAdherenceChange = async (itemId: string, checked: boolean) => {
-    if (!data) return
-    setData({
-      ...data,
-      adherenceChecklist: data.adherenceChecklist.map((item) =>
-        item.id === itemId ? { ...item, checked } : item
-      ),
-    })
+    setCheckedMeals((prev) => ({ ...prev, [itemId]: checked }))
     try {
-      await updateAdherence(itemId, checked)
-    } catch {
-      // Keep optimistic update
-    }
+      await updateAdherence({ [itemId]: checked })
+    } catch { /* keep optimistic update */ }
   }
 
   if (loading) {
@@ -204,35 +136,62 @@ export default function DietPage() {
     )
   }
 
-  const diet = data || mockDietData
-  const totalKcal = diet.meals.reduce((sum, meal) => sum + meal.kcal, 0)
+  const planDay = data ?? mockPlanDay
 
   return (
     <AppLayout>
       <div className="space-y-6">
+        {/* Stale banner */}
+        {stale && (
+          <div className="bg-amber-500/20 border border-amber-400/30 rounded-2xl p-4 flex items-center justify-between">
+            <span className="text-amber-300 text-sm">
+              Tu plan es de la semana pasada. ¿Regenerar ahora?
+            </span>
+            <a href="/weekly-plan" className="text-amber-400 text-sm font-semibold hover:underline ml-4">
+              Ver plan →
+            </a>
+          </div>
+        )}
+
         {/* Header */}
         <Card className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-6">
           <div className="flex items-center justify-between flex-wrap gap-3">
             <div>
               <h2 className="text-3xl font-bold text-white">Dieta de hoy</h2>
-              <p className="text-white/60">
-                Total planificado: <span className="text-emerald-400 font-semibold">{totalKcal} kcal</span>
+              <p className="text-white/60 text-sm">
+                {planDay.dayName}, semana del{" "}
+                {new Date(planDay.date + "T00:00:00").toLocaleDateString("es-ES", {
+                  day: "numeric", month: "short"
+                })}
               </p>
+              <p className="text-white/60 mt-1">
+                Total planificado:{" "}
+                <span className="text-emerald-400 font-semibold">
+                  {planDay.exerciseAdj
+                    ? planDay.exerciseAdj.adjustedTotal
+                    : planDay.totalKcal}{" "}
+                  kcal
+                </span>
+              </p>
+              {planDay.exerciseAdj && planDay.exerciseAdj.extraKcal > 0 && (
+                <p className="text-yellow-300 text-sm mt-1">
+                  ⚡ +{planDay.exerciseAdj.extraKcal} kcal · porciones ampliadas
+                  <span className="text-white/40 ml-1">({planDay.exerciseAdj.source})</span>
+                </p>
+              )}
             </div>
-            <Button
-              onClick={handleRegenerate}
-              disabled={regenerating}
-              className="bg-white/10 hover:bg-white/20 border border-white/20 hover:border-white/30 text-white transition-all duration-300"
+            <a
+              href="/weekly-plan"
+              className="text-emerald-400 text-sm font-semibold hover:underline flex items-center gap-1"
             >
-              <RefreshCw className={`mr-2 h-4 w-4 ${regenerating ? "animate-spin" : ""}`} />
-              Regenerar dieta
-            </Button>
+              Ver plan completo →
+            </a>
           </div>
         </Card>
 
         {/* Meal Cards */}
         <div className="grid grid-cols-1 gap-4">
-          {diet.meals.map((meal) => {
+          {planDay.meals.map((meal) => {
             const MealIcon = mealIcons[meal.type] || Utensils
             return (
               <Card
@@ -250,15 +209,22 @@ export default function DietPage() {
                         <h3 className="text-xl font-semibold text-white">{meal.name}</h3>
                       </div>
                       <p className="text-white/80">{meal.description}</p>
-                      <div className="flex items-center gap-2 text-amber-400 text-sm">
-                        <Lightbulb className="h-4 w-4" />
-                        <span>{meal.tip}</span>
-                      </div>
+                      {meal.note && (
+                        <div className="flex items-center gap-2 text-amber-400 text-sm">
+                          <Lightbulb className="h-4 w-4" />
+                          <span>{meal.note}</span>
+                        </div>
+                      )}
                     </div>
                   </div>
                   <div className="flex items-center gap-4">
                     <div className="text-right">
-                      <p className="text-2xl font-bold text-white">{meal.kcal}</p>
+                      <p className="text-2xl font-bold text-white">
+                        {meal.adjustedKcal ?? meal.kcal}
+                      </p>
+                      {meal.portionScale && meal.portionScale > 1 && (
+                        <p className="text-yellow-300 text-xs">×{meal.portionScale.toFixed(2)}</p>
+                      )}
                       <p className="text-white/60 text-sm">kcal</p>
                     </div>
                     <Button
@@ -285,7 +251,7 @@ export default function DietPage() {
             <h3 className="text-xl font-semibold text-white">Seguimiento de adherencia</h3>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
-            {diet.adherenceChecklist.map((item) => (
+            {adherenceItems.map((item) => (
               <label
                 key={item.id}
                 className="flex items-center gap-3 p-4 bg-white/5 rounded-xl border border-white/10 hover:bg-white/10 transition-all duration-300 cursor-pointer"
