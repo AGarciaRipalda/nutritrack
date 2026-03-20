@@ -309,6 +309,9 @@ cd nutrition_assistant && python -m pytest tests/test_storage.py -v
 
 - [ ] **2.2** Add `exercise_adj` and `weekly_history` parameters to `save_session()`.
 
+  > **Confirmed:** `_MISSING = object()` is already defined at module level in `storage.py`
+  > (line 71), immediately before the existing `save_session` function. Do not redefine it.
+
   Replace the entire existing `save_session` function (copy-paste ready):
 
   ```python
@@ -490,6 +493,20 @@ cd nutrition_assistant && python -m pytest tests/test_diet.py -v
 ### Steps
 
 - [ ] **3.1** Add `from datetime import date, timedelta` to `diet.py` imports (if not present).
+
+  > **Confirmed:** `import random` is already present at line 8 of `diet.py`. No change needed.
+
+  > **Assumptions — pre-existing symbols in `diet.py` (do NOT modify):**
+  > The following constants and functions already exist in `diet.py` and are called by
+  > `generate_week_plan()`. They must not be redefined or overwritten:
+  > - `_scale_meal(meal, scale)` — scales a meal template to a calorie target (line ~708)
+  > - `SNACK_TARGET_KCAL` — integer constant for snack budget (line 33)
+  > - `MAIN_MEAL_SPLIT` — dict `{"desayuno": 0.28, "almuerzo": 0.45, "cena": 0.27}` (line 34)
+  > - `DESAYUNOS` — list of breakfast template dicts (line 44)
+  > - `MEDIA_MANANA` — list of mid-morning snack template dicts (line 116)
+  > - `ALMUERZOS` — list of lunch template dicts (line 194)
+  > - `MERIENDAS` — list of afternoon snack template dicts (line 439)
+  > - `CENAS` — list of dinner template dicts (line 533)
 
 - [ ] **3.2** Add `DAY_NAMES_ES` mapping:
 
@@ -778,6 +795,9 @@ client = TestClient(app)
 def mock_storage(tmp_path):
     """Isolate all file I/O."""
     import storage
+    # NOTE: storage.PROFILE_FILE is confirmed to exist in storage.py (line 5).
+    # NOTE: storage.SESSION_FILE is confirmed to exist in storage.py (line 6).
+    # Both are module-level string constants — patch.object is the correct approach.
     with patch.object(storage, "SESSION_FILE", str(tmp_path / "session.json")), \
          patch.object(storage, "PROFILE_FILE", str(tmp_path / "profile.json")):
         yield
@@ -911,6 +931,8 @@ cd nutrition_assistant && python -m pytest tests/test_api.py -v
   def _is_stale(plan: dict, tz_header: str | None) -> bool:
       """True when plan.generated_at is from a previous week."""
       current_monday = _get_monday_for_tz(tz_header)
+      # Empty or missing generated_at ("") < any date string is True —
+      # treats missing plan as stale, which is intentional.
       return plan.get("generated_at", "") < current_monday
   ```
 
@@ -922,6 +944,11 @@ cd nutrition_assistant && python -m pytest tests/test_api.py -v
       regenerate_meal,
   )
   ```
+
+  > **Confirmed:** `regenerate_meal` already exists in `diet.py` (line 776) with signature:
+  > `regenerate_meal(day: dict, meal_key: str, excluded: list, favorites: list) -> dict`
+  > It swaps a single meal slot in a day dict, choosing a different option from the same pool.
+  > No new function needs to be created for Step 5.6 — this is the correct existing function.
 
   Remove `generate_adaptive_day`, `DAYS`, and `MEAL_LABELS` from the import.
   `DAYS` and `MEAL_LABELS` were only used by `generate_adaptive_day` (which is being removed);
@@ -936,6 +963,12 @@ cd nutrition_assistant && python -m pytest tests/test_api.py -v
   class SwapMealModel(BaseModel):
       meal_id: str
   ```
+
+  > **Assumptions — pre-existing helper functions in `api.py` (confirmed, do NOT redefine):**
+  > - `_get_session()` — exists at line 78 of `api.py`; calls `load_session()` and returns the session dict.
+  > - `load_excluded()` — exists in `preferences.py` (line 31); imported into `api.py` via `from preferences import ... load_excluded, load_favorites`. It is NOT in `storage.py`.
+  > - `load_favorites()` — exists in `preferences.py` (line 36); same import path as above.
+  > - `_get_daily_target()` — exists at line 228 of `api.py`; loads profile, calculates BMR, and calls `calculate_daily_target`.
 
 - [ ] **5.4** Replace `get_today_diet()` endpoint:
 
@@ -1153,6 +1186,12 @@ cd nutrition_assistant && python -m pytest tests/test_api.py -v
       load_weekly_history, save_weekly_history, save_exercise_adj,
   )
   ```
+
+  > **Important:** `load_excluded` and `load_favorites` are NOT in `storage.py`. They live in
+  > `preferences.py` and are already imported in the existing `api.py` via:
+  > `from preferences import _load as load_prefs, _save as save_prefs, load_excluded, load_favorites`
+  > Do NOT add them to the `storage` import line above. The existing `preferences` import remains
+  > unchanged — only the `storage` import line needs the three new functions listed above.
 
 ### Verification
 
@@ -1387,7 +1426,18 @@ After implementing:
   </Card>
   ```
 
-  Replace variable `diet` with `planDay` (rename): `const planDay = data ?? mockPlanDay`.
+  Replace variable `diet` with `planDay` (rename). The assignment must appear AFTER the
+  loading-state null guard, not before it, so that the loading return is not skipped:
+
+  ```typescript
+  if (loading) return <LoadingSpinner />
+  if (error) return <ErrorMessage message={error} />
+  const planDay = data ?? mockPlanDay  // ← placed AFTER null guards
+  ```
+
+  Note: `diet/page.tsx` currently uses an inline loading spinner (not a named `<LoadingSpinner>`
+  component) and has no `error` state. Adjust to match the actual component structure — the
+  principle is that `planDay` must be derived only after all early-exit guards are satisfied.
 
 - [ ] **6.9** Update meal cards — replace `meal.tip` with `meal.note`:
 
@@ -1931,15 +1981,52 @@ After implementing:
   }
   ```
 
-  Update `PrintShoppingList` call — shopping list is now separate. Fetch it independently and
-  use the explicit type (not the deprecated `WeeklyPlan["shoppingList"]`):
+  Update `PrintShoppingList` call — shopping list is now separate. Fetch it independently.
+
+  > **Correction for codebase:** The current `weekly-plan/page.tsx` does NOT use a bare `get`
+  > helper or a `transformShoppingList` function. The page fetches its data exclusively via
+  > `fetchWeeklyPlan()` from `@/lib/api`, and the shopping list is currently embedded as part
+  > of the `WeeklyPlan` mock data (`shoppingList` property). There is no `get` import in the
+  > page file and no `transformShoppingList` utility in the codebase.
+  >
+  > The correct approach to fetch the shopping list independently is:
+
+  Add state:
   ```typescript
   const [shoppingList, setShoppingList] = useState<{ category: string; items: string[] }[]>([])
-  // In useEffect, add parallel fetch:
-  get<any>("/diet/shopping-list").then(raw => setShoppingList(transformShoppingList(raw))).catch(() => {})
   ```
 
-  Or simply hide the print shopping list section until the data is available.
+  In the existing `useEffect`, add a parallel fetch alongside `fetchWeeklyPlan()`:
+  ```typescript
+  useEffect(() => {
+    fetchWeeklyPlan()
+      .then((d) => { setStale(d.stale); setData(d) })
+      .catch(() => setData(mockWeeklyPlanResponse))
+      .finally(() => setLoading(false))
+
+    // Shopping list: backend returns { category: string[] } — transform to array of objects
+    fetch(`${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"}/diet/shopping-list`, {
+      headers: { "ngrok-skip-browser-warning": "true" },
+    })
+      .then((res) => res.json())
+      .then((raw: Record<string, string[]>) => {
+        setShoppingList(
+          Object.entries(raw).map(([category, items]) => ({ category, items }))
+        )
+      })
+      .catch(() => {}) // silently keep empty list; print section is hidden until data loads
+  }, [])
+  ```
+
+  In the print section, guard `<PrintShoppingList>` so it only renders when data is available:
+  ```tsx
+  {shoppingList.length > 0 && (
+    <PrintShoppingList shoppingList={shoppingList} />
+  )}
+  ```
+
+  > The `PrintShoppingList` component signature remains unchanged — it already accepts
+  > `{ category: string; items: string[] }[]`. No `transformShoppingList` function is needed.
 
 - [ ] **7.11** Update `totalWeekKcal` calculation:
 
