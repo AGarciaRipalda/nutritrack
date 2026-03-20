@@ -105,6 +105,14 @@ const mealTypeIcons: Record<string, typeof Coffee> = {
   dinner: Moon,
 }
 
+const mealDisplayName: Record<string, string> = {
+  desayuno:     "Desayuno",
+  media_manana: "Media mañana",
+  almuerzo:     "Almuerzo",
+  merienda:     "Merienda",
+  cena:         "Cena",
+}
+
 const mealTypeEmoji: Record<string, string> = {
   breakfast: "☕",
   "mid-morning": "🌅",
@@ -125,19 +133,22 @@ const mealTypeColor: Record<string, { bg: string; text: string; border: string }
 function MealCard({ meal }: { meal: PlanDay["meals"][0] }) {
   const MealIcon = mealTypeIcons[meal.type] || Utensils
   return (
-    <div className="p-3 bg-white/5 rounded-xl border border-white/10 flex flex-col gap-1.5">
-      <div className="flex items-center gap-1.5">
-        <MealIcon className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
-        <span className="text-white/60 text-xs font-semibold uppercase tracking-wide">
-          {meal.name}
+    <div className="p-3 bg-white/5 rounded-xl border border-white/10 flex flex-col gap-2">
+      {/* Title row: icon + meal name + kcal */}
+      <div className="flex items-center gap-2 border-b border-white/10 pb-2">
+        <MealIcon className="h-4 w-4 text-emerald-400 shrink-0" />
+        <span className="text-white text-sm font-semibold flex-1">
+          {mealDisplayName[meal.id] ?? meal.name}
         </span>
         {meal.kcal > 0 && (
-          <Badge className="ml-auto bg-emerald-500/20 text-emerald-400 border-emerald-400/30 text-xs px-1.5 py-0">
+          <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-400/30 text-xs px-1.5 py-0 shrink-0">
             {meal.kcal} kcal
           </Badge>
         )}
       </div>
-      <p className="text-white text-xs leading-snug">{meal.description}</p>
+      {/* Description: ingredients + grams */}
+      <p className="text-white/80 text-xs leading-snug">{meal.description}</p>
+      {/* Tip */}
       {meal.note && (
         <div className="flex items-start gap-1 mt-0.5">
           <Lightbulb className="h-3 w-3 text-amber-400 shrink-0 mt-0.5" />
