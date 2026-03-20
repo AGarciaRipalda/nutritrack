@@ -7,23 +7,27 @@ Documentación automática en: http://localhost:8000/docs
 import os, json
 from datetime import date, timedelta
 from typing import Optional, List
+import zoneinfo
 
 # Fijar el directorio de trabajo para que los JSON relativos funcionen
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request, Header
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 # ── Módulos del proyecto ──────────────────────────────────────────────────────
-from storage import load_profile, save_profile, load_session, save_session
+from storage import (
+    load_profile, save_profile, load_session, save_session,
+    load_weekly_history, save_weekly_history, save_exercise_adj,
+)
 from calculator import (
     calculate_bmr, calculate_tdee, calculate_daily_target,
     calculate_macros, ACTIVITY_LEVELS, GOAL_ADJUSTMENTS,
 )
 from diet import (
-    generate_week_plan, generate_adaptive_day,
-    regenerate_meal, DAYS, MEAL_LABELS,
+    generate_week_plan, get_day_from_plan,
+    regenerate_meal,
 )
 from exercise_log import (
     EXERCISES, RECOVERY_FACTOR, TODAY_BONUS_KCAL, TODAY_TIMING,
@@ -77,6 +81,39 @@ _cache: dict = {}
 
 def _get_session():
     return load_session()
+
+
+def _get_today_for_tz(tz_header: str | None) -> str:
+    """Return today's ISO date string in the user's timezone. Falls back to UTC."""
+    # Empty or unrecognized timezone → fall back to UTC, log warning
+    try:
+        tz = zoneinfo.ZoneInfo(tz_header) if tz_header else zoneinfo.ZoneInfo("UTC")
+    except Exception:
+        import warnings
+        warnings.warn(f"Unrecognized timezone '{tz_header}', falling back to UTC")
+        tz = zoneinfo.ZoneInfo("UTC")
+    from datetime import datetime
+    return datetime.now(tz=tz).date().isoformat()
+
+
+def _get_monday_for_tz(tz_header: str | None) -> str:
+    """Return Monday of the current week in the user's timezone."""
+    from datetime import datetime, timedelta
+    try:
+        tz = zoneinfo.ZoneInfo(tz_header) if tz_header else zoneinfo.ZoneInfo("UTC")
+    except Exception:
+        tz = zoneinfo.ZoneInfo("UTC")
+    today = datetime.now(tz=tz).date()
+    monday = today - timedelta(days=today.weekday())
+    return monday.isoformat()
+
+
+def _is_stale(plan: dict, tz_header: str | None) -> bool:
+    """True when plan.generated_at is from a previous week."""
+    current_monday = _get_monday_for_tz(tz_header)
+    # Empty or missing generated_at ("") < any date string is True —
+    # treats missing plan as stale, which is intentional.
+    return plan.get("generated_at", "") < current_monday
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -135,6 +172,14 @@ class EventModel(BaseModel):
     date: str    # ISO format YYYY-MM-DD
 
 
+class RegenerateWeeklyModel(BaseModel):
+    apply_from: str = "tomorrow"   # "today" | "tomorrow"
+
+
+class SwapMealModel(BaseModel):
+    meal_id: str
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # PERFIL
 # ══════════════════════════════════════════════════════════════════════════════
@@ -176,49 +221,107 @@ def get_nutrition(exercise_adj: int = 0):
 # ══════════════════════════════════════════════════════════════════════════════
 
 @app.get("/diet/today", tags=["Dieta"])
-def get_today_diet():
-    """Devuelve la dieta adaptada de hoy (genera si no existe)."""
-    session = _get_session()
-    day     = session.get("adaptive_day")
+def get_today_diet(x_user_timezone: Optional[str] = Header(None)):
+    """Returns today's PlanDay from the weekly plan. Auto-generates plan if needed."""
+    session  = _get_session()
+    tz       = x_user_timezone
+    today    = _get_today_for_tz(tz)
 
-    if not day:
-        profile        = load_profile()
-        exercise_data  = session.get("exercise_data") or {"burned_kcal": 0, "adjustment_kcal": 0, "exercises": []}
-        today_training = session.get("today_training") or {}
-        excluded       = load_excluded()
-        favorites      = load_favorites()
-        day = generate_adaptive_day(profile, exercise_data, excluded, today_training, favorites)
-        save_session(adaptive_day=day)
+    plan = session.get("week_plan")
 
-    return day
+    # Auto-generate if no plan exists
+    if not plan:
+        excluded  = load_excluded()
+        favorites = load_favorites()
+        history   = session.get("weekly_history", []) or load_weekly_history()
+        plan = generate_week_plan(excluded, favorites, _get_daily_target(), history=history or None)
+        save_session(week_plan=plan)
+
+    stale        = _is_stale(plan, tz)
+    exercise_adj = session.get("exercise_adj", {})
+    day          = get_day_from_plan(today, plan, exercise_adj)
+
+    if day is None:
+        raise HTTPException(
+            404,
+            {"error": "date_not_in_plan",
+             "detail": f"Date {today} is not in the current plan. Regenerate the plan."}
+        )
+
+    return {**day, "stale": stale}
 
 
 @app.post("/diet/today/regenerate", tags=["Dieta"])
-def regenerate_today_diet():
-    """Regenera la dieta del día desde cero."""
-    profile        = load_profile()
-    session        = _get_session()
-    exercise_data  = session.get("exercise_data") or {"burned_kcal": 0, "adjustment_kcal": 0, "exercises": []}
-    today_training = session.get("today_training") or {}
-    excluded       = load_excluded()
-    favorites      = load_favorites()
-    day = generate_adaptive_day(profile, exercise_data, excluded, today_training, favorites)
-    save_session(adaptive_day=day)
-    return day
-
-
-@app.post("/diet/today/{meal_type}/swap", tags=["Dieta"])
-def swap_meal(meal_type: str):
-    """Sustituye un plato concreto manteniendo el presupuesto calórico."""
-    session = _get_session()
-    day     = session.get("adaptive_day")
-    if not day:
-        raise HTTPException(404, "No hay dieta generada. Llama primero a GET /diet/today")
+def regenerate_today_diet(x_user_timezone: Optional[str] = Header(None)):
+    """Regenerates the full weekly plan and returns today's PlanDay."""
+    session   = _get_session()
     excluded  = load_excluded()
     favorites = load_favorites()
-    day = regenerate_meal(day, meal_type, excluded, favorites)
-    save_session(adaptive_day=day)
-    return day
+    history   = load_weekly_history()
+    plan = generate_week_plan(excluded, favorites, _get_daily_target(), history=history or None)
+    save_session(week_plan=plan)
+    today        = _get_today_for_tz(x_user_timezone)
+    exercise_adj = session.get("exercise_adj", {})
+    day          = get_day_from_plan(today, plan, exercise_adj)
+    if day is None:
+        raise HTTPException(404, {"error": "date_not_in_plan", "detail": "Regenerated plan does not cover today."})
+    return {**day, "stale": False}
+
+
+@app.post("/diet/today/swap", tags=["Dieta"])
+def swap_meal_new(data: SwapMealModel, x_user_timezone: Optional[str] = Header(None)):
+    """Swaps a meal in today's plan slot. Returns updated PlanDay."""
+    meal_type = data.meal_id
+    session   = _get_session()
+    plan      = session.get("week_plan")
+    if not plan:
+        raise HTTPException(404, {"error": "no_plan", "detail": "No weekly plan. Call GET /diet/today first."})
+
+    today = _get_today_for_tz(x_user_timezone)
+    days  = plan.get("days", [])
+    day_idx = next((i for i, d in enumerate(days) if d["date"] == today), None)
+    if day_idx is None:
+        raise HTTPException(404, {"error": "date_not_in_plan", "detail": f"No plan for {today}."})
+
+    excluded  = load_excluded()
+    favorites = load_favorites()
+
+    # Regenerate that meal slot in the plan day
+    today_day = days[day_idx]
+    daily_target = plan.get("weekly_target_kcal", 1800)
+    updated_day_meals = dict({m["id"]: m for m in today_day["meals"]})
+
+    # Use existing regenerate_meal logic
+    flat_day = {"daily_target": daily_target, "meals": updated_day_meals}
+    flat_day = regenerate_meal(flat_day, meal_type, excluded, favorites)
+    new_meals_dict = flat_day["meals"]
+
+    # Rebuild meals list preserving order
+    new_meals_list = [
+        {**new_meals_dict[m["id"]], "id": m["id"]}
+        if m["id"] in new_meals_dict else m
+        for m in today_day["meals"]
+    ]
+    plan["days"][day_idx] = {
+        **today_day,
+        "meals":     new_meals_list,
+        "totalKcal": sum(m["kcal"] for m in new_meals_list),
+    }
+    save_session(week_plan=plan)
+
+    # Return the updated PlanDay with exercise_adj applied
+    exercise_adj = session.get("exercise_adj", {})
+    updated_plan_day = get_day_from_plan(today, plan, exercise_adj)
+    return updated_plan_day
+
+
+@app.post("/diet/today/{meal_type}/swap", tags=["Dieta"], deprecated=True)
+def swap_meal_legacy(meal_type: str, x_user_timezone: Optional[str] = Header(None)):
+    """Legacy endpoint — use POST /diet/today/swap with JSON body instead."""
+    from pydantic import BaseModel as BM
+    class _Body(BM):
+        meal_id: str = meal_type
+    return swap_meal_new(_Body(meal_id=meal_type), x_user_timezone)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -233,25 +336,88 @@ def _get_daily_target() -> int:
 
 
 @app.get("/diet/weekly", tags=["Dieta"])
-def get_weekly_plan():
-    """Devuelve el plan semanal (genera si no existe)."""
+def get_weekly_plan(x_user_timezone: Optional[str] = Header(None)):
+    """Returns full weekly plan as { days: PlanDay[], summary, stale }."""
     session = _get_session()
     plan    = session.get("week_plan")
     if not plan:
         excluded  = load_excluded()
         favorites = load_favorites()
-        plan = generate_week_plan(excluded, favorites, _get_daily_target())
+        history   = load_weekly_history()
+        plan = generate_week_plan(excluded, favorites, _get_daily_target(), history=history or None)
         save_session(week_plan=plan)
-    return plan
+
+    stale        = _is_stale(plan, x_user_timezone)
+    exercise_adj = session.get("exercise_adj", {})
+
+    # Apply exercise adjustments to each day
+    days_with_adj = []
+    for day in plan.get("days", []):
+        enriched = get_day_from_plan(day["date"], plan, exercise_adj)
+        if enriched:
+            days_with_adj.append(enriched)
+
+    return {
+        "days":    days_with_adj,
+        "summary": plan.get("weekly_summary"),
+        "stale":   stale,
+    }
 
 
 @app.post("/diet/weekly/regenerate", tags=["Dieta"])
-def regenerate_weekly_plan():
+def regenerate_weekly_plan(
+    data: RegenerateWeeklyModel = RegenerateWeeklyModel(),
+    x_user_timezone: Optional[str] = Header(None),
+):
+    """Regenerates part or all of the weekly plan. Returns { days: PlanDay[] }."""
+    session   = _get_session()
     excluded  = load_excluded()
     favorites = load_favorites()
-    plan = generate_week_plan(excluded, favorites, _get_daily_target())
-    save_session(week_plan=plan)
-    return plan
+    history   = load_weekly_history()
+
+    new_plan = generate_week_plan(excluded, favorites, _get_daily_target(), history=history or None)
+
+    today = _get_today_for_tz(x_user_timezone)
+    apply_from = data.apply_from  # "today" or "tomorrow"
+
+    existing_plan = session.get("week_plan")
+    if existing_plan and apply_from in ("today", "tomorrow"):
+        from datetime import date as _date, timedelta
+        cutoff = _date.fromisoformat(today)
+        if apply_from == "tomorrow":
+            cutoff = cutoff + timedelta(days=1)
+
+        # Keep days BEFORE cutoff from existing plan, take days from cutoff onward from new plan
+        old_days_by_date = {d["date"]: d for d in existing_plan.get("days", [])}
+
+        merged_days = []
+        for d in new_plan["days"]:
+            day_date = _date.fromisoformat(d["date"])
+            if day_date < cutoff and d["date"] in old_days_by_date:
+                merged_days.append(old_days_by_date[d["date"]])
+            else:
+                merged_days.append(d)
+
+        # Discard FUTURE exercise_adj if apply_from == "today".
+        # Use `k <= today` (not `k < today`) so that today's adjustment is preserved
+        # per the spec: "exercise_adj[today] is preserved when apply_from == 'today'".
+        exercise_adj = session.get("exercise_adj", {})
+        if apply_from == "today":
+            exercise_adj = {k: v for k, v in exercise_adj.items() if k <= today}
+            save_session(exercise_adj=exercise_adj)
+
+        new_plan["days"] = merged_days
+
+    save_session(week_plan=new_plan)
+
+    exercise_adj = _get_session().get("exercise_adj", {})
+    days_with_adj = [
+        get_day_from_plan(d["date"], new_plan, exercise_adj)
+        for d in new_plan["days"]
+        if get_day_from_plan(d["date"], new_plan, exercise_adj) is not None
+    ]
+
+    return {"days": days_with_adj}
 
 
 @app.get("/diet/shopping-list", tags=["Dieta"])
