@@ -13,134 +13,123 @@ import {
 import { Badge } from "@/components/ui/badge"
 import {
   ShoppingCart, CalendarDays, Coffee, Sun, Utensils,
-  Cookie, Moon, FileDown, Lightbulb,
+  Cookie, Moon, FileDown, Lightbulb, RefreshCw, X,
 } from "lucide-react"
-import type { WeeklyPlan, WeeklyMeal } from "@/lib/api"
-import { fetchWeeklyPlan } from "@/lib/api"
+import type { WeeklyPlanResponse, PlanDay, WeeklyHistorySummary } from "@/lib/api"
+import { fetchWeeklyPlan, regenerateWeeklyPlan } from "@/lib/api"
 
-const mockWeeklyPlan: WeeklyPlan = {
+const todayISO = new Date().toISOString().slice(0, 10)
+
+const mockWeeklyPlanResponse: WeeklyPlanResponse = {
+  stale: false,
+  summary: null,
   days: [
     {
-      day: "Lunes",
-      meals: {
-        breakfast:  { text: "80g de pan thins con 40g de jamón serrano y tomate + café", kcal: 386, note: "4 rebanadas de pan thins. Tomate natural en rodajas." },
-        midMorning: { text: "Yogurt proteínas (200g) + 13g de frutos secos", kcal: 175, note: "Frutos secos de la bolsa de Aldi." },
-        lunch:      { text: "105g de espaguetis con 120g de carne picada de ternera, tomate frito sin azúcar y orégano", kcal: 645, note: "Sofríe la carne con ajo y añade tomate al final." },
-        snack:      { text: "2 tortitas de arroz con 50g de pavo y guacamole", kcal: 175, note: "Crema de cacahuete opcional." },
-        dinner:     { text: "2 huevos a la plancha con medio calabacín y tomate frito sin azúcar", kcal: 344, note: "Espolvorea orégano sobre los huevos." },
-      },
+      date: "2026-03-16", dayName: "Lunes", totalKcal: 1725,
+      meals: [
+        { id: "desayuno",     type: "breakfast",   name: "Desayuno",     kcal: 386, description: "80g de pan thins con 40g de jamón serrano y tomate + café", note: "4 rebanadas de pan thins. Tomate natural en rodajas." },
+        { id: "media_manana", type: "mid-morning",  name: "Media mañana", kcal: 175, description: "Yogurt proteínas (200g) + 13g de frutos secos", note: "Frutos secos de la bolsa de Aldi." },
+        { id: "almuerzo",     type: "lunch",        name: "Almuerzo",     kcal: 645, description: "105g de espaguetis con 120g de carne picada de ternera, tomate frito sin azúcar y orégano", note: "Sofríe la carne con ajo y añade tomate al final." },
+        { id: "merienda",     type: "snack",        name: "Merienda",     kcal: 175, description: "2 tortitas de arroz con 50g de pavo y guacamole", note: "Crema de cacahuete opcional." },
+        { id: "cena",         type: "dinner",       name: "Cena",         kcal: 344, description: "2 huevos a la plancha con medio calabacín y tomate frito sin azúcar", note: "Espolvorea orégano sobre los huevos." },
+      ],
     },
     {
-      day: "Martes",
-      meals: {
-        breakfast:  { text: "60g de cereales crunchy Mercadona con leche semidesnatada", kcal: 325, note: "Corn flakes, espelta o crunchy Mercadona." },
-        midMorning: { text: "1 fruta de temporada + 3-4 nueces", kcal: 175, note: "Manzana, pera o naranja." },
-        lunch:      { text: "107g de arroz basmati con 140g de pechuga de pollo y brócoli al vapor", kcal: 570, note: "Aliña el brócoli con limón y ajo." },
-        snack:      { text: "Medio kefir con sandía + 13g de frutos secos", kcal: 175, note: "Puedes cambiar kefir por yogurt proteínas." },
-        dinner:     { text: "170g de merluza al horno con verduras al gusto", kcal: 375, note: "Con limón, perejil y un hilo de aceite." },
-      },
+      date: "2026-03-17", dayName: "Martes", totalKcal: 1620,
+      meals: [
+        { id: "desayuno",     type: "breakfast",   name: "Desayuno",     kcal: 325, description: "60g de cereales crunchy Mercadona con leche semidesnatada", note: "Corn flakes, espelta o crunchy Mercadona." },
+        { id: "media_manana", type: "mid-morning",  name: "Media mañana", kcal: 175, description: "1 fruta de temporada + 3-4 nueces", note: "Manzana, pera o naranja." },
+        { id: "almuerzo",     type: "lunch",        name: "Almuerzo",     kcal: 570, description: "107g de arroz basmati con 140g de pechuga de pollo y brócoli al vapor", note: "Aliña el brócoli con limón y ajo." },
+        { id: "merienda",     type: "snack",        name: "Merienda",     kcal: 175, description: "Medio kefir con sandía + 13g de frutos secos", note: "Puedes cambiar kefir por yogurt proteínas." },
+        { id: "cena",         type: "dinner",       name: "Cena",         kcal: 375, description: "170g de merluza al horno con verduras al gusto", note: "Con limón, perejil y un hilo de aceite." },
+      ],
     },
     {
-      day: "Miércoles",
-      meals: {
-        breakfast:  { text: "80g de pan centeno con 30g de jamón serrano y tomate + café", kcal: 362, note: "Pan recomendado: Thins, Rustik, centeno." },
-        midMorning: { text: "Batido de proteínas con agua o leche vegetal", kcal: 175, note: "Aporta ~25g de proteína." },
-        lunch:      { text: "200g de ñoquis con 180g de gambas, cebollino y salsa de soja", kcal: 460, note: "Salta los ñoquis hasta que doren." },
-        snack:      { text: "Bowl: 40g de harina de avena + 1 huevo + leche + oncita de chocolate (45s micro)", kcal: 175, note: "45 segundos al microondas." },
-        dinner:     { text: "Ensalada de canónigos con 2 latas de atún, queso fresco y tomate", kcal: 360, note: "Aliñar con aceite de oliva y vinagre." },
-      },
+      date: "2026-03-18", dayName: "Miércoles", totalKcal: 1532,
+      meals: [
+        { id: "desayuno",     type: "breakfast",   name: "Desayuno",     kcal: 362, description: "80g de pan centeno con 30g de jamón serrano y tomate + café", note: "Pan recomendado: Thins, Rustik, centeno." },
+        { id: "media_manana", type: "mid-morning",  name: "Media mañana", kcal: 175, description: "Batido de proteínas con agua o leche vegetal", note: "Aporta ~25g de proteína." },
+        { id: "almuerzo",     type: "lunch",        name: "Almuerzo",     kcal: 460, description: "200g de ñoquis con 180g de gambas, cebollino y salsa de soja", note: "Salta los ñoquis hasta que doren." },
+        { id: "merienda",     type: "snack",        name: "Merienda",     kcal: 175, description: "Bowl: 40g de harina de avena + 1 huevo + leche + oncita de chocolate (45s micro)", note: "45 segundos al microondas." },
+        { id: "cena",         type: "dinner",       name: "Cena",         kcal: 360, description: "Ensalada de canónigos con 2 latas de atún, queso fresco y tomate", note: "Aliñar con aceite de oliva y vinagre." },
+      ],
     },
     {
-      day: "Jueves",
-      meals: {
-        breakfast:  { text: "Tortita de avena: 30g de avena + 2 huevos + leche + 1 cdta cacahuete + onza chocolate negro", kcal: 410, note: "Sartén antiadherente sin aceite." },
-        midMorning: { text: "50g de caña de lomo de pavo + 13g de frutos secos", kcal: 175, note: "Opción fácil de llevar al trabajo." },
-        lunch:      { text: "Papas aliñás: 250g de patata cocida con 2 latas de atún, 1 huevo, cebolla y perejil", kcal: 488, note: "Sirve templado. La patata aliñada gana sabor al reposar." },
-        snack:      { text: "Yogurt proteínas con 1 cda crema de cacahuete en polvo + fresas", kcal: 175, note: "Endulza con stevia si lo necesitas." },
-        dinner:     { text: "Fajita de pan thins con 130g de pollo, cebolla, pimiento y salsa de yogurt", kcal: 449, note: "Salsa yogurt: yogurt griego + ajo + limón." },
-      },
+      date: "2026-03-19", dayName: "Jueves", totalKcal: 1697,
+      meals: [
+        { id: "desayuno",     type: "breakfast",   name: "Desayuno",     kcal: 410, description: "Tortita de avena: 30g de avena + 2 huevos + leche + 1 cdta cacahuete + onza chocolate negro", note: "Sartén antiadherente sin aceite." },
+        { id: "media_manana", type: "mid-morning",  name: "Media mañana", kcal: 175, description: "50g de caña de lomo de pavo + 13g de frutos secos", note: "Opción fácil de llevar al trabajo." },
+        { id: "almuerzo",     type: "lunch",        name: "Almuerzo",     kcal: 488, description: "Papas aliñás: 250g de patata cocida con 2 latas de atún, 1 huevo, cebolla y perejil", note: "Sirve templado. La patata aliñada gana sabor al reposar." },
+        { id: "merienda",     type: "snack",        name: "Merienda",     kcal: 175, description: "Yogurt proteínas con 1 cda crema de cacahuete en polvo + fresas", note: "Endulza con stevia si lo necesitas." },
+        { id: "cena",         type: "dinner",       name: "Cena",         kcal: 449, description: "Fajita de pan thins con 130g de pollo, cebolla, pimiento y salsa de yogurt", note: "Salsa yogurt: yogurt griego + ajo + limón." },
+      ],
     },
     {
-      day: "Viernes",
-      meals: {
-        breakfast:  { text: "80g de pan thins con 1 lata de atún y 4 rodajas de tomate + café", kcal: 366, note: "Aliña el atún con limón." },
-        midMorning: { text: "70g de pechuga de pavo/pollo + 13g de frutos secos", kcal: 175, note: "Frutos secos de Aldi." },
-        lunch:      { text: "160g de salmón a la plancha con 107g de arroz basmati y brócoli", kcal: 700, note: "Sin aceite extra — el salmón ya tiene grasa." },
-        snack:      { text: "1 lata de piña al natural + 4 nueces", kcal: 175, note: "Piña sin almíbar." },
-        dinner:     { text: "2 hamburguesas de ternera (180g) con calabacín a la plancha", kcal: 390, note: "Sin pan. Calabacín con ajo y sal." },
-      },
+      date: "2026-03-20", dayName: "Viernes", totalKcal: 1806,
+      meals: [
+        { id: "desayuno",     type: "breakfast",   name: "Desayuno",     kcal: 366, description: "80g de pan thins con 1 lata de atún y 4 rodajas de tomate + café", note: "Aliña el atún con limón." },
+        { id: "media_manana", type: "mid-morning",  name: "Media mañana", kcal: 175, description: "70g de pechuga de pavo/pollo + 13g de frutos secos", note: "Frutos secos de Aldi." },
+        { id: "almuerzo",     type: "lunch",        name: "Almuerzo",     kcal: 700, description: "160g de salmón a la plancha con 107g de arroz basmati y brócoli", note: "Sin aceite extra — el salmón ya tiene grasa." },
+        { id: "merienda",     type: "snack",        name: "Merienda",     kcal: 175, description: "1 lata de piña al natural + 4 nueces", note: "Piña sin almíbar." },
+        { id: "cena",         type: "dinner",       name: "Cena",         kcal: 390, description: "2 hamburguesas de ternera (180g) con calabacín a la plancha", note: "Sin pan. Calabacín con ajo y sal." },
+      ],
     },
     {
-      day: "Sábado",
-      meals: {
-        breakfast:  { text: "60g de cereales crunchy con leche semidesnatada", kcal: 325, note: "Cereales crunchy Mercadona." },
-        midMorning: { text: "Bizcocho en taza: 30g de avena + levadura + 1 huevo + 2 onzas chocolate (4 min micro)", kcal: 175, note: "4 minutos al microondas." },
-        lunch:      { text: "Lentejas: 200g de lentejas cocidas con verduras y 120g de pollo troceado", kcal: 432, note: "Sofrito base: cebolla, pimiento, zanahoria." },
-        snack:      { text: "2 tajas de sandía + 13g de frutos secos", kcal: 175, note: "Los frutos secos son muy saciantes." },
-        dinner:     { text: "140g de salmón a la plancha con espárragos verdes", kcal: 300, note: "El salmón no necesita aceite extra." },
-      },
+      date: "2026-03-21", dayName: "Sábado", totalKcal: 1407,
+      meals: [
+        { id: "desayuno",     type: "breakfast",   name: "Desayuno",     kcal: 325, description: "60g de cereales crunchy con leche semidesnatada", note: "Cereales crunchy Mercadona." },
+        { id: "media_manana", type: "mid-morning",  name: "Media mañana", kcal: 175, description: "Bizcocho en taza: 30g de avena + levadura + 1 huevo + 2 onzas chocolate (4 min micro)", note: "4 minutos al microondas." },
+        { id: "almuerzo",     type: "lunch",        name: "Almuerzo",     kcal: 432, description: "Lentejas: 200g de lentejas cocidas con verduras y 120g de pollo troceado", note: "Sofrito base: cebolla, pimiento, zanahoria." },
+        { id: "merienda",     type: "snack",        name: "Merienda",     kcal: 175, description: "2 tajas de sandía + 13g de frutos secos", note: "Los frutos secos son muy saciantes." },
+        { id: "cena",         type: "dinner",       name: "Cena",         kcal: 300, description: "140g de salmón a la plancha con espárragos verdes", note: "El salmón no necesita aceite extra." },
+      ],
     },
     {
-      day: "Domingo",
-      meals: {
-        breakfast:  { text: "Tortita de avena: 30g de avena + 2 huevos + leche + 1 cdta cacahuete + onza chocolate negro", kcal: 410, note: "Desayuno especial del domingo." },
-        midMorning: { text: "Yogurt proteínas (200g) + 13g de frutos secos", kcal: 175, note: "" },
-        lunch:      { text: "Pechuga de pollo (160g) en salsa de curry con 107g de arroz basmati", kcal: 590, note: "Salsa curry: yogurt griego, curry, limón, cebolla." },
-        snack:      { text: "Helado casero de yogurt proteínas con crema de cacahuete y chocolate negro", kcal: 175, note: "Congela el yogurt 2-3 horas." },
-        dinner:     { text: "Salmorejo cordobés con 1 huevo cocido, 1 lata de atún y picatostes", kcal: 370, note: "Salmorejo casero: tomates, pan, ajo, aceite." },
-      },
+      date: "2026-03-22", dayName: "Domingo", totalKcal: 1720,
+      meals: [
+        { id: "desayuno",     type: "breakfast",   name: "Desayuno",     kcal: 410, description: "Tortita de avena: 30g de avena + 2 huevos + leche + 1 cdta cacahuete + onza chocolate negro", note: "Desayuno especial del domingo." },
+        { id: "media_manana", type: "mid-morning",  name: "Media mañana", kcal: 175, description: "Yogurt proteínas (200g) + 1 pieza de fruta", note: "Cualquier fruta de temporada." },
+        { id: "almuerzo",     type: "lunch",        name: "Almuerzo",     kcal: 600, description: "Paella de verduras: 120g de arroz con pimiento, judías verdes, zanahoria y tomate", note: "Caldo de verduras en lugar de agua." },
+        { id: "merienda",     type: "snack",        name: "Merienda",     kcal: 175, description: "Fruta de temporada + 13g de frutos secos", note: "Naranja, kiwi o fresas." },
+        { id: "cena",         type: "dinner",       name: "Cena",         kcal: 360, description: "Ensalada mixta con 100g de pavo, aguacate y tomate cherry", note: "Con aceite de oliva y vinagre balsámico." },
+      ],
     },
-  ],
-  shoppingList: [
-    { category: "Proteínas", items: ["Pechuga de pollo (1 kg)", "Filetes de salmón (4)", "Carne picada de ternera (500 g)", "Huevos (2 docenas)", "Gambas (500 g)", "Filetes de merluza (4)", "Latas de atún (12)", "Lonchas de pavo (200 g)"] },
-    { category: "Cereales e hidratos", items: ["Pan thins (2 paquetes)", "Pan de centeno", "Harina de avena (500 g)", "Arroz basmati (1 kg)", "Espaguetis (500 g)", "Ñoquis (2 bolsas)", "Cereales crunchy Mercadona", "Crackers"] },
-    { category: "Frutas y verduras", items: ["Fruta de temporada variada", "Espinacas (2 bolsas)", "Brócoli (2 cabezas)", "Calabacín (4)", "Tomates (6)", "Zanahorias (1 bolsa)", "Espárragos (1 manojo)", "Pimientos variados"] },
-    { category: "Lácteos y alternativas", items: ["Leche semidesnatada (2 L)", "Yogurt proteínas (4 uds)", "Kefir (2 uds)", "Queso fresco 0% (2 uds)"] },
-    { category: "Despensa", items: ["Jamón serrano (150 g)", "Caña de lomo (150 g)", "Crema de cacahuete", "Aceite de oliva virgen extra", "Tomate frito sin azúcar (2 botes)", "Frutos secos variados (Aldi)", "Chocolate negro 70%", "Salsa de soja"] },
   ],
 }
 
 const mealTypeIcons: Record<string, typeof Coffee> = {
   breakfast: Coffee,
-  midMorning: Sun,
+  "mid-morning": Sun,
   lunch: Utensils,
   snack: Cookie,
   dinner: Moon,
 }
 
-const mealTypeLabels: Record<string, string> = {
-  breakfast: "Desayuno",
-  midMorning: "Media mañana",
-  lunch: "Almuerzo",
-  snack: "Merienda",
-  dinner: "Cena",
-}
-
 const mealTypeEmoji: Record<string, string> = {
   breakfast: "☕",
-  midMorning: "🌅",
+  "mid-morning": "🌅",
   lunch: "🍽️",
   snack: "🍎",
   dinner: "🌙",
 }
 
 const mealTypeColor: Record<string, { bg: string; text: string; border: string }> = {
-  breakfast:  { bg: "#fef3c7", text: "#92400e", border: "#fde68a" },
-  midMorning: { bg: "#ffe4e6", text: "#9f1239", border: "#fecdd3" },
-  lunch:      { bg: "#dcfce7", text: "#14532d", border: "#bbf7d0" },
-  snack:      { bg: "#ede9fe", text: "#4c1d95", border: "#ddd6fe" },
-  dinner:     { bg: "#e0f2fe", text: "#0c4a6e", border: "#bae6fd" },
+  breakfast:    { bg: "#fef3c7", text: "#92400e", border: "#fde68a" },
+  "mid-morning": { bg: "#ffe4e6", text: "#9f1239", border: "#fecdd3" },
+  lunch:        { bg: "#dcfce7", text: "#14532d", border: "#bbf7d0" },
+  snack:        { bg: "#ede9fe", text: "#4c1d95", border: "#ddd6fe" },
+  dinner:       { bg: "#e0f2fe", text: "#0c4a6e", border: "#bae6fd" },
 }
 
 // ── Screen meal card ────────────────────────────────────────────────────────
-function MealCard({ mealType, meal }: { mealType: string; meal: WeeklyMeal }) {
-  const MealIcon = mealTypeIcons[mealType] || Utensils
+function MealCard({ meal }: { meal: PlanDay["meals"][0] }) {
+  const MealIcon = mealTypeIcons[meal.type] || Utensils
   return (
     <div className="p-3 bg-white/5 rounded-xl border border-white/10 flex flex-col gap-1.5">
       <div className="flex items-center gap-1.5">
         <MealIcon className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
         <span className="text-white/60 text-xs font-semibold uppercase tracking-wide">
-          {mealTypeLabels[mealType]}
+          {meal.name}
         </span>
         {meal.kcal > 0 && (
           <Badge className="ml-auto bg-emerald-500/20 text-emerald-400 border-emerald-400/30 text-xs px-1.5 py-0">
@@ -148,7 +137,7 @@ function MealCard({ mealType, meal }: { mealType: string; meal: WeeklyMeal }) {
           </Badge>
         )}
       </div>
-      <p className="text-white text-xs leading-snug">{meal.text}</p>
+      <p className="text-white text-xs leading-snug">{meal.description}</p>
       {meal.note && (
         <div className="flex items-start gap-1 mt-0.5">
           <Lightbulb className="h-3 w-3 text-amber-400 shrink-0 mt-0.5" />
@@ -160,9 +149,8 @@ function MealCard({ mealType, meal }: { mealType: string; meal: WeeklyMeal }) {
 }
 
 // ── Print day card ──────────────────────────────────────────────────────────
-function PrintDayCard({ dayPlan }: { dayPlan: WeeklyPlan["days"][0] }) {
-  const mealKeys = Object.keys(dayPlan.meals) as Array<keyof typeof dayPlan.meals>
-  const totalKcal = Object.values(dayPlan.meals).reduce((sum, m) => sum + m.kcal, 0)
+function PrintDayCard({ dayPlan }: { dayPlan: PlanDay }) {
+  const totalKcal = dayPlan.totalKcal
 
   return (
     <div
@@ -187,7 +175,7 @@ function PrintDayCard({ dayPlan }: { dayPlan: WeeklyPlan["days"][0] }) {
         }}
       >
         <span style={{ fontWeight: 700, fontSize: "12pt", letterSpacing: "0.02em" }}>
-          {dayPlan.day}
+          {dayPlan.dayName}
         </span>
         {totalKcal > 0 && (
           <span
@@ -206,19 +194,18 @@ function PrintDayCard({ dayPlan }: { dayPlan: WeeklyPlan["days"][0] }) {
 
       {/* Meals row */}
       <div style={{ display: "flex" }}>
-        {mealKeys.map((mealType, idx) => {
-          const meal = dayPlan.meals[mealType]
-          const color = mealTypeColor[mealType]
+        {dayPlan.meals.map((meal, idx) => {
+          const color = mealTypeColor[meal.type] ?? { bg: "#f9fafb", text: "#374151", border: "#e5e7eb" }
           return (
             <div
-              key={mealType}
+              key={meal.id}
               style={{
                 flex: 1,
                 display: "flex",
                 flexDirection: "column",
                 gap: "4pt",
                 padding: "7pt 7pt",
-                borderRight: idx < 4 ? "1px solid #e5e7eb" : "none",
+                borderRight: idx < dayPlan.meals.length - 1 ? "1px solid #e5e7eb" : "none",
                 backgroundColor: "white",
               }}
             >
@@ -236,7 +223,7 @@ function PrintDayCard({ dayPlan }: { dayPlan: WeeklyPlan["days"][0] }) {
                 }}
               >
                 <div style={{ display: "flex", alignItems: "center", gap: "4pt" }}>
-                  <span style={{ fontSize: "11pt" }}>{mealTypeEmoji[mealType]}</span>
+                  <span style={{ fontSize: "11pt" }}>{mealTypeEmoji[meal.type] ?? "🍽️"}</span>
                   <span
                     style={{
                       fontSize: "6.5pt",
@@ -246,7 +233,7 @@ function PrintDayCard({ dayPlan }: { dayPlan: WeeklyPlan["days"][0] }) {
                       color: "#6b7280",
                     }}
                   >
-                    {mealTypeLabels[mealType]}
+                    {meal.name}
                   </span>
                 </div>
                 {meal.kcal > 0 && (
@@ -277,7 +264,7 @@ function PrintDayCard({ dayPlan }: { dayPlan: WeeklyPlan["days"][0] }) {
                   flex: 1,
                 }}
               >
-                {meal.text}
+                {meal.description}
               </p>
 
               {/* Tip */}
@@ -307,7 +294,7 @@ function PrintDayCard({ dayPlan }: { dayPlan: WeeklyPlan["days"][0] }) {
 }
 
 // ── Print shopping list ─────────────────────────────────────────────────────
-function PrintShoppingList({ shoppingList }: { shoppingList: WeeklyPlan["shoppingList"] }) {
+function PrintShoppingList({ shoppingList }: { shoppingList: { category: string; items: string[] }[] }) {
   const categoryEmoji: Record<string, string> = {
     "Proteínas": "🥩",
     "Cereales e hidratos": "🌾",
@@ -427,15 +414,39 @@ function PrintShoppingList({ shoppingList }: { shoppingList: WeeklyPlan["shoppin
 
 // ── Page ────────────────────────────────────────────────────────────────────
 export default function WeeklyPlanPage() {
-  const [data, setData] = useState<WeeklyPlan | null>(null)
+  const [data, setData] = useState<WeeklyPlanResponse | null>(null)
   const [loading, setLoading] = useState(true)
+  const [stale, setStale] = useState(false)
+  const [showRegenModal, setShowRegenModal] = useState(false)
+  const [regenApplyFrom, setRegenApplyFrom] = useState<"today" | "tomorrow">("tomorrow")
+  const [regenerating, setRegenerating] = useState(false)
+  const [regenError, setRegenError] = useState<string | null>(null)
+  const [shoppingList, setShoppingList] = useState<{ category: string; items: string[] }[]>([])
 
   useEffect(() => {
     fetchWeeklyPlan()
-      .then(setData)
-      .catch(() => setData(mockWeeklyPlan))
+      .then((d) => {
+        setStale(d.stale)
+        setData(d)
+      })
+      .catch(() => setData(mockWeeklyPlanResponse))
       .finally(() => setLoading(false))
   }, [])
+
+  const handleRegenerate = async () => {
+    setRegenerating(true)
+    setRegenError(null)
+    try {
+      const result = await regenerateWeeklyPlan(regenApplyFrom)
+      setData({ days: result.days, summary: data?.summary ?? null, stale: false })
+      setStale(false)
+      setShowRegenModal(false)
+    } catch {
+      setRegenError("Error al regenerar el plan. Inténtalo de nuevo.")
+    } finally {
+      setRegenerating(false)
+    }
+  }
 
   if (loading) {
     return (
@@ -447,11 +458,8 @@ export default function WeeklyPlanPage() {
     )
   }
 
-  const plan = data || mockWeeklyPlan
-  const totalWeekKcal = plan.days.reduce(
-    (sum, day) => sum + Object.values(day.meals).reduce((s, m) => s + m.kcal, 0),
-    0
-  )
+  const weeklyPlan = data ?? mockWeeklyPlanResponse
+  const totalWeekKcal = weeklyPlan.days.reduce((sum, day) => sum + day.totalKcal, 0)
   const dateStr = new Date().toLocaleDateString("es-ES", {
     weekday: "long", year: "numeric", month: "long", day: "numeric",
   })
@@ -468,6 +476,44 @@ export default function WeeklyPlanPage() {
 
       <div className="space-y-6">
 
+        {/* ── Stale banner ── */}
+        {stale && (
+          <div className="bg-amber-500/20 border border-amber-400/30 rounded-2xl p-4 flex items-center justify-between mb-4">
+            <span className="text-amber-300 text-sm">
+              Tu plan es de la semana pasada.
+            </span>
+            <button
+              onClick={() => setShowRegenModal(true)}
+              className="text-amber-400 text-sm font-semibold hover:underline ml-4"
+            >
+              Regenerar ahora →
+            </button>
+          </div>
+        )}
+
+        {/* ── Adaptive summary card ── */}
+        {data?.summary && (
+          <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl p-4 mb-4">
+            <p className="text-white/60 text-sm">
+              Plan ajustado por:{" "}
+              {data.summary.weight_delta !== null && (
+                <span className="text-white font-medium">
+                  {data.summary.weight_delta > 0 ? "+" : ""}{data.summary.weight_delta}kg semana anterior
+                </span>
+              )}
+              {data.summary.total_exercise_kcal > 0 && (
+                <span className="text-white font-medium ml-2">
+                  · {data.summary.total_exercise_kcal.toLocaleString()} kcal ejercicio
+                </span>
+              )}
+              {" · "}
+              <span className="text-white font-medium">
+                {Math.round(data.summary.avg_adherence * 100)}% adherencia
+              </span>
+            </p>
+          </div>
+        )}
+
         {/* ── Screen header ── */}
         <Card className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-6 print:hidden">
           <div className="flex items-center justify-between flex-wrap gap-3">
@@ -478,13 +524,22 @@ export default function WeeklyPlanPage() {
                 <p className="text-white/60">Tus comidas planificadas para toda la semana</p>
               </div>
             </div>
-            <Button
-              onClick={() => window.print()}
-              className="bg-white/10 hover:bg-white/20 border border-white/20 text-white"
-            >
-              <FileDown className="mr-2 h-4 w-4" />
-              Exportar PDF
-            </Button>
+            <div className="flex items-center gap-3 flex-wrap">
+              <button
+                onClick={() => setShowRegenModal(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-400/30 rounded-xl text-emerald-300 text-sm font-medium transition-colors"
+              >
+                <RefreshCw className="w-4 h-4" />
+                Regenerar plan semanal
+              </button>
+              <Button
+                onClick={() => window.print()}
+                className="bg-white/10 hover:bg-white/20 border border-white/20 text-white"
+              >
+                <FileDown className="mr-2 h-4 w-4" />
+                Exportar PDF
+              </Button>
+            </div>
           </div>
         </Card>
 
@@ -492,28 +547,45 @@ export default function WeeklyPlanPage() {
         <div className="print:hidden">
           <Card className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-6">
             <Accordion type="single" collapsible className="space-y-2">
-              {plan.days.map((dayPlan) => {
-                const totalKcal = Object.values(dayPlan.meals).reduce((sum, m) => sum + m.kcal, 0)
+              {weeklyPlan.days.map((dayPlan) => {
+                const isToday = dayPlan.date === todayISO
+                const displayKcal = dayPlan.exerciseAdj?.adjustedTotal ?? dayPlan.totalKcal
                 return (
                   <AccordionItem
-                    key={dayPlan.day}
-                    value={dayPlan.day}
-                    className="bg-white/5 rounded-xl border border-white/10 px-4 data-[state=open]:bg-white/10"
+                    key={dayPlan.date}
+                    value={dayPlan.date}
+                    className={`bg-white/5 rounded-xl border px-4 data-[state=open]:bg-white/10 ${
+                      isToday ? "border-emerald-400/50" : "border-white/10"
+                    }`}
                   >
                     <AccordionTrigger className="hover:no-underline py-4">
                       <div className="flex items-center justify-between w-full pr-4">
-                        <span className="text-lg font-semibold text-white">{dayPlan.day}</span>
-                        {totalKcal > 0 && (
-                          <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-400/30">
-                            {totalKcal} kcal
-                          </Badge>
-                        )}
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg font-semibold text-white">{dayPlan.dayName}</span>
+                          {isToday && (
+                            <span className="bg-emerald-500 text-white text-xs px-2 py-0.5 rounded-full font-medium">
+                              HOY
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1">
+                          {dayPlan.exerciseAdj && (
+                            <span className="text-yellow-300 text-xs ml-2">
+                              ⚡ +{dayPlan.exerciseAdj.extraKcal}kcal
+                            </span>
+                          )}
+                          {displayKcal > 0 && (
+                            <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-400/30">
+                              {displayKcal} kcal
+                            </Badge>
+                          )}
+                        </div>
                       </div>
                     </AccordionTrigger>
                     <AccordionContent className="pb-4">
                       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-                        {(Object.keys(dayPlan.meals) as Array<keyof typeof dayPlan.meals>).map((mealType) => (
-                          <MealCard key={mealType} mealType={mealType} meal={dayPlan.meals[mealType]} />
+                        {dayPlan.meals.map((meal) => (
+                          <MealCard key={meal.id} meal={meal} />
                         ))}
                       </div>
                     </AccordionContent>
@@ -525,29 +597,31 @@ export default function WeeklyPlanPage() {
         </div>
 
         {/* ── Screen shopping list ── */}
-        <Card className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-6 print:hidden">
-          <div className="flex items-center gap-2 mb-6">
-            <ShoppingCart className="h-5 w-5 text-emerald-400" />
-            <h3 className="text-xl font-semibold text-white">Lista de la compra</h3>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-6">
-            {plan.shoppingList.map((category) => (
-              <div key={category.category} className="space-y-3">
-                <h4 className="text-white font-semibold border-b border-white/10 pb-2">
-                  {category.category}
-                </h4>
-                <ul className="space-y-2">
-                  {category.items.map((item, index) => (
-                    <li key={index} className="text-white/80 text-sm flex items-center gap-2">
-                      <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full shrink-0" />
-                      {item}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ))}
-          </div>
-        </Card>
+        {shoppingList.length > 0 && (
+          <Card className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-6 print:hidden">
+            <div className="flex items-center gap-2 mb-6">
+              <ShoppingCart className="h-5 w-5 text-emerald-400" />
+              <h3 className="text-xl font-semibold text-white">Lista de la compra</h3>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-6">
+              {shoppingList.map((category) => (
+                <div key={category.category} className="space-y-3">
+                  <h4 className="text-white font-semibold border-b border-white/10 pb-2">
+                    {category.category}
+                  </h4>
+                  <ul className="space-y-2">
+                    {category.items.map((item, index) => (
+                      <li key={index} className="text-white/80 text-sm flex items-center gap-2">
+                        <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full shrink-0" />
+                        {item}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          </Card>
+        )}
 
         {/* ══════════════════════════════════════════════════════════════════
             PRINT-ONLY TEMPLATE
@@ -595,13 +669,88 @@ export default function WeeklyPlanPage() {
           </div>
 
           {/* Day cards */}
-          {plan.days.map((dayPlan) => (
-            <PrintDayCard key={dayPlan.day} dayPlan={dayPlan} />
+          {weeklyPlan.days.map((dayPlan) => (
+            <PrintDayCard key={dayPlan.date} dayPlan={dayPlan} />
           ))}
 
-          {/* Shopping list on new page */}
-          <PrintShoppingList shoppingList={plan.shoppingList} />
+          {/* Shopping list on new page (only if available) */}
+          {shoppingList.length > 0 && (
+            <PrintShoppingList shoppingList={shoppingList} />
+          )}
         </div>
+
+        {/* Regeneration modal */}
+        {showRegenModal && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-6 w-full max-w-md">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-white font-bold text-lg">Regenerar plan semanal</h3>
+                <button onClick={() => setShowRegenModal(false)} className="text-white/60 hover:text-white">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {data?.summary ? (
+                <div className="bg-white/5 rounded-xl p-4 mb-4 text-sm text-white/70 space-y-1">
+                  <p>Basado en tu semana anterior:</p>
+                  <p>· Adherencia: <span className="text-white">{Math.round(data.summary.avg_adherence * 100)}%</span></p>
+                  <p>· Ejercicio acumulado: <span className="text-white">{data.summary.total_exercise_kcal.toLocaleString()} kcal</span></p>
+                  {data.summary.weight_delta !== null && (
+                    <p>· Peso: <span className="text-white">{data.summary.weight_delta > 0 ? "+" : ""}{data.summary.weight_delta} kg</span></p>
+                  )}
+                </div>
+              ) : (
+                <p className="text-white/50 text-sm mb-4">No hay historial de la semana anterior disponible.</p>
+              )}
+
+              <p className="text-white/70 text-sm mb-3">¿Desde cuándo aplicar el nuevo plan?</p>
+              <div className="space-y-2 mb-4">
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="applyFrom"
+                    value="today"
+                    checked={regenApplyFrom === "today"}
+                    onChange={() => setRegenApplyFrom("today")}
+                    className="accent-emerald-400"
+                  />
+                  <span className="text-white text-sm">Desde hoy (reemplaza el menú de hoy)</span>
+                </label>
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="applyFrom"
+                    value="tomorrow"
+                    checked={regenApplyFrom === "tomorrow"}
+                    onChange={() => setRegenApplyFrom("tomorrow")}
+                    className="accent-emerald-400"
+                  />
+                  <span className="text-white text-sm">Desde mañana (mantiene el menú de hoy)</span>
+                </label>
+              </div>
+
+              {regenError && (
+                <p className="text-red-400 text-sm mb-3">{regenError}</p>
+              )}
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowRegenModal(false)}
+                  className="flex-1 px-4 py-2 border border-white/20 rounded-xl text-white/70 text-sm hover:bg-white/5 transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleRegenerate}
+                  disabled={regenerating}
+                  className="flex-1 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 rounded-xl text-white text-sm font-medium transition-colors"
+                >
+                  {regenerating ? "Regenerando..." : "Regenerar"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
       </div>
     </AppLayout>
