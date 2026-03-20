@@ -244,7 +244,7 @@ function PrintDayCard({ dayPlan }: { dayPlan: PlanDay }) {
                       color: "#6b7280",
                     }}
                   >
-                    {meal.name}
+                    {mealDisplayName[meal.id] ?? meal.name}
                   </span>
                 </div>
                 {meal.kcal > 0 && (
