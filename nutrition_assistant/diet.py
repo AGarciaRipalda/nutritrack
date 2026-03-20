@@ -889,3 +889,51 @@ def generate_week_plan(
         "weekly_target_kcal":  adjusted_target,
         "weekly_summary":      weekly_summary_used,
     }
+
+
+def get_day_from_plan(
+    date_iso: str,
+    plan: dict,
+    exercise_adj: dict,
+) -> dict | None:
+    """
+    Returns the PlanDay for the given ISO date from the plan,
+    with exercise adjustment applied if present.
+    Returns None if the date is not in the plan.
+    """
+    days: list = plan.get("days", [])
+    day = next((d for d in days if d["date"] == date_iso), None)
+    if day is None:
+        return None
+
+    # Deep copy to avoid mutating stored plan
+    import copy
+    day = copy.deepcopy(day)
+
+    adj_entry = exercise_adj.get(date_iso)
+    if adj_entry and adj_entry.get("extra_kcal", 0) > 0:
+        extra_kcal          = adj_entry["extra_kcal"]
+        source              = adj_entry.get("source", "")
+        total_base_kcal     = day["totalKcal"] or 1
+        portion_scale       = min(1.0 + (extra_kcal / total_base_kcal), 1.5)
+
+        adjusted_meals = []
+        for meal in day["meals"]:
+            base_kcal     = meal["kcal"]
+            adj_kcal      = round(base_kcal * portion_scale)
+            adjusted_meals.append({
+                **meal,
+                "portionScale":  round(portion_scale, 4),
+                "adjustedKcal":  adj_kcal,
+            })
+        adjusted_total = round(day["totalKcal"] * portion_scale)
+        day["meals"]       = adjusted_meals
+        day["exerciseAdj"] = {
+            "extraKcal":     extra_kcal,
+            "source":        source,
+            "adjustedTotal": adjusted_total,
+        }
+    else:
+        day.pop("exerciseAdj", None)
+
+    return day

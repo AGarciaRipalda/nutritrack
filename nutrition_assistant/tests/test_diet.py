@@ -1,6 +1,6 @@
 import pytest
 from datetime import date, timedelta
-from diet import generate_week_plan
+from diet import generate_week_plan, get_day_from_plan
 
 # Helper: Monday of the week containing a given date
 def monday_of(d: date) -> date:
@@ -76,3 +76,50 @@ def test_minimum_target_is_1200_kcal():
     }]
     plan = generate_week_plan([], [], daily_target=1200, history=history)
     assert plan["weekly_target_kcal"] >= 1200
+
+
+@pytest.fixture
+def sample_plan():
+    return generate_week_plan([], [], daily_target=1800)
+
+def test_get_day_from_plan_returns_correct_day(sample_plan):
+    today = date.today()
+    monday = today - timedelta(days=today.weekday())
+    iso = monday.isoformat()
+    result = get_day_from_plan(iso, sample_plan, exercise_adj={})
+    assert result is not None
+    assert result["date"] == iso
+
+def test_get_day_from_plan_returns_none_for_missing_date(sample_plan):
+    result = get_day_from_plan("2020-01-01", sample_plan, exercise_adj={})
+    assert result is None
+
+def test_get_day_from_plan_applies_exercise_adj(sample_plan):
+    today = date.today()
+    monday = today - timedelta(days=today.weekday())
+    iso = monday.isoformat()
+    adj = {iso: {"extra_kcal": 300, "source": "running 30min"}}
+    result = get_day_from_plan(iso, sample_plan, exercise_adj=adj)
+    assert result["exerciseAdj"] is not None
+    assert result["exerciseAdj"]["extraKcal"] == 300
+    # Each meal should have portionScale > 1.0
+    for meal in result["meals"]:
+        assert meal.get("portionScale", 1.0) > 1.0
+
+def test_portion_scale_capped_at_1_5(sample_plan):
+    today = date.today()
+    monday = today - timedelta(days=today.weekday())
+    iso = monday.isoformat()
+    # Extreme exercise to force cap
+    adj = {iso: {"extra_kcal": 99999, "source": "extreme"}}
+    result = get_day_from_plan(iso, sample_plan, exercise_adj=adj)
+    for meal in result["meals"]:
+        assert meal.get("portionScale", 1.0) <= 1.5
+
+def test_get_day_from_plan_no_exercise_adj_no_scale(sample_plan):
+    today = date.today()
+    iso = (today - timedelta(days=today.weekday())).isoformat()
+    result = get_day_from_plan(iso, sample_plan, exercise_adj={})
+    assert result.get("exerciseAdj") is None
+    for meal in result["meals"]:
+        assert meal.get("portionScale") is None
