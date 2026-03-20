@@ -30,10 +30,25 @@ def test_save_and_load_weekly_history(tmp_session):
     assert len(history) == 1
     assert history[0]["week_start"] == "2026-03-10"
 
+def test_weekly_history_newest_first(tmp_session):
+    storage.save_weekly_history({"week_start": "2026-03-03", "avg_adherence": 0.7, "total_exercise_kcal": 500, "weight_start": None, "weight_end": None, "weight_delta": None, "days_logged": 5})
+    storage.save_weekly_history({"week_start": "2026-03-10", "avg_adherence": 0.85, "total_exercise_kcal": 800, "weight_start": None, "weight_end": None, "weight_delta": None, "days_logged": 7})
+    history = storage.load_weekly_history()
+    assert history[0]["week_start"] == "2026-03-10"  # newest first
+
+def test_weekly_history_deduplicates_same_week(tmp_session):
+    summary_v1 = {"week_start": "2026-03-10", "avg_adherence": 0.5, "total_exercise_kcal": 0, "weight_start": None, "weight_end": None, "weight_delta": None, "days_logged": 3}
+    summary_v2 = {"week_start": "2026-03-10", "avg_adherence": 0.9, "total_exercise_kcal": 1200, "weight_start": None, "weight_end": None, "weight_delta": None, "days_logged": 7}
+    storage.save_weekly_history(summary_v1)
+    storage.save_weekly_history(summary_v2)
+    history = storage.load_weekly_history()
+    assert len(history) == 1
+    assert history[0]["avg_adherence"] == 0.9  # latest version wins
+
 def test_weekly_history_capped_at_12(tmp_session):
     for i in range(15):
         storage.save_weekly_history({
-            "week_start": f"2025-{i+1:02d}-01",
+            "week_start": f"2025-01-{i+1:02d}",
             "avg_adherence": 0.8,
             "total_exercise_kcal": 0,
             "weight_start": None,
