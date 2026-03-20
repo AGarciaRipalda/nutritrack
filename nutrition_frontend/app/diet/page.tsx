@@ -15,9 +15,10 @@ import {
   Moon,
   Lightbulb,
   CheckCircle2,
+  Wheat,
 } from "lucide-react"
-import type { PlanDay, Meal } from "@/lib/api"
-import { fetchTodaysPlan, swapMeal, updateAdherence } from "@/lib/api"
+import type { PlanDay, Meal, FavoriteCarb } from "@/lib/api"
+import { fetchTodaysPlan, swapMeal, updateAdherence, fetchFavoriteCarbs } from "@/lib/api"
 
 const today = new Date().toISOString().slice(0, 10)
 const mockPlanDay: PlanDay = {
@@ -98,6 +99,8 @@ export default function DietPage() {
   const [loading, setLoading] = useState(true)
   const [swapping, setSwapping] = useState<string | null>(null)
   const [checkedMeals, setCheckedMeals] = useState<Record<string, boolean>>({})
+  const [favoriteCarbs, setFavoriteCarbs] = useState<FavoriteCarb[]>([])
+  const [selectedCarbs, setSelectedCarbs] = useState<Record<string, FavoriteCarb | null>>({})
 
   useEffect(() => {
     fetchTodaysPlan()
@@ -107,6 +110,10 @@ export default function DietPage() {
       })
       .catch(() => setData(mockPlanDay))
       .finally(() => setLoading(false))
+
+    fetchFavoriteCarbs()
+      .then(setFavoriteCarbs)
+      .catch(() => {})
   }, [])
 
   const handleSwap = async (mealId: string) => {
@@ -203,6 +210,13 @@ export default function DietPage() {
           {planDay.meals.map((meal) => {
             const MealIcon = mealIcons[meal.type] || Utensils
             const label = mealLabels[meal.type] ?? mealIdLabels[meal.id]
+            const selCarb = selectedCarbs[meal.id] ?? null
+
+            // Recalculate grams instantly when a different carb is selected
+            const carbGrams = selCarb && meal.fixedKcal != null && meal.targetKcal != null
+              ? Math.round(Math.max(meal.targetKcal - meal.fixedKcal, 0) / (selCarb.kcal / 100))
+              : null
+
             return (
               <Card
                 key={meal.id}
@@ -226,6 +240,33 @@ export default function DietPage() {
 
                 {/* Dish description */}
                 <p className="text-white text-sm leading-snug mb-3">{meal.description}</p>
+
+                {/* Carb selector — only shown when backend provides fixedKcal */}
+                {favoriteCarbs.length > 0 && meal.fixedKcal != null && (
+                  <div className="flex items-center gap-2 mb-3">
+                    <Wheat className="h-3.5 w-3.5 text-white/40 shrink-0" />
+                    <select
+                      value={selCarb?.key ?? ""}
+                      onChange={(e) => {
+                        const found = favoriteCarbs.find((c) => c.key === e.target.value) ?? null
+                        setSelectedCarbs((prev) => ({ ...prev, [meal.id]: found }))
+                      }}
+                      className="flex-1 bg-white/5 border border-white/10 rounded-lg text-white/60 text-xs px-2 py-1.5 focus:outline-none focus:border-emerald-400/40"
+                    >
+                      <option value="">Carbohidrato original</option>
+                      {favoriteCarbs.map((c) => (
+                        <option key={c.key} value={c.key}>
+                          {c.name} · {c.kcal} kcal/100g
+                        </option>
+                      ))}
+                    </select>
+                    {carbGrams != null && (
+                      <span className="text-emerald-400 text-xs font-semibold shrink-0 whitespace-nowrap">
+                        {carbGrams}g
+                      </span>
+                    )}
+                  </div>
+                )}
 
                 {/* Tip */}
                 {meal.note && (

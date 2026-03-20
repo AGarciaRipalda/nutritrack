@@ -75,6 +75,12 @@ export interface DashboardData {
   }[]
 }
 
+export interface FavoriteCarb {
+  key: string    // "arroz_cocido"
+  name: string   // "Arroz cocido"
+  kcal: number   // kcal per 100g
+}
+
 export interface Meal {
   id: string            // "desayuno", "almuerzo", etc.
   type: string          // "breakfast", "lunch", etc.
@@ -85,6 +91,9 @@ export interface Meal {
   timingNote?: string   // "Best before 10am", etc.
   adjustedKcal?: number // kcal adjusted for exercise (if applicable)
   portionScale?: number // portion scale factor, e.g. 1.15
+  fixedKcal?: number    // protein+fat+veg fixed component (for carb swap calc)
+  targetKcal?: number   // calorie target for this meal slot
+  carbG?: number        // original carb grams
 }
 
 export interface PlanDay {
@@ -273,6 +282,9 @@ function transformPlanDay(d: any): PlanDay & { stale: boolean } {
       timingNote:   m.timing_note ?? undefined,
       adjustedKcal: m.adjusted_kcal ?? undefined,
       portionScale: m.portion_scale ?? undefined,
+      fixedKcal:   m.fixedKcal ?? undefined,
+      targetKcal:  m.targetKcal ?? undefined,
+      carbG:       m.carb_g ?? undefined,
     }
   })
   return {
@@ -636,4 +648,9 @@ export async function saveEvent(event: { name: string; date: string }): Promise<
 
 export async function deleteEvent(): Promise<void> {
   await del("/event")
+}
+
+export async function fetchFavoriteCarbs(): Promise<FavoriteCarb[]> {
+  const d = await get<any>("/diet/carbs")
+  return d.carbs ?? []
 }

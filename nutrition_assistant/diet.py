@@ -30,6 +30,15 @@ CARB_SOURCES = {
     "quinoa":        {"name": "quinoa cocida",            "kcal": 120},
 }
 
+# ─── Carbohidratos favoritos (seleccionables por el usuario) ─────────────────
+FAVORITE_CARBS = [
+    {"key": "arroz_cocido",  "name": "Arroz cocido",  "kcal": 130},
+    {"key": "pasta_cocida",  "name": "Pasta cocida",  "kcal": 150},
+    {"key": "patata_cocida", "name": "Patata cocida", "kcal": 77},
+    {"key": "pan_integral",  "name": "Pan integral",  "kcal": 250},
+    {"key": "quinoa",        "name": "Quinoa",        "kcal": 120},
+]
+
 # ─── Distribución del presupuesto calórico entre comidas ─────────────────────
 SNACK_TARGET_KCAL = 175
 MAIN_MEAL_SPLIT   = {"desayuno": 0.28, "almuerzo": 0.45, "cena": 0.27}
@@ -749,6 +758,8 @@ def _scale_meal(template_data: dict, target_kcal: float, meal_key: str) -> dict:
         "carb_name":  carb_display,
         "note":       template_data.get("note", ""),
         "timing_note": "",
+        "fixedKcal":  fixed,
+        "targetKcal": round(target_kcal),
     }
 
 
@@ -929,7 +940,7 @@ def get_day_from_plan(
         extra_kcal          = adj_entry["extra_kcal"]
         source              = adj_entry.get("source", "")
         total_base_kcal     = day["totalKcal"] or 1
-        portion_scale       = min(1.0 + (extra_kcal / total_base_kcal), 1.5)
+        portion_scale       = min(1.0 + (extra_kcal / total_base_kcal), 1.3)
 
         adjusted_meals = []
         for meal in day["meals"]:

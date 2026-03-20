@@ -27,7 +27,7 @@ from calculator import (
 )
 from diet import (
     generate_week_plan, get_day_from_plan,
-    regenerate_meal,
+    regenerate_meal, FAVORITE_CARBS,
 )
 from exercise_log import (
     EXERCISES, RECOVERY_FACTOR, TODAY_BONUS_KCAL, TODAY_TIMING,
@@ -333,6 +333,12 @@ def _get_daily_target() -> int:
     bmr      = calculate_bmr(profile["gender"], profile["age"],
                               profile["height_cm"], profile["weight_kg"])
     return calculate_daily_target(bmr, profile["goal"])
+
+
+@app.get("/diet/carbs", tags=["Dieta"])
+def get_favorite_carbs():
+    """Returns the list of swappable carb sources for the UI selector."""
+    return {"carbs": FAVORITE_CARBS}
 
 
 @app.get("/diet/weekly", tags=["Dieta"])
