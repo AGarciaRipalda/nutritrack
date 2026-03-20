@@ -48,7 +48,8 @@ async function put<T>(path: string, body: unknown): Promise<T> {
 }
 
 async function del(path: string): Promise<void> {
-  await fetch(`${API_BASE}${path}`, { method: "DELETE", headers: getHeaders() })
+  const res = await fetch(`${API_BASE}${path}`, { method: "DELETE", headers: getHeaders() })
+  if (!res.ok) throw new Error(`DELETE ${path} failed: ${res.status}`)
 }
 
 // ── Tipos públicos (usados por los componentes de v0) ─────────────────────────
@@ -257,6 +258,9 @@ function trendLine(points: WeightEntry[]): WeightEntry[] {
 // (per the unified spec model). MEAL_MAP lookup is therefore NOT used here —
 // using it would silently overwrite correct backend values with stale frontend data.
 // MEAL_MAP can be removed entirely once the backend migration is complete.
+// `d` is typed as `any` intentionally: the backend response shape is being
+// migrated from the old format. Once Task 5 (backend endpoints) is complete,
+// this can be narrowed to a proper BackendPlanDay interface.
 function transformPlanDay(d: any): PlanDay & { stale: boolean } {
   const meals: Meal[] = (d.meals ?? []).map((m: any) => {
     return {
