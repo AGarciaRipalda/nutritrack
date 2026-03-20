@@ -6,6 +6,7 @@ de carbohidrato al presupuesto calórico del día.
 """
 
 import random
+from datetime import date, timedelta
 from calculator import calculate_bmr, calculate_daily_target, calculate_macros
 
 # ─── Fuentes de carbohidratos (kcal / 100 g en crudo salvo indicación) ────────
@@ -32,6 +33,8 @@ CARB_SOURCES = {
 # ─── Distribución del presupuesto calórico entre comidas ─────────────────────
 SNACK_TARGET_KCAL = 175
 MAIN_MEAL_SPLIT   = {"desayuno": 0.28, "almuerzo": 0.45, "cena": 0.27}
+DAY_NAMES_ES      = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
+MEAL_ID_ORDER     = ["desayuno", "media_manana", "almuerzo", "merienda", "cena"]
 MIN_CARB_G        = {"desayuno": 30, "almuerzo": 50, "cena": 20,
                      "media_manana": 5, "merienda": 5}
 
@@ -804,17 +807,87 @@ def regenerate_meal(day: dict, meal_key: str,
     return {**day, "meals": meals}
 
 
-def generate_week_plan(excluded: list, favorites: list, daily_target: int = 1800) -> dict:
-    """Genera un plan semanal completo con gramaje exacto."""
+def generate_week_plan(
+    excluded: list,
+    favorites: list,
+    daily_target: int = 1800,
+    history: list | None = None,
+    reference_date: date | None = None,
+) -> dict:
+    """
+    Generates a full weekly plan keyed by ISO date.
+    reference_date: the "today" date in the user's timezone, resolved by the caller.
+                    If None, falls back to date.today() (UTC).
+    Returns:
+      {
+        "days": [PlanDay, ...],          # 7 items, Mon–Sun
+        "generated_at": "2026-03-17",   # ISO date of Monday of this week
+        "weekly_target_kcal": int,
+        "weekly_summary": {...} | None,  # summary used for adjustment
+      }
+    """
+    # ── 1. Determine Monday of current week ──────────────────────────────
+    # Use caller-provided reference_date (timezone-aware); fall back to UTC today.
+    today = reference_date if reference_date is not None else date.today()
+    monday = today - timedelta(days=today.weekday())
+
+    # ── 2. Adjust target based on history ────────────────────────────────
+    adjusted_target = daily_target
+    weekly_summary_used = None
+    if history:
+        prev = history[0]  # newest entry
+        weekly_summary_used = prev
+        weight_delta      = prev.get("weight_delta") or 0.0
+        avg_adherence     = prev.get("avg_adherence", 1.0)
+        total_exercise    = prev.get("total_exercise_kcal", 0)
+
+        # Exercise bonus: avg weekly exercise / 7 days
+        daily_exercise_avg = total_exercise / 7
+        # Low adherence penalty: reduce by up to 100 kcal
+        adherence_factor   = 1.0 if avg_adherence >= 0.8 else (avg_adherence / 0.8)
+        # Weight progress signal: if losing faster than expected (-0.5kg/wk) add calories
+        weight_adj = 0
+        if weight_delta is not None:
+            if weight_delta < -0.5:
+                weight_adj = +100   # losing too fast → add calories
+            elif weight_delta > 0.1:
+                weight_adj = -100   # gaining unintentionally → reduce calories
+
+        adjusted_target = round(
+            (daily_target + daily_exercise_avg + weight_adj) * adherence_factor
+        )
+        adjusted_target = max(adjusted_target, 1200)  # hard floor
+
+    # ── 3. Generate each day ──────────────────────────────────────────────
     snack_budget = SNACK_TARGET_KCAL
-    main_budget  = daily_target - 2 * snack_budget
-    plan = {}
-    for day in DAYS:
-        plan[day] = {
+    main_budget  = adjusted_target - 2 * snack_budget
+    days = []
+    for i in range(7):
+        day_date = monday + timedelta(days=i)
+        day_iso  = day_date.isoformat()
+        day_name = DAY_NAMES_ES[i]
+        meals_raw = {
             "desayuno":     _scale_meal(random.choice(DESAYUNOS),    main_budget * MAIN_MEAL_SPLIT["desayuno"], "desayuno"),
             "media_manana": _scale_meal(random.choice(MEDIA_MANANA), snack_budget,                              "media_manana"),
             "almuerzo":     _scale_meal(random.choice(ALMUERZOS),    main_budget * MAIN_MEAL_SPLIT["almuerzo"], "almuerzo"),
             "merienda":     _scale_meal(random.choice(MERIENDAS),    snack_budget,                              "merienda"),
             "cena":         _scale_meal(random.choice(CENAS),        main_budget * MAIN_MEAL_SPLIT["cena"],     "cena"),
         }
-    return plan
+        meals_list = [
+            {**v, "id": k}
+            for k, v in meals_raw.items()
+        ]
+        total_kcal = sum(m["kcal"] for m in meals_list)
+        days.append({
+            "date":      day_iso,
+            "dayName":   day_name,
+            "meals":     meals_list,
+            "totalKcal": total_kcal,
+        })
+
+    return {
+        "days":                days,
+        "generated_at":        monday.isoformat(),
+        "weekly_target_kcal":  adjusted_target,
+        "weekly_summary":      weekly_summary_used,
+    }
