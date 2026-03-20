@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import { AppLayout } from "@/components/app-layout"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
 import {
   Shuffle,
@@ -213,13 +214,12 @@ export default function DietPage() {
                     <MealIcon className="h-4 w-4 text-emerald-400" />
                   </div>
                   <span className="text-white/60 text-sm font-medium flex-1">{label}</span>
-                  <div className="text-right shrink-0">
-                    <span className="text-white font-bold text-lg leading-none">
-                      {meal.adjustedKcal ?? meal.kcal}
-                    </span>
-                    <span className="text-white/60 text-sm ml-1">kcal</span>
+                  <div className="flex flex-col items-end shrink-0 gap-0.5">
+                    <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-400/30 text-sm px-2 py-0.5">
+                      {meal.adjustedKcal ?? meal.kcal} kcal
+                    </Badge>
                     {meal.portionScale && meal.portionScale > 1 && (
-                      <p className="text-yellow-300 text-xs mt-0.5">×{meal.portionScale.toFixed(2)}</p>
+                      <span className="text-yellow-300 text-xs">×{meal.portionScale.toFixed(2)}</span>
                     )}
                   </div>
                 </div>

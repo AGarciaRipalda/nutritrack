@@ -105,6 +105,14 @@ const mealTypeIcons: Record<string, typeof Coffee> = {
   dinner: Moon,
 }
 
+const mealIdIcons: Record<string, typeof Coffee> = {
+  desayuno:     Coffee,
+  media_manana: Sun,
+  almuerzo:     Utensils,
+  merienda:     Cookie,
+  cena:         Moon,
+}
+
 const mealDisplayName: Record<string, string> = {
   desayuno:     "Desayuno",
   media_manana: "Media mañana",
@@ -139,7 +147,7 @@ const mealTypeColor: Record<string, { bg: string; text: string; border: string }
 
 // ── Screen meal card ────────────────────────────────────────────────────────
 function MealCard({ meal }: { meal: PlanDay["meals"][0] }) {
-  const MealIcon = mealTypeIcons[meal.type] || Utensils
+  const MealIcon = mealIdIcons[meal.id] ?? mealTypeIcons[meal.type] ?? Utensils
   return (
     <div className="p-3 bg-white/5 rounded-xl border border-white/10 flex flex-col gap-2">
       {/* Title row: icon + meal name + kcal */}
