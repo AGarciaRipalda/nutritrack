@@ -25,6 +25,9 @@ nutrition_assistant/macro_adjustments.json
 nutrition_assistant/dietas/
 nutrition_assistant/*.pdf
 
+# ── Worktrees ─────────────────────────────────────────────────────────────────
+.worktrees/
+
 # ── General ───────────────────────────────────────────────────────────────────
 .env
 .env.local
