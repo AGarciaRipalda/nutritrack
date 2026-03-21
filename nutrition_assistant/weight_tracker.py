@@ -8,8 +8,9 @@ Muestra si el ritmo real está alineado con el objetivo.
 import json
 import os
 from datetime import date, timedelta
+from data_dir import DATA_DIR
 
-HISTORY_FILE = "weight_history.json"
+HISTORY_FILE = DATA_DIR / "weight_history.json"
 
 # Ritmo esperado de cambio semanal en kg según objetivo
 EXPECTED_WEEKLY_CHANGE = {

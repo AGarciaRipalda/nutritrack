@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: nutritrack-backend
+    runtime: python
+    rootDir: nutrition_assistant
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn api:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: DATA_DIR
+        value: /data
+      - key: GOOGLE_CREDENTIALS_JSON
+        sync: false   # se rellena a mano en el dashboard de Render
+    disk:
+      name: nutritrack-data
+      mountPath: /data
+      sizeGB: 1

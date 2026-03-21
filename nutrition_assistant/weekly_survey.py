@@ -7,8 +7,9 @@ Evalúa 4 áreas en escala 1-5: energía, hambre, adherencia percibida, sueño.
 import json
 import os
 from datetime import date
+from data_dir import DATA_DIR
 
-SURVEY_FILE = "survey_history.json"
+SURVEY_FILE = DATA_DIR / "survey_history.json"
 
 QUESTIONS = [
     ("energia",    "¿Cómo ha sido tu nivel de ENERGÍA esta semana?  (1=muy baja, 5=excelente)"),

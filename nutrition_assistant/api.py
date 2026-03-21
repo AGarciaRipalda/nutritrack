@@ -9,7 +9,10 @@ from datetime import date, timedelta
 from typing import Optional, List
 import zoneinfo
 
-# Fijar el directorio de trabajo para que los JSON relativos funcionen
+# Fijar el directorio de trabajo al directorio del script
+# (necesario para que los módulos Python locales se importen correctamente)
+import sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
 from fastapi import FastAPI, HTTPException, Request, Header

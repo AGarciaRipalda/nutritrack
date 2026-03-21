@@ -7,8 +7,9 @@ Los datos se guardan en adherence_log.json con fecha.
 import json
 import os
 from datetime import date, timedelta
+from data_dir import DATA_DIR
 
-ADHERENCE_FILE = "adherence_log.json"
+ADHERENCE_FILE = DATA_DIR / "adherence_log.json"
 
 MEAL_LABELS = {
     "desayuno":     "Desayuno",

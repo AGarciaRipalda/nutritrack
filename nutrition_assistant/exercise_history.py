@@ -7,8 +7,9 @@ Permite ver resumen semanal: días entrenados, kcal totales, racha.
 import json
 import os
 from datetime import date, timedelta
+from data_dir import DATA_DIR
 
-HISTORY_FILE = "exercise_history.json"
+HISTORY_FILE = DATA_DIR / "exercise_history.json"
 
 
 def _load() -> dict:

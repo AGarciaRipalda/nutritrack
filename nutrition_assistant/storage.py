@@ -1,9 +1,10 @@
 import json
 import os
 from datetime import date
+from data_dir import DATA_DIR
 
-PROFILE_FILE = "user_profile.json"
-SESSION_FILE = "session.json"
+PROFILE_FILE = DATA_DIR / "user_profile.json"
+SESSION_FILE = DATA_DIR / "session.json"
 
 DEFAULT_PROFILE = {
     "name": "Usuario",
@@ -27,7 +28,7 @@ def load_profile() -> dict:
 def save_profile(profile: dict) -> None:
     with open(PROFILE_FILE, "w", encoding="utf-8") as f:
         json.dump(profile, f, indent=2, ensure_ascii=False)
-    print(f"  Perfil guardado en '{PROFILE_FILE}'.")
+    print(f"  Perfil guardado en '{PROFILE_FILE}'.", flush=True)
 
 
 def _today() -> str:

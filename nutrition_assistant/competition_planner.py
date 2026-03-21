@@ -9,8 +9,9 @@ Planificación nutricional para eventos y competiciones.
 import json
 import os
 from datetime import date, timedelta
+from data_dir import DATA_DIR
 
-COMPETITION_FILE = "competition.json"
+COMPETITION_FILE = DATA_DIR / "competition.json"
 
 
 def _load() -> dict:

@@ -7,8 +7,9 @@ Gestión de preferencias alimentarias:
 
 import json
 import os
+from data_dir import DATA_DIR
 
-PREFERENCES_FILE = "preferences.json"
+PREFERENCES_FILE = DATA_DIR / "preferences.json"
 
 
 def _load() -> dict:

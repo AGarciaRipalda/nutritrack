@@ -27,7 +27,15 @@ from typing import Optional
 
 SPREADSHEET_ID  = "1zxZeuvjVO0hB0zRiq9DcM9iuVoLQh5wzsFC3PWzQVfk"
 SHEET_GID       = 627901101
-CREDENTIALS_FILE = Path(__file__).parent / "google_credentials.json"
+
+# Credenciales: env var tiene prioridad (producción), luego fichero local (desarrollo)
+_CREDS_ENV = os.environ.get("GOOGLE_CREDENTIALS_JSON")
+if _CREDS_ENV:
+    _tmp = Path("/tmp/google_credentials.json")
+    _tmp.write_text(_CREDS_ENV, encoding="utf-8")
+    CREDENTIALS_FILE = _tmp
+else:
+    CREDENTIALS_FILE = Path(__file__).parent / "google_credentials.json"
 
 COMPOUND_KEYWORDS = [
     "peso muerto", "rdl", "sentadilla", "prensa", "leg press",
