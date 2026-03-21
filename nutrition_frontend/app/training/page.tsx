@@ -451,20 +451,44 @@ export default function TrainingPage() {
                 <TableBody>
                   {training.history.slice(0, 7).map((log) => {
                     const isPendingDelete = confirmDeleteId === log.id
+                    const hasAppleHealth  = log.sources?.includes("apple_health")
+                    const hasSheets       = log.sources?.some(s => s === "sheets" || s === "excel" || s === "google_sheets")
                     return (
                       <TableRow
                         key={log.id}
                         className={`border-white/10 transition-colors ${isPendingDelete ? "bg-red-500/10" : ""}`}
                       >
                         <TableCell className="text-white/80">
-                          {new Date(log.date + "T12:00:00").toLocaleDateString("es-ES", {
-                            weekday: "short",
-                            month: "short",
-                            day: "numeric",
-                          })}
+                          <div>
+                            {new Date(log.date + "T12:00:00").toLocaleDateString("es-ES", {
+                              weekday: "short",
+                              month: "short",
+                              day: "numeric",
+                            })}
+                            <div className="flex gap-1 mt-1 flex-wrap">
+                              {hasAppleHealth && (
+                                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-red-500/20 text-red-300 border border-red-500/30 leading-none">
+                                  Apple Health
+                                </span>
+                              )}
+                              {hasSheets && (
+                                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 leading-none">
+                                  Sheets
+                                </span>
+                              )}
+                            </div>
+                          </div>
                         </TableCell>
-                        <TableCell className="text-white font-medium">{log.type}</TableCell>
-                        <TableCell className="text-white/80">{log.minutes} min</TableCell>
+                        <TableCell className="text-white font-medium">
+                          <div>{log.type}</div>
+                          {log.healthData?.steps && (
+                            <div className="text-white/40 text-xs">{log.healthData.steps.toLocaleString()} pasos</div>
+                          )}
+                          {log.healthData?.heart_rate_avg && (
+                            <div className="text-white/40 text-xs">{log.healthData.heart_rate_avg} ppm avg</div>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-white/80">{log.minutes ? `${log.minutes} min` : "—"}</TableCell>
                         <TableCell>
                           <div className="flex items-center gap-3">
                             <div className="flex-1 bg-white/10 rounded-full h-2 max-w-32">

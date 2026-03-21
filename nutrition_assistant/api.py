@@ -153,6 +153,16 @@ class ExerciseLogByDateModel(BaseModel):
     entries: Optional[List[ExerciseEntryModel]] = []
 
 
+class HealthSyncModel(BaseModel):
+    date: str                              # ISO YYYY-MM-DD
+    active_calories: float                 # kcal activas medidas por Apple Watch/iPhone
+    workout_type: Optional[str] = None     # "Strength Training", "Running", etc.
+    duration_min: Optional[int] = None
+    steps: Optional[int] = None
+    heart_rate_avg: Optional[int] = None
+    heart_rate_max: Optional[int] = None
+
+
 class TodayTrainingModel(BaseModel):
     trains: bool
     exercise_key: Optional[str] = None   # "1"-"7"
@@ -618,20 +628,39 @@ def get_gym_history(days: int = 7):
                 history = json.load(f)
 
         changed = False
+        goal = load_profile()["goal"]
         for s in sessions:
             if s["date"] is None:
                 continue
             date_str = s["date"].isoformat() if hasattr(s["date"], "isoformat") else str(s["date"])
-            if date_str not in history or history[date_str].get("burned_kcal", 0) == 0:
-                kcal = round(estimate_session_calories(s))
+            existing  = history.get(date_str, {})
+            has_health = "apple_health" in existing.get("sources", [])
+
+            # Siempre actualizar el detalle de gym (Sheets), pero respetar kcal de Apple Health
+            gym_detail = [{"name": ex["name"], "volume": ex.get("volume"), "compound": ex.get("compound")}
+                          for ex in s["exercises"]]
+            sheets_kcal = round(estimate_session_calories(s))
+
+            if has_health:
+                # Apple Health ya tiene las kcal → solo actualizamos gym_detail
+                history[date_str]["gym_detail"] = gym_detail
+                sources = existing.get("sources", [])
+                if source not in sources:
+                    sources.append(source)
+                history[date_str]["sources"] = sources
+            else:
+                # Sin Apple Health → usamos estimación de Sheets como hasta ahora
+                sources = existing.get("sources", [source])
+                if source not in sources:
+                    sources.append(source)
                 history[date_str] = {
-                    "burned_kcal":     kcal,
-                    "adjustment_kcal": round(kcal * RECOVERY_FACTOR.get(load_profile()["goal"], 0.85)),
-                    "exercises":       [{"name": ex["name"], "minutes": 60, "kcal": kcal, "burned": kcal}
-                                        for ex in s["exercises"][:1]],
-                    "source": source,
+                    **existing,
+                    "burned_kcal":     sheets_kcal,
+                    "adjustment_kcal": round(sheets_kcal * RECOVERY_FACTOR.get(goal, 0.85)),
+                    "gym_detail":      gym_detail,
+                    "sources":         sources,
                 }
-                changed = True
+            changed = True
 
         if changed:
             with open(EX_HISTORY_FILE, "w") as f:
@@ -668,6 +697,9 @@ def get_exercise_history(days: int = 7):
             "burned_kcal": burned,
             "trained":     burned > 0,
             "exercises":   entry.get("exercises", []),
+            "sources":     entry.get("sources", [entry["source"]] if "source" in entry else []),
+            "health_data": entry.get("health_data"),
+            "gym_detail":  entry.get("gym_detail"),
         })
         if burned > 0 and i > 0:
             streak += 1
@@ -792,6 +824,82 @@ def delete_exercise_by_date(target_date: str):
         json.dump(history, f, indent=2, ensure_ascii=False)
 
     return {"ok": True, "deleted_date": target_date}
+
+
+@app.post("/health/sync", tags=["Apple Health"])
+def sync_health_data(data: HealthSyncModel):
+    """
+    Recibe datos de Apple Health (vía iOS Shortcuts) y los fusiona con el historial
+    de ejercicio. Apple Health tiene prioridad sobre la estimación por fórmula para
+    burned_kcal, pero preserva el detalle de ejercicios de Google Sheets si existe.
+
+    Reglas de merge:
+    - Si ya hay un registro para esa fecha con datos de Sheets → mantiene gym_detail,
+      reemplaza burned_kcal con el valor de Apple Health (más preciso).
+    - Si no hay registro previo → crea uno nuevo con los datos de Health.
+    - Siempre recalcula adjustment_kcal sobre el burned_kcal final.
+    """
+    try:
+        date.fromisoformat(data.date)
+    except ValueError:
+        raise HTTPException(400, "Formato de fecha inválido. Usa YYYY-MM-DD.")
+
+    if data.active_calories < 0:
+        raise HTTPException(400, "active_calories debe ser >= 0.")
+
+    # Cargar historial existente
+    history: dict = {}
+    if os.path.exists(EX_HISTORY_FILE):
+        with open(EX_HISTORY_FILE) as f:
+            history = json.load(f)
+
+    existing = history.get(data.date, {})
+    profile  = load_profile()
+    factor   = RECOVERY_FACTOR.get(profile["goal"], 0.85)
+
+    # Apple Health es la fuente de verdad para kcal cuando está disponible
+    burned_kcal     = round(data.active_calories)
+    adjustment_kcal = round(burned_kcal * factor)
+
+    # Construir sources — preservar fuentes previas
+    sources = list(existing.get("sources", []))
+    if existing.get("source") and existing["source"] not in sources:
+        sources.append(existing["source"])
+    if "apple_health" not in sources:
+        sources.append("apple_health")
+
+    # Preservar detalle de gym (Sheets) si existe
+    gym_detail = existing.get("gym_detail") or existing.get("exercises")
+
+    merged = {
+        **existing,
+        "burned_kcal":     burned_kcal,
+        "adjustment_kcal": adjustment_kcal,
+        "sources":         sources,
+        "health_data": {
+            "active_calories": data.active_calories,
+            "workout_type":    data.workout_type,
+            "duration_min":    data.duration_min,
+            "steps":           data.steps,
+            "heart_rate_avg":  data.heart_rate_avg,
+            "heart_rate_max":  data.heart_rate_max,
+        },
+    }
+    if gym_detail:
+        merged["gym_detail"] = gym_detail
+
+    history[data.date] = merged
+    with open(EX_HISTORY_FILE, "w") as f:
+        json.dump(history, f, indent=2, ensure_ascii=False)
+
+    return {
+        "ok":              True,
+        "date":            data.date,
+        "burned_kcal":     burned_kcal,
+        "adjustment_kcal": adjustment_kcal,
+        "sources":         sources,
+        "had_gym_detail":  bool(gym_detail),
+    }
 
 
 # ══════════════════════════════════════════════════════════════════════════════

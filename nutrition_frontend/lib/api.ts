@@ -133,6 +133,15 @@ export interface ExerciseLog {
   type: string
   minutes: number
   caloriesBurned: number
+  sources?: string[]          // ["apple_health", "google_sheets", ...]
+  healthData?: {
+    active_calories: number
+    workout_type: string | null
+    duration_min: number | null
+    steps: number | null
+    heart_rate_avg: number | null
+    heart_rate_max: number | null
+  } | null
 }
 
 export interface ExerciseRoutine {
@@ -400,11 +409,16 @@ export async function fetchTraining(): Promise<TrainingData> {
   const history: ExerciseLog[] = historyRaw.history
     .filter((e: any) => e.trained)
     .map((e: any) => ({
-      id:            e.date,
-      date:          e.date,
-      type:          e.exercises?.[0]?.name ?? "Ejercicio",
-      minutes:       e.exercises?.[0]?.minutes ?? 0,
+      id:             e.date,
+      date:           e.date,
+      type:           e.health_data?.workout_type
+                        ?? e.gym_detail?.[0]?.name
+                        ?? e.exercises?.[0]?.name
+                        ?? "Ejercicio",
+      minutes:        e.health_data?.duration_min ?? e.exercises?.[0]?.minutes ?? 0,
       caloriesBurned: e.burned_kcal,
+      sources:        e.sources ?? (e.source ? [e.source] : []),
+      healthData:     e.health_data ?? null,
     }))
 
   return {
@@ -476,6 +490,36 @@ export async function fetchGymHistory(days = 7): Promise<GymHistoryData> {
 
 export async function deleteExerciseByDate(date: string): Promise<void> {
   await del(`/exercise/log/${date}`)
+}
+
+export interface HealthData {
+  active_calories: number
+  workout_type: string | null
+  duration_min: number | null
+  steps: number | null
+  heart_rate_avg: number | null
+  heart_rate_max: number | null
+}
+
+export interface HealthSyncResult {
+  ok: boolean
+  date: string
+  burned_kcal: number
+  adjustment_kcal: number
+  sources: string[]
+  had_gym_detail: boolean
+}
+
+export async function syncHealthData(data: {
+  date: string
+  active_calories: number
+  workout_type?: string
+  duration_min?: number
+  steps?: number
+  heart_rate_avg?: number
+  heart_rate_max?: number
+}): Promise<HealthSyncResult> {
+  return post<HealthSyncResult>("/health/sync", data)
 }
 
 // Alias que usa el componente de v0 directamente
