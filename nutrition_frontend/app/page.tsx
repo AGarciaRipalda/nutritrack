@@ -1,0 +1,328 @@
+"use client"
+
+import { useEffect, useState } from "react"
+import { AppLayout } from "@/components/app-layout"
+import { Card } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import {
+  Flame, Dumbbell, Bell, Scale, ClipboardList,
+  Calendar, TrendingUp, Beef, Wheat, Droplet, Star, X,
+} from "lucide-react"
+import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts"
+import type { DashboardData } from "@/lib/api"
+import { fetchDashboard } from "@/lib/api"
+import { useCheatDay } from "@/context/CheatDayContext"
+
+// Mock data for development when API is unavailable
+const mockDashboardData: DashboardData = {
+  dailyCalorieTarget: 2200,
+  caloriesConsumed: 1650,
+  macros: {
+    protein: { current: 95, target: 150 },
+    carbs: { current: 180, target: 250 },
+    fat: { current: 55, target: 70 },
+  },
+  exerciseYesterday: {
+    type: "Running",
+    minutes: 45,
+    caloriesBurned: 420,
+  },
+  alerts: [
+    { id: "1", type: "weigh-in", message: "Time for your weekly weigh-in!" },
+    { id: "2", type: "survey", message: "Complete your weekly sensations survey" },
+    { id: "3", type: "event", message: "Beach vacation in 3 weeks", dueDate: "2024-02-15" },
+  ],
+}
+
+const todayISO = new Date().toISOString().slice(0, 10)
+
+export default function DashboardPage() {
+  const [data, setData]         = useState<DashboardData | null>(null)
+  const [loading, setLoading]   = useState(true)
+  const [showConfirm, setShowConfirm] = useState(false)
+
+  const { record, isCheatDay, isWeeklyLimitReached, activateCheatDay } = useCheatDay()
+
+  const cheatActive  = isCheatDay(todayISO)
+  const weeklyUsed   = isWeeklyLimitReached(todayISO) && !cheatActive
+
+  useEffect(() => {
+    fetchDashboard()
+      .then(setData)
+      .catch(() => setData(mockDashboardData))
+      .finally(() => setLoading(false))
+  }, [])
+
+  if (loading) {
+    return (
+      <AppLayout>
+        <div className="flex items-center justify-center h-full">
+          <div className="text-white/60">Cargando...</div>
+        </div>
+      </AppLayout>
+    )
+  }
+
+  const dashboard = data || mockDashboardData
+  const calorieProgress = Math.round((dashboard.caloriesConsumed / dashboard.dailyCalorieTarget) * 100)
+
+  const macroData = [
+    { name: "Proteínas", value: dashboard.macros.protein.current, color: "#f87171" },
+    { name: "Carbohidratos", value: dashboard.macros.carbs.current, color: "#fbbf24" },
+    { name: "Grasas", value: dashboard.macros.fat.current, color: "#60a5fa" },
+  ]
+
+  const getAlertIcon = (type: string) => {
+    switch (type) {
+      case "weigh-in":
+        return Scale
+      case "survey":
+        return ClipboardList
+      case "event":
+        return Calendar
+      default:
+        return Bell
+    }
+  }
+
+  const getAlertColor = (type: string) => {
+    switch (type) {
+      case "weigh-in":
+        return "bg-blue-500/20 text-blue-400 border-blue-400/30"
+      case "survey":
+        return "bg-amber-500/20 text-amber-400 border-amber-400/30"
+      case "event":
+        return "bg-emerald-500/20 text-emerald-400 border-emerald-400/30"
+      default:
+        return "bg-white/20 text-white border-white/30"
+    }
+  }
+
+  return (
+    <AppLayout>
+      <div className="space-y-6">
+        {/* Header */}
+        <Card className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-6">
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <div>
+              <h2 className="text-3xl font-bold text-white">Panel</h2>
+              <p className="text-white/60">Sigue tu nutrición y objetivos de fitness</p>
+            </div>
+            <div className="flex items-center gap-3 flex-wrap">
+              {/* Comodín button */}
+              {cheatActive ? (
+                <div className="flex items-center gap-2 px-4 py-2 bg-amber-500/20 border border-amber-400/30 rounded-xl">
+                  <Star className="h-4 w-4 text-amber-400 fill-amber-400" />
+                  <span className="text-amber-300 text-sm font-medium">Comodín activo hoy</span>
+                </div>
+              ) : weeklyUsed ? (
+                <div
+                  title="Tu metabolismo necesita estabilidad. ¡Reserva tu próximo comodín para la semana que viene!"
+                  className="flex items-center gap-2 px-4 py-2 bg-white/5 border border-white/10 rounded-xl cursor-not-allowed opacity-60"
+                >
+                  <Star className="h-4 w-4 text-white/40" />
+                  <span className="text-white/40 text-sm">Comodín usado</span>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setShowConfirm(true)}
+                  className="flex items-center gap-2 px-4 py-2 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-400/20 hover:border-amber-400/40 rounded-xl text-amber-300 text-sm font-medium transition-colors"
+                >
+                  <Star className="h-4 w-4" />
+                  Activar Comodín
+                </button>
+              )}
+              <div className="text-right">
+                <p className="text-white/60 text-sm">Hoy</p>
+                <p className="text-white font-medium">
+                  {new Date().toLocaleDateString("es-ES", { weekday: "long", month: "short", day: "numeric" })}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Weekly limit tooltip shown inline when hovered */}
+          {weeklyUsed && (
+            <p className="mt-3 text-white/40 text-xs">
+              ⚠ Tu metabolismo necesita estabilidad. ¡Reserva tu próximo comodín para la semana que viene!
+            </p>
+          )}
+        </Card>
+
+        {/* Comodín confirmation modal */}
+        {showConfirm && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-6 w-full max-w-sm">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <Star className="h-5 w-5 text-amber-400 fill-amber-400" />
+                  <h3 className="text-white font-bold text-lg">Activar Comodín</h3>
+                </div>
+                <button onClick={() => setShowConfirm(false)} className="text-white/50 hover:text-white">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <p className="text-white/70 text-sm mb-2">
+                El límite calórico de hoy se vuelve <span className="text-amber-300 font-medium">flexible</span>.
+                Los avisos en rojo desaparecen.
+              </p>
+              <p className="text-white/50 text-xs mb-5">
+                Al final del día podrás repartir el exceso en los próximos 3 días para mantener tu meta semanal intacta.
+                Solo puedes usar un comodín por semana.
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowConfirm(false)}
+                  className="flex-1 px-4 py-2 border border-white/20 rounded-xl text-white/60 text-sm hover:bg-white/5"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={() => { activateCheatDay(todayISO); setShowConfirm(false) }}
+                  className="flex-1 px-4 py-2 bg-amber-500 hover:bg-amber-600 rounded-xl text-white text-sm font-medium"
+                >
+                  Activar
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Calorie and Macro Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+          {/* Daily Calories */}
+          <Card className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-6 transition-all duration-300 hover:bg-white/15">
+            <div className="flex items-start justify-between mb-4">
+              <div>
+                <p className="text-white/60 text-sm">Calorías del día</p>
+                <p className="text-3xl font-bold text-white">
+                  {dashboard.caloriesConsumed.toLocaleString()}
+                </p>
+                <p className="text-white/60 text-sm">
+                  de {dashboard.dailyCalorieTarget.toLocaleString()} kcal
+                </p>
+              </div>
+              <Flame className="h-8 w-8 text-orange-400" />
+            </div>
+            <div className="space-y-2">
+              <div className="w-full bg-white/10 rounded-full h-3">
+                <div
+                  className="bg-gradient-to-r from-orange-400 to-red-500 h-3 rounded-full transition-all duration-500"
+                  style={{ width: `${Math.min(calorieProgress, 100)}%` }}
+                />
+              </div>
+              <p className="text-right text-sm text-white/60">{calorieProgress}%</p>
+            </div>
+          </Card>
+
+          {/* Macros Donut Chart */}
+          <Card className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-6 transition-all duration-300 hover:bg-white/15">
+            <p className="text-white/60 text-sm mb-2">Distribución de macros</p>
+            <div className="flex items-center gap-4">
+              <div className="w-32 h-32">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={macroData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={35}
+                      outerRadius={55}
+                      paddingAngle={3}
+                      dataKey="value"
+                    >
+                      {macroData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <Beef className="h-4 w-4 text-red-400" />
+                  <span className="text-white/80 text-sm">
+                    Proteínas: {dashboard.macros.protein.current}g / {dashboard.macros.protein.target}g
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Wheat className="h-4 w-4 text-amber-400" />
+                  <span className="text-white/80 text-sm">
+                    Carbohidratos: {dashboard.macros.carbs.current}g / {dashboard.macros.carbs.target}g
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Droplet className="h-4 w-4 text-blue-400" />
+                  <span className="text-white/80 text-sm">
+                    Grasas: {dashboard.macros.fat.current}g / {dashboard.macros.fat.target}g
+                  </span>
+                </div>
+              </div>
+            </div>
+          </Card>
+
+          {/* Yesterday's Exercise */}
+          <Card className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-6 transition-all duration-300 hover:bg-white/15">
+            <div className="flex items-start justify-between mb-4">
+              <div>
+                <p className="text-white/60 text-sm">Ejercicio de ayer</p>
+                {dashboard.exerciseYesterday ? (
+                  <>
+                    <p className="text-2xl font-bold text-white">
+                      {dashboard.exerciseYesterday.type}
+                    </p>
+                    <p className="text-emerald-400 font-medium">
+                      {dashboard.exerciseYesterday.minutes} min
+                    </p>
+                  </>
+                ) : (
+                  <p className="text-xl font-medium text-white/60">Sin ejercicio registrado</p>
+                )}
+              </div>
+              <Dumbbell className="h-8 w-8 text-emerald-400" />
+            </div>
+            {dashboard.exerciseYesterday && (
+              <div className="flex items-center gap-2 bg-white/5 rounded-xl p-3">
+                <TrendingUp className="h-5 w-5 text-orange-400" />
+                <span className="text-white/80">
+                  {dashboard.exerciseYesterday.caloriesBurned} kcal quemadas
+                </span>
+              </div>
+            )}
+          </Card>
+        </div>
+
+        {/* Alerts */}
+        <Card className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <Bell className="h-5 w-5 text-white" />
+            <h3 className="text-xl font-semibold text-white">Alertas y recordatorios</h3>
+          </div>
+          <div className="space-y-3">
+            {dashboard.alerts.map((alert) => {
+              const AlertIcon = getAlertIcon(alert.type)
+              return (
+                <div
+                  key={alert.id}
+                  className="flex items-center justify-between p-4 bg-white/5 rounded-xl border border-white/10 hover:bg-white/10 transition-all duration-300"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className={`p-2 rounded-lg ${getAlertColor(alert.type)}`}>
+                      <AlertIcon className="h-5 w-5" />
+                    </div>
+                    <span className="text-white">{alert.message}</span>
+                  </div>
+                  {alert.dueDate && (
+                    <Badge className="bg-white/10 text-white/80 border-white/20">
+                      {new Date(alert.dueDate).toLocaleDateString()}
+                    </Badge>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </Card>
+      </div>
+    </AppLayout>
+  )
+}

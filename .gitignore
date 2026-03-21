@@ -1,0 +1,35 @@
+# Frontend
+nutrition_frontend/.next/
+nutrition_frontend/node_modules/
+nutrition_frontend/.env*.local
+nutrition_frontend/out/
+nutrition_frontend/build/
+
+# Backend
+nutrition_assistant/__pycache__/
+nutrition_assistant/**/__pycache__/
+nutrition_assistant/*.pyc
+nutrition_assistant/venv/
+nutrition_assistant/.env
+
+# Credenciales Google (nunca subir)
+nutrition_assistant/google_credentials.json
+
+# Datos locales del usuario
+nutrition_assistant/user_profile.json
+nutrition_assistant/session.json
+nutrition_assistant/exercise_history.json
+nutrition_assistant/weight_history.json
+nutrition_assistant/adherence.json
+nutrition_assistant/surveys.json
+nutrition_assistant/weekly_history.json
+nutrition_assistant/event.json
+nutrition_assistant/food_preferences.json
+
+# Misc
+.DS_Store
+*.log
+.vercel
+.claude/
+.env.local
+.env*.local
