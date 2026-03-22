@@ -278,21 +278,21 @@ export default function DashboardPage() {
                   {dashboard.steps != null && (
                     <div className="flex flex-col items-center bg-white/5 rounded-xl p-3">
                       <Footprints className="h-5 w-5 text-blue-400 mb-1" />
-                      <span className="text-white font-bold text-lg">{dashboard.steps.toLocaleString()}</span>
+                      <span className="text-white font-bold text-lg">{Math.round(dashboard.steps!).toLocaleString()}</span>
                       <span className="text-white/40 text-xs">pasos</span>
                     </div>
                   )}
                   {dashboard.activeCalories != null && (
                     <div className="flex flex-col items-center bg-white/5 rounded-xl p-3">
                       <Flame className="h-5 w-5 text-orange-400 mb-1" />
-                      <span className="text-white font-bold text-lg">{dashboard.activeCalories}</span>
+                      <span className="text-white font-bold text-lg">{Math.round(dashboard.activeCalories!)}</span>
                       <span className="text-white/40 text-xs">kcal activas</span>
                     </div>
                   )}
                   {dashboard.heartRateAvg != null && (
                     <div className="flex flex-col items-center bg-white/5 rounded-xl p-3">
                       <Heart className="h-5 w-5 text-red-400 mb-1" />
-                      <span className="text-white font-bold text-lg">{dashboard.heartRateAvg}</span>
+                      <span className="text-white font-bold text-lg">{Math.round(dashboard.heartRateAvg!)}</span>
                       <span className="text-white/40 text-xs">bpm</span>
                     </div>
                   )}

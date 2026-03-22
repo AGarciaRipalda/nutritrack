@@ -916,12 +916,12 @@ def sync_health_data(data: HealthSyncModel):
         "adjustment_kcal": adjustment_kcal,
         "sources":         sources,
         "health_data": {
-            "active_calories": data.active_calories,
+            "active_calories": round(data.active_calories),
             "workout_type":    data.workout_type,
             "duration_min":    data.duration_min,
-            "steps":           data.steps,
-            "heart_rate_avg":  data.heart_rate_avg,
-            "heart_rate_max":  data.heart_rate_max,
+            "steps":           round(data.steps) if data.steps else data.steps,
+            "heart_rate_avg":  round(data.heart_rate_avg) if data.heart_rate_avg else data.heart_rate_avg,
+            "heart_rate_max":  round(data.heart_rate_max) if data.heart_rate_max else data.heart_rate_max,
         },
     }
     if gym_detail:
@@ -1433,22 +1433,106 @@ def get_gamification_status():
 
 @app.get("/report/download", tags=["Informe"])
 def download_report_pdf():
-    """Genera y descarga el plan semanal en PDF."""
-    session = _get_session()
-    plan = session.get("week_plan")
-    if not plan:
-        raise HTTPException(404, "No hay un plan semanal generado. Genera uno primero.")
+    """Genera y descarga el informe semanal en PDF."""
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib import colors
+    from reportlab.lib.units import cm
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, HRFlowable, Table, TableStyle
+    from reportlab.lib.enums import TA_CENTER
 
     profile = load_profile()
+    goal = profile["goal"]
+    ex_days, ex_kcal = _last_week_exercise()
+    prev_w, curr_w = _weight_change()
+    adherence = weekly_adherence()
+    survey = last_survey_scores()
+    weight_change = round(curr_w - prev_w, 1) if prev_w and curr_w else None
+    rec_raw = _recommendation(goal, adherence, ex_days, weight_change, survey)
+    recommendations = [line.strip().lstrip("•").strip()
+                       for line in rec_raw.strip().split("\n") if line.strip()]
+
     tmp = tempfile.NamedTemporaryFile(suffix=".pdf", delete=False)
     tmp.close()
 
-    export_week_plan_pdf(plan, profile=profile, output_path=tmp.name)
+    GREEN_DARK = colors.HexColor("#2E7D32")
+    GREY_MID = colors.HexColor("#E0E0E0")
+
+    base = getSampleStyleSheet()
+    s_title = ParagraphStyle("RTitle", parent=base["Normal"], fontSize=20,
+                             textColor=GREEN_DARK, alignment=TA_CENTER,
+                             fontName="Helvetica-Bold", spaceAfter=4)
+    s_sub = ParagraphStyle("RSub", parent=base["Normal"], fontSize=10,
+                           textColor=colors.grey, alignment=TA_CENTER, spaceAfter=2)
+    s_h2 = ParagraphStyle("RH2", parent=base["Normal"], fontSize=12,
+                          textColor=GREEN_DARK, fontName="Helvetica-Bold",
+                          spaceBefore=14, spaceAfter=6)
+    s_body = ParagraphStyle("RBody", parent=base["Normal"], fontSize=10,
+                            textColor=colors.black, leading=14)
+    s_rec = ParagraphStyle("RRec", parent=base["Normal"], fontSize=10,
+                           textColor=colors.black, leading=14, leftIndent=12)
+    s_foot = ParagraphStyle("RFoot", parent=base["Normal"], fontSize=8,
+                            textColor=colors.grey, alignment=TA_CENTER)
+
+    doc = SimpleDocTemplate(tmp.name, pagesize=A4,
+                            leftMargin=2*cm, rightMargin=2*cm,
+                            topMargin=1.8*cm, bottomMargin=1.8*cm)
+    story = []
+
+    name = profile.get("name", "Usuario")
+    goal_map = {"lose": "Perder peso", "maintain": "Mantener peso", "gain": "Ganar músculo"}
+
+    story.append(Paragraph("Informe Semanal", s_title))
+    story.append(Paragraph(f"{name}  ·  {goal_map.get(goal, '')}  ·  {date.today().strftime('%d/%m/%Y')}", s_sub))
+    story.append(Spacer(1, 0.4*cm))
+    story.append(HRFlowable(width="100%", thickness=1.5, color=GREEN_DARK))
+    story.append(Spacer(1, 0.4*cm))
+
+    # Exercise
+    story.append(Paragraph("Ejercicio", s_h2))
+    story.append(Paragraph(f"Días entrenados: <b>{ex_days}/7</b>", s_body))
+    story.append(Paragraph(f"Calorías quemadas: <b>{ex_kcal} kcal</b>", s_body))
+
+    # Weight
+    story.append(Paragraph("Peso", s_h2))
+    if curr_w:
+        story.append(Paragraph(f"Peso actual: <b>{curr_w:.1f} kg</b>", s_body))
+        if weight_change is not None:
+            arrow = "↓" if weight_change < 0 else "↑" if weight_change > 0 else "→"
+            story.append(Paragraph(f"Cambio semanal: <b>{weight_change:+.1f} kg {arrow}</b>", s_body))
+    else:
+        story.append(Paragraph("Sin datos de peso esta semana.", s_body))
+
+    # Adherence
+    story.append(Paragraph("Adherencia al plan", s_h2))
+    story.append(Paragraph(f"<b>{adherence}%</b>", s_body))
+
+    # Survey
+    if survey:
+        story.append(Paragraph("Sensaciones", s_h2))
+        labels = {"energia": "Energía", "hambre": "Sin hambre",
+                  "adherencia": "Adherencia percibida", "sueno": "Sueño"}
+        for key, lbl in labels.items():
+            v = survey.get(key, 0)
+            if v:
+                story.append(Paragraph(f"{lbl}: {'★'*v}{'☆'*(5-v)} ({v}/5)", s_body))
+
+    # Recommendations
+    story.append(Paragraph("Recomendaciones", s_h2))
+    for i, rec in enumerate(recommendations, 1):
+        story.append(Paragraph(f"{i}. {rec}", s_rec))
+
+    story.append(Spacer(1, 0.6*cm))
+    story.append(HRFlowable(width="100%", thickness=0.5, color=GREY_MID))
+    story.append(Spacer(1, 0.2*cm))
+    story.append(Paragraph("NutriTrack  ·  Informe generado automáticamente", s_foot))
+
+    doc.build(story)
 
     return FileResponse(
         tmp.name,
         media_type="application/pdf",
-        filename=f"plan_semanal_{date.today().isoformat()}.pdf",
+        filename=f"informe_semanal_{date.today().isoformat()}.pdf",
     )
 
 
