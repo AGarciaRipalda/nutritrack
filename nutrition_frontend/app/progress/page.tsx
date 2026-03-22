@@ -67,25 +67,20 @@ export default function ProgressPage() {
   const handleLogWeight = async () => {
     if (!weight) return
     setLogging(true)
-    try {
-      const newEntry = await logWeight(parseFloat(weight))
-      setData((prev) =>
-        prev
-          ? { ...prev, weightHistory: [...prev.weightHistory, newEntry] }
-          : prev
-      )
-    } catch {
-      // Mock response
-      const mockEntry = {
-        date: new Date().toISOString().split("T")[0],
-        weight: parseFloat(weight),
-      }
-      setData((prev) =>
-        prev
-          ? { ...prev, weightHistory: [...prev.weightHistory, mockEntry] }
-          : prev
-      )
+    const newEntry = {
+      date: new Date().toISOString().split("T")[0],
+      weight: parseFloat(weight),
     }
+    try {
+      await logWeight(parseFloat(weight))
+    } catch {
+      // continue — add entry locally even if API fails
+    }
+    setData((prev) =>
+      prev
+        ? { ...prev, weightHistory: [...prev.weightHistory, newEntry] }
+        : prev
+    )
     setWeight("")
     setLogging(false)
   }
