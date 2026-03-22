@@ -914,6 +914,7 @@ def sync_health_data(data: HealthSyncModel):
         **existing,
         "burned_kcal":     burned_kcal,
         "adjustment_kcal": adjustment_kcal,
+        "duration_min":    data.duration_min or existing.get("duration_min"),
         "sources":         sources,
         "health_data": {
             "active_calories": round(data.active_calories),

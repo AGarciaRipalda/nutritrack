@@ -345,8 +345,8 @@ export async function fetchDashboard(): Promise<DashboardData> {
     },
     exerciseYesterday: ex?.burned_kcal > 0
       ? {
-          type:           exHealth?.workout_type ?? ex.exercises?.[0]?.name ?? "Ejercicio",
-          minutes:        exHealth?.duration_min ?? ex.exercises?.[0]?.minutes ?? 0,
+          type:           ex.session_type ?? exHealth?.workout_type ?? ex.exercises?.[0]?.name ?? "Ejercicio",
+          minutes:        ex.duration_min ?? exHealth?.duration_min ?? ex.exercises?.[0]?.minutes ?? 0,
           caloriesBurned: ex.burned_kcal,
           steps:          exHealth?.steps ?? null,
           heartRateAvg:   exHealth?.heart_rate_avg ?? null,
