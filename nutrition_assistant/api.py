@@ -17,7 +17,7 @@ os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
 from fastapi import FastAPI, HTTPException, Request, Header
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, model_validator
 
 # ── Módulos del proyecto ──────────────────────────────────────────────────────
 from storage import (
@@ -158,13 +158,23 @@ class ExerciseLogByDateModel(BaseModel):
 
 
 class HealthSyncModel(BaseModel):
-    date: str                              # ISO YYYY-MM-DD
-    active_calories: float                 # kcal activas medidas por Apple Watch/iPhone
-    workout_type: Optional[str] = None     # "Strength Training", "Running", etc.
+    date: str                                   # ISO YYYY-MM-DD
+    active_calories: Optional[float] = None     # nombre preferido
+    burned_kcal: Optional[float] = None         # alias que envía el Shortcut
+    workout_type: Optional[str] = None          # "Strength Training", "Running", etc.
     duration_min: Optional[int] = None
     steps: Optional[int] = None
     heart_rate_avg: Optional[int] = None
     heart_rate_max: Optional[int] = None
+
+    @model_validator(mode="after")
+    def resolve_calories(self):
+        # Acepta burned_kcal como sinónimo de active_calories
+        if self.active_calories is None and self.burned_kcal is not None:
+            self.active_calories = self.burned_kcal
+        if self.active_calories is None:
+            raise ValueError("Se requiere 'active_calories' o 'burned_kcal'")
+        return self
 
 
 class TodayTrainingModel(BaseModel):
