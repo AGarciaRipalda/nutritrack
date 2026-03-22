@@ -645,8 +645,9 @@ def get_gym_history(days: int = 7):
             sheets_kcal = round(estimate_session_calories(s))
 
             if has_health:
-                # Apple Health ya tiene las kcal → solo actualizamos gym_detail
-                history[date_str]["gym_detail"] = gym_detail
+                # Apple Health ya tiene las kcal → solo actualizamos gym_detail y tipo
+                history[date_str]["gym_detail"]    = gym_detail
+                history[date_str]["session_type"]  = s["type"]
                 sources = existing.get("sources", [])
                 if source not in sources:
                     sources.append(source)
@@ -661,6 +662,7 @@ def get_gym_history(days: int = 7):
                     "burned_kcal":     sheets_kcal,
                     "adjustment_kcal": round(sheets_kcal * RECOVERY_FACTOR.get(goal, 0.85)),
                     "gym_detail":      gym_detail,
+                    "session_type":    s["type"],
                     "sources":         sources,
                 }
             changed = True
@@ -700,9 +702,10 @@ def get_exercise_history(days: int = 7):
             "burned_kcal": burned,
             "trained":     burned > 0,
             "exercises":   entry.get("exercises", []),
-            "sources":     entry.get("sources", [entry["source"]] if "source" in entry else []),
-            "health_data": entry.get("health_data"),
-            "gym_detail":  entry.get("gym_detail"),
+            "sources":      entry.get("sources", [entry["source"]] if "source" in entry else []),
+            "health_data":  entry.get("health_data"),
+            "gym_detail":   entry.get("gym_detail"),
+            "session_type": entry.get("session_type"),
         })
         if burned > 0 and i > 0:
             streak += 1

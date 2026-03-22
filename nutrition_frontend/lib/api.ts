@@ -411,8 +411,8 @@ export async function fetchTraining(): Promise<TrainingData> {
     .map((e: any) => ({
       id:             e.date,
       date:           e.date,
-      type:           e.health_data?.workout_type
-                        ?? e.gym_detail?.[0]?.name
+      type:           e.session_type
+                        ?? e.health_data?.workout_type
                         ?? e.exercises?.[0]?.name
                         ?? "Ejercicio",
       minutes:        e.health_data?.duration_min ?? e.exercises?.[0]?.minutes ?? 0,
