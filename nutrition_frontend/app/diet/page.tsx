@@ -107,11 +107,20 @@ export default function DietPage() {
   const day = planDay ?? mockPlanDay
   const cheatActive = isCheatDay(day.date)
   const { totalEffective, remaining, exceeded, overLimit, rebalancedTargets, effectiveKcalPerMeal } = derived
-  // When comodín is active, suppress the over-limit red warning
-  const showOverLimit = overLimit && !cheatActive
   const dailyTarget   = state.dailyTarget || day.totalKcal
-  const pct = dailyTarget > 0 ? Math.min((totalEffective / dailyTarget) * 100, cheatActive ? 130 : 110) : 0
-  const excessKcal = Math.max(totalEffective - dailyTarget, 0)
+
+  // Kcal realmente consumidas = solo comidas marcadas
+  const consumedKcal    = day.meals
+    .filter((m) => checkedMeals[m.id])
+    .reduce((sum, m) => sum + (effectiveKcalPerMeal[m.id] ?? m.kcal), 0)
+  const consumedPct     = dailyTarget > 0 ? Math.min((consumedKcal / dailyTarget) * 100, cheatActive ? 130 : 110) : 0
+  const consumedExceeded  = consumedKcal > dailyTarget
+  const consumedOverLimit = consumedKcal > dailyTarget * 1.1
+  const consumedRemaining = dailyTarget - consumedKcal
+
+  // When comodín is active, suppress the over-limit red warning
+  const showOverLimit = consumedOverLimit && !cheatActive
+  const excessKcal = Math.max(consumedKcal - dailyTarget, 0)
 
   return (
     <AppLayout>
@@ -152,36 +161,34 @@ export default function DietPage() {
               <span className="text-white/60">Consumido</span>
               <span className={`font-semibold ${
                 showOverLimit ? "text-red-400"
-                : cheatActive && exceeded ? "text-amber-300"
-                : exceeded ? "text-amber-400"
+                : cheatActive && consumedExceeded ? "text-amber-300"
+                : consumedExceeded ? "text-amber-400"
                 : "text-emerald-400"
               }`}>
-                {state.initialized ? totalEffective : day.totalKcal} / {dailyTarget} kcal
+                {consumedKcal} / {dailyTarget} kcal
               </span>
             </div>
             <div className="h-2 bg-white/10 rounded-full overflow-hidden">
               <div
                 className={`h-full rounded-full transition-all duration-300 ${
                   showOverLimit ? "bg-red-400"
-                  : cheatActive && exceeded ? "bg-amber-400"
-                  : exceeded ? "bg-amber-400"
+                  : cheatActive && consumedExceeded ? "bg-amber-400"
+                  : consumedExceeded ? "bg-amber-400"
                   : "bg-emerald-400"
                 }`}
-                style={{ width: `${pct}%` }}
+                style={{ width: `${consumedPct}%` }}
               />
             </div>
             <div className="flex justify-between text-xs text-white/40">
               <span>
-                {state.initialized
-                  ? remaining >= 0
-                    ? `Restante: ${remaining} kcal`
-                    : `Exceso: +${Math.abs(remaining)} kcal`
-                  : ""}
+                {consumedRemaining >= 0
+                  ? `Restante: ${consumedRemaining} kcal`
+                  : `Exceso: +${Math.abs(consumedRemaining)} kcal`}
               </span>
               {showOverLimit && (
                 <span className="text-red-400 font-medium">⚠ Límite diario excedido</span>
               )}
-              {cheatActive && exceeded && (
+              {cheatActive && consumedExceeded && (
                 <span className="text-amber-300 font-medium">⭐ Comodín activo</span>
               )}
             </div>
