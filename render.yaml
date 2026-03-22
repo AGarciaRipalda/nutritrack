@@ -3,7 +3,7 @@ services:
     name: nutritrack-backend
     runtime: python
     rootDir: nutrition_assistant
-    buildCommand: pip install -r nutrition_assistant/requirements.txt
+    buildCommand: pip install -r requirements.txt
     startCommand: cd nutrition_assistant && uvicorn api:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: DATA_DIR
