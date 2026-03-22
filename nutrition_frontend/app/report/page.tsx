@@ -18,24 +18,10 @@ import {
   Utensils,
   Lightbulb,
   Send,
+  Download,
 } from "lucide-react"
 import type { WeeklyReportData } from "@/lib/api"
-import { fetchWeeklyReport, submitSensationsSurvey } from "@/lib/api"
-
-const mockReportData: WeeklyReportData = {
-  daysTrained: 5,
-  totalKcalBurned: 2450,
-  adherencePercent: 88,
-  weightChange: -0.8,
-  sensationsSurvey: null,
-  recommendations: [
-    "¡Gran progreso esta semana! Mantén la constancia en tus entrenamientos.",
-    "Considera añadir más proteínas en el desayuno para mejorar la saciedad.",
-    "Tu calidad de sueño parece baja: intenta mantener un horario regular para dormir.",
-    "Excelente adherencia a tu plan de comidas. ¡Los resultados se están viendo!",
-    "Añade más verduras al almuerzo para una mejor ingesta de micronutrientes.",
-  ],
-}
+import { fetchWeeklyReport, submitSensationsSurvey, getReportPdfUrl } from "@/lib/api"
 
 const sensationLabels = {
   energy: ["Muy baja", "Baja", "Moderada", "Alta", "Muy alta"],
@@ -59,7 +45,7 @@ export default function ReportPage() {
   useEffect(() => {
     fetchWeeklyReport()
       .then(setData)
-      .catch(() => setData(mockReportData))
+      .catch((err) => console.error("Report fetch failed:", err))
       .finally(() => setLoading(false))
   }, [])
 
@@ -89,19 +75,40 @@ export default function ReportPage() {
     )
   }
 
-  const report = data || mockReportData
+  if (!data) {
+    return (
+      <AppLayout>
+        <div className="flex items-center justify-center h-full">
+          <div className="text-white/60">Error al cargar el informe</div>
+        </div>
+      </AppLayout>
+    )
+  }
+
+  const report = data
 
   return (
     <AppLayout>
       <div className="space-y-6">
         {/* Header */}
         <Card className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-6">
-          <div className="flex items-center gap-3">
-            <FileBarChart className="h-7 w-7 text-emerald-400" />
-            <div>
-              <h2 className="text-3xl font-bold text-white">Informe semanal</h2>
-              <p className="text-white/60">Resumen de tu rendimiento esta semana</p>
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <div className="flex items-center gap-3">
+              <FileBarChart className="h-7 w-7 text-emerald-400" />
+              <div>
+                <h2 className="text-3xl font-bold text-white">Informe semanal</h2>
+                <p className="text-white/60">Resumen de tu rendimiento esta semana</p>
+              </div>
             </div>
+            <a
+              href={getReportPdfUrl()}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 px-4 py-2 bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-400/30 rounded-xl text-emerald-300 text-sm font-medium transition-colors"
+            >
+              <Download className="h-4 w-4" />
+              Descargar PDF
+            </a>
           </div>
         </Card>
 
@@ -144,8 +151,8 @@ export default function ReportPage() {
             <div className="flex items-start justify-between">
               <div>
                 <p className="text-white/60 text-sm">Cambio de peso</p>
-                <p className={`text-3xl font-bold ${report.weightChange <= 0 ? "text-emerald-400" : "text-red-400"}`}>
-                  {report.weightChange > 0 ? "+" : ""}{report.weightChange} kg
+                <p className={`text-3xl font-bold ${(report.weightChange ?? 0) <= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                  {(report.weightChange ?? 0) > 0 ? "+" : ""}{report.weightChange ?? 0} kg
                 </p>
                 <p className="text-white/60 text-sm">esta semana</p>
               </div>

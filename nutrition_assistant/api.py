@@ -15,7 +15,12 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
-from fastapi import FastAPI, HTTPException, Request, Header
+import tempfile
+import urllib.request
+import urllib.parse
+
+from fastapi import FastAPI, HTTPException, Request, Header, Query
+from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, model_validator
 
@@ -63,6 +68,7 @@ from training import (
     _build_ppl_plan, _filter_exercises,
 )
 from gamification import gamification_status
+from pdf_export import export_week_plan_pdf
 
 # ── App ───────────────────────────────────────────────────────────────────────
 app = FastAPI(
@@ -300,7 +306,22 @@ def get_today_diet(x_user_timezone: Optional[str] = Header(None)):
              "detail": f"Date {today} is not in the current plan. Regenerate the plan."}
         )
 
-    return {**day, "stale": stale}
+    # Attach persisted adherence state so the frontend can restore it on reload
+    adh_log = {}
+    if os.path.exists(ADHERENCE_FILE):
+        with open(ADHERENCE_FILE) as f:
+            adh_log = json.load(f)
+    today_adh = adh_log.get(today, {})
+
+    return {
+        **day,
+        "stale": stale,
+        "adherence": {
+            "meals":         today_adh.get("meals", {}),
+            "skipped_meals": today_adh.get("skipped_meals", {}),
+            "consumed_kcal": today_adh.get("consumed_kcal", 0),
+        },
+    }
 
 
 @app.post("/diet/today/regenerate", tags=["Dieta"])
@@ -1170,8 +1191,23 @@ def get_dashboard():
     session  = _get_session()
     ex_data  = session.get("exercise_data") or {"burned_kcal": 0, "adjustment_kcal": 0, "exercises": []}
 
-    # Kcal consumidas hoy (desde adherencia)
+    # Enrich exercise_data with health_data from exercise history
+    # (Apple Health data is stored in the history file, not the session)
     today_iso = date.today().isoformat()
+    yesterday_iso = (date.today() - timedelta(days=1)).isoformat()
+    ex_history = {}
+    if os.path.exists(EX_HISTORY_FILE):
+        with open(EX_HISTORY_FILE) as f:
+            ex_history = json.load(f)
+
+    # Today's health data (steps, HR, active_calories synced from Apple Health)
+    today_health = ex_history.get(today_iso, {}).get("health_data")
+    # Yesterday's full exercise entry for the "exercise card"
+    yesterday_entry = ex_history.get(yesterday_iso, {})
+    if yesterday_entry.get("burned_kcal", 0) > 0:
+        ex_data = {**ex_data, **yesterday_entry}
+
+    # Kcal consumidas hoy (desde adherencia)
     adh_log   = {}
     if os.path.exists(ADHERENCE_FILE):
         with open(ADHERENCE_FILE) as f:
@@ -1207,6 +1243,7 @@ def get_dashboard():
                          "daily_target": target, "macros": macros,
                          "consumed_kcal": consumed_kcal},
         "exercise_data": ex_data,
+        "today_health":  today_health,
         "today_training": today_tr,
         "alerts":        alerts,
         "session_has_exercise": session.get("exercise_data") is not None,
@@ -1388,4 +1425,71 @@ def get_calistenia_routine(
 def get_gamification_status():
     """Devuelve el nivel, XP total, progreso al siguiente nivel y desglose de puntos."""
     return gamification_status()
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# PDF EXPORT
+# ══════════════════════════════════════════════════════════════════════════════
+
+@app.get("/report/download", tags=["Informe"])
+def download_report_pdf():
+    """Genera y descarga el plan semanal en PDF."""
+    session = _get_session()
+    plan = session.get("week_plan")
+    if not plan:
+        raise HTTPException(404, "No hay un plan semanal generado. Genera uno primero.")
+
+    profile = load_profile()
+    tmp = tempfile.NamedTemporaryFile(suffix=".pdf", delete=False)
+    tmp.close()
+
+    export_week_plan_pdf(plan, profile=profile, output_path=tmp.name)
+
+    return FileResponse(
+        tmp.name,
+        media_type="application/pdf",
+        filename=f"plan_semanal_{date.today().isoformat()}.pdf",
+    )
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# FOOD SEARCH (OpenFoodFacts proxy)
+# ══════════════════════════════════════════════════════════════════════════════
+
+@app.get("/food/search", tags=["Alimentos"])
+def search_food(q: str = Query(..., min_length=2, description="Nombre del alimento")):
+    """
+    Busca alimentos en OpenFoodFacts y devuelve nombre + kcal por 100g.
+    Actúa como proxy para evitar CORS y normalizar la respuesta.
+    """
+    params = urllib.parse.urlencode({
+        "search_terms": q,
+        "search_simple": 1,
+        "action": "process",
+        "json": 1,
+        "page_size": 10,
+        "fields": "product_name,nutriments,image_small_url",
+    })
+    url = f"https://world.openfoodfacts.org/cgi/search.pl?{params}"
+
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "NutriTrack/1.0"})
+        with urllib.request.urlopen(req, timeout=8) as resp:
+            data = json.loads(resp.read().decode())
+    except Exception:
+        raise HTTPException(502, "No se pudo consultar OpenFoodFacts")
+
+    results = []
+    for product in data.get("products", []):
+        name = product.get("product_name", "").strip()
+        kcal = product.get("nutriments", {}).get("energy-kcal_100g")
+        if not name or kcal is None:
+            continue
+        results.append({
+            "name": name,
+            "kcal_100g": round(kcal),
+            "image": product.get("image_small_url"),
+        })
+
+    return {"results": results}
 

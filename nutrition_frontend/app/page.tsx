@@ -7,33 +7,13 @@ import { Badge } from "@/components/ui/badge"
 import {
   Flame, Dumbbell, Bell, Scale, ClipboardList,
   Calendar, TrendingUp, Beef, Wheat, Droplet, Star, X,
+  Footprints, Heart,
 } from "lucide-react"
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts"
 import type { DashboardData, GamificationStatus } from "@/lib/api"
 import { fetchDashboard, fetchGamification } from "@/lib/api"
 import { LevelBadge } from "@/components/level-badge"
 import { useCheatDay } from "@/context/CheatDayContext"
-
-// Mock data for development when API is unavailable
-const mockDashboardData: DashboardData = {
-  dailyCalorieTarget: 2200,
-  caloriesConsumed: 1650,
-  macros: {
-    protein: { current: 95, target: 150 },
-    carbs: { current: 180, target: 250 },
-    fat: { current: 55, target: 70 },
-  },
-  exerciseYesterday: {
-    type: "Running",
-    minutes: 45,
-    caloriesBurned: 420,
-  },
-  alerts: [
-    { id: "1", type: "weigh-in", message: "Time for your weekly weigh-in!" },
-    { id: "2", type: "survey", message: "Complete your weekly sensations survey" },
-    { id: "3", type: "event", message: "Beach vacation in 3 weeks", dueDate: "2024-02-15" },
-  ],
-}
 
 const todayISO = new Date().toISOString().slice(0, 10)
 
@@ -51,22 +31,22 @@ export default function DashboardPage() {
   useEffect(() => {
     fetchDashboard()
       .then(setData)
-      .catch(() => setData(mockDashboardData))
+      .catch((err) => console.error("Dashboard fetch failed:", err))
       .finally(() => setLoading(false))
     fetchGamification().then(setGamification).catch(() => null)
   }, [])
 
-  if (loading) {
+  if (loading || !data) {
     return (
       <AppLayout>
         <div className="flex items-center justify-center h-full">
-          <div className="text-white/60">Cargando...</div>
+          <div className="text-white/60">{loading ? "Cargando..." : "Error al cargar el dashboard"}</div>
         </div>
       </AppLayout>
     )
   }
 
-  const dashboard = data || mockDashboardData
+  const dashboard = data
   const calorieProgress = Math.round((dashboard.caloriesConsumed / dashboard.dailyCalorieTarget) * 100)
 
   const macroData = [
@@ -288,8 +268,39 @@ export default function DashboardPage() {
             </div>
           </Card>
 
-          {/* Yesterday's Exercise */}
+          {/* Activity & Exercise */}
           <Card className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-6 transition-all duration-300 hover:bg-white/15">
+            {/* Today's health data from Apple Health */}
+            {(dashboard.steps != null || dashboard.activeCalories != null || dashboard.heartRateAvg != null) && (
+              <div className="mb-4">
+                <p className="text-white/60 text-sm mb-2">Actividad de hoy</p>
+                <div className="grid grid-cols-3 gap-2">
+                  {dashboard.steps != null && (
+                    <div className="flex flex-col items-center bg-white/5 rounded-xl p-3">
+                      <Footprints className="h-5 w-5 text-blue-400 mb-1" />
+                      <span className="text-white font-bold text-lg">{dashboard.steps.toLocaleString()}</span>
+                      <span className="text-white/40 text-xs">pasos</span>
+                    </div>
+                  )}
+                  {dashboard.activeCalories != null && (
+                    <div className="flex flex-col items-center bg-white/5 rounded-xl p-3">
+                      <Flame className="h-5 w-5 text-orange-400 mb-1" />
+                      <span className="text-white font-bold text-lg">{dashboard.activeCalories}</span>
+                      <span className="text-white/40 text-xs">kcal activas</span>
+                    </div>
+                  )}
+                  {dashboard.heartRateAvg != null && (
+                    <div className="flex flex-col items-center bg-white/5 rounded-xl p-3">
+                      <Heart className="h-5 w-5 text-red-400 mb-1" />
+                      <span className="text-white font-bold text-lg">{dashboard.heartRateAvg}</span>
+                      <span className="text-white/40 text-xs">bpm</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Yesterday's exercise */}
             <div className="flex items-start justify-between mb-4">
               <div>
                 <p className="text-white/60 text-sm">Ejercicio de ayer</p>
@@ -315,6 +326,11 @@ export default function DashboardPage() {
                   {dashboard.exerciseYesterday.caloriesBurned} kcal quemadas
                 </span>
               </div>
+            )}
+
+            {/* No data at all */}
+            {!dashboard.exerciseYesterday && dashboard.steps == null && dashboard.activeCalories == null && (
+              <p className="text-white/30 text-sm">Sincroniza Apple Health para ver tu actividad aquí</p>
             )}
           </Card>
         </div>

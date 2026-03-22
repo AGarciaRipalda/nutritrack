@@ -57,6 +57,9 @@ async function del(path: string): Promise<void> {
 export interface DashboardData {
   dailyCalorieTarget: number
   caloriesConsumed: number
+  steps: number | null
+  heartRateAvg: number | null
+  activeCalories: number | null
   macros: {
     protein: { current: number; target: number }
     carbs: { current: number; target: number }
@@ -66,6 +69,8 @@ export interface DashboardData {
     type: string
     minutes: number
     caloriesBurned: number
+    steps: number | null
+    heartRateAvg: number | null
   } | null
   alerts: {
     id: string
@@ -319,10 +324,20 @@ export async function fetchDashboard(): Promise<DashboardData> {
   const d = await get<any>("/dashboard")
   const ex = d.exercise_data
   const macros = d.nutrition.macros
+  const exHealth = ex?.health_data          // yesterday's health (from exercise history)
+  const todayHealth = d.today_health        // today's health (steps, HR from Apple Health)
+
+  // Exercise adjustment: if there's exercise data, daily_target already
+  // includes it from the backend (TDEE + exercise adjustment).
+  const dailyCalorieTarget = d.nutrition.daily_target
 
   return {
-    dailyCalorieTarget: d.nutrition.daily_target,
+    dailyCalorieTarget,
     caloriesConsumed:   d.nutrition.consumed_kcal ?? 0,
+    // Today's health data from Apple Health sync
+    steps:              todayHealth?.steps ?? exHealth?.steps ?? null,
+    heartRateAvg:       todayHealth?.heart_rate_avg ?? exHealth?.heart_rate_avg ?? null,
+    activeCalories:     todayHealth?.active_calories ?? exHealth?.active_calories ?? null,
     macros: {
       protein: { current: 0, target: macros.protein_g },
       carbs:   { current: 0, target: macros.carb_g },
@@ -330,9 +345,11 @@ export async function fetchDashboard(): Promise<DashboardData> {
     },
     exerciseYesterday: ex?.burned_kcal > 0
       ? {
-          type:          ex.exercises?.[0]?.name ?? "Ejercicio",
-          minutes:       ex.exercises?.[0]?.minutes ?? 0,
+          type:           exHealth?.workout_type ?? ex.exercises?.[0]?.name ?? "Ejercicio",
+          minutes:        exHealth?.duration_min ?? ex.exercises?.[0]?.minutes ?? 0,
           caloriesBurned: ex.burned_kcal,
+          steps:          exHealth?.steps ?? null,
+          heartRateAvg:   exHealth?.heart_rate_avg ?? null,
         }
       : null,
     alerts: d.alerts.map((a: any) => ({
@@ -343,9 +360,23 @@ export async function fetchDashboard(): Promise<DashboardData> {
   }
 }
 
-export async function fetchTodaysPlan(): Promise<PlanDay & { stale: boolean }> {
+export interface TodayAdherence {
+  meals: Record<string, boolean>
+  skippedMeals: Record<string, { foods: { name: string; kcal: number }[] }>
+  consumedKcal: number
+}
+
+export async function fetchTodaysPlan(): Promise<PlanDay & { stale: boolean; adherence: TodayAdherence }> {
   const d = await get<any>("/diet/today")
-  return transformPlanDay(d)
+  const adh = d.adherence ?? {}
+  return {
+    ...transformPlanDay(d),
+    adherence: {
+      meals:         adh.meals ?? {},
+      skippedMeals:  adh.skipped_meals ?? {},
+      consumedKcal:  adh.consumed_kcal ?? 0,
+    },
+  }
 }
 
 export async function swapMeal(mealId: string): Promise<PlanDay> {
@@ -800,4 +831,24 @@ export interface GamificationStatus {
 
 export async function fetchGamification(): Promise<GamificationStatus> {
   return get<GamificationStatus>("/gamification/status")
+}
+
+// ── PDF Export ─────────────────────────────────────────────────────────────────
+
+export function getReportPdfUrl(): string {
+  return `${API_BASE}/report/download`
+}
+
+// ── Food Search (OpenFoodFacts) ──────────────────────────────────────────────
+
+export interface FoodSearchResult {
+  name: string
+  kcal_100g: number
+  image: string | null
+}
+
+export async function searchFood(query: string): Promise<FoodSearchResult[]> {
+  if (query.length < 2) return []
+  const d = await get<{ results: FoodSearchResult[] }>(`/food/search?q=${encodeURIComponent(query)}`)
+  return d.results
 }

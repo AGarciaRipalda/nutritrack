@@ -14,10 +14,11 @@ from adherence import ADHERENCE_FILE, weekly_adherence
 from weekly_survey import last_survey_scores
 
 
-def _load(path: str) -> dict | list:
-    if not os.path.exists(path):
-        return {} if path.endswith(".json") and "history" in path.lower() else []
-    with open(path, "r", encoding="utf-8") as f:
+def _load(path) -> dict | list:
+    p = str(path)
+    if not os.path.exists(p):
+        return {} if p.endswith(".json") and "history" in p.lower() else []
+    with open(p, "r", encoding="utf-8") as f:
         return json.load(f)
 
 

@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useRef, useCallback } from "react"
 import { AppLayout } from "@/components/app-layout"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -10,8 +10,8 @@ import {
   Shuffle, Coffee, Sun, Utensils, Cookie, Moon,
   Lightbulb, CheckCircle2, Wheat, Scale, Star, X, Ban, Plus,
 } from "lucide-react"
-import type { PlanDay } from "@/lib/api"
-import { fetchTodaysPlan, swapMeal, updateAdherence, fetchFavoriteCarbs } from "@/lib/api"
+import type { PlanDay, FoodSearchResult } from "@/lib/api"
+import { fetchTodaysPlan, swapMeal, updateAdherence, fetchFavoriteCarbs, searchFood } from "@/lib/api"
 import { useDietDay } from "@/context/DietDayContext"
 import { useCheatDay } from "@/context/CheatDayContext"
 
@@ -52,8 +52,29 @@ export default function DietPage() {
   const [swapping, setSwapping]       = useState<string | null>(null)
   const [checkedMeals, setCheckedMeals] = useState<Record<string, boolean>>({})
   const [skippedMeals, setSkippedMeals] = useState<Record<string, { foods: { name: string; kcal: number }[] }>>({})
-  const [foodInput, setFoodInput] = useState<Record<string, { name: string; kcal: string }>>({})
+  const [foodInput, setFoodInput] = useState<Record<string, { name: string; grams: string; kcalPer100g: number | null }>>({})
   const [showCompModal, setShowCompModal] = useState(false)
+  const [foodSuggestions, setFoodSuggestions] = useState<Record<string, FoodSearchResult[]>>({})
+  const [searchingFood, setSearchingFood] = useState<Record<string, boolean>>({})
+  const searchTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
+
+  const debouncedFoodSearch = useCallback((mealId: string, query: string) => {
+    if (searchTimers.current[mealId]) clearTimeout(searchTimers.current[mealId])
+    if (query.length < 2) {
+      setFoodSuggestions((prev) => ({ ...prev, [mealId]: [] }))
+      return
+    }
+    searchTimers.current[mealId] = setTimeout(async () => {
+      setSearchingFood((prev) => ({ ...prev, [mealId]: true }))
+      try {
+        const results = await searchFood(query)
+        setFoodSuggestions((prev) => ({ ...prev, [mealId]: results }))
+      } catch {
+        setFoodSuggestions((prev) => ({ ...prev, [mealId]: [] }))
+      }
+      setSearchingFood((prev) => ({ ...prev, [mealId]: false }))
+    }, 400)
+  }, [])
 
   useEffect(() => {
     Promise.all([fetchTodaysPlan(), fetchFavoriteCarbs()])
@@ -62,6 +83,15 @@ export default function DietPage() {
         setPlanDay(d)
         const target = d.exerciseAdj?.adjustedTotal ?? d.totalKcal
         init(d.date, target, d.meals, carbs)
+        // Restore persisted adherence state (skipped meals + checked meals)
+        if (d.adherence) {
+          if (Object.keys(d.adherence.meals).length > 0) {
+            setCheckedMeals(d.adherence.meals)
+          }
+          if (Object.keys(d.adherence.skippedMeals).length > 0) {
+            setSkippedMeals(d.adherence.skippedMeals)
+          }
+        }
       })
       .catch(() => setPlanDay(mockPlanDay))
       .finally(() => setLoading(false))
@@ -118,15 +148,17 @@ export default function DietPage() {
 
   const handleAddFood = async (mealId: string) => {
     const input = foodInput[mealId]
-    if (!input?.name?.trim() || !input?.kcal) return
-    const kcal = parseInt(input.kcal)
-    if (isNaN(kcal) || kcal <= 0) return
+    if (!input?.name?.trim() || !input?.grams) return
+    const grams = parseInt(input.grams)
+    if (isNaN(grams) || grams <= 0) return
+    const kcalPer100g = input.kcalPer100g ?? 100  // fallback: 100 kcal/100g
+    const kcal = Math.round((kcalPer100g * grams) / 100)
     const newSkipped = {
       ...skippedMeals,
       [mealId]: { foods: [...(skippedMeals[mealId]?.foods ?? []), { name: input.name.trim(), kcal }] },
     }
     setSkippedMeals(newSkipped)
-    setFoodInput((prev) => ({ ...prev, [mealId]: { name: "", kcal: "" } }))
+    setFoodInput((prev) => ({ ...prev, [mealId]: { name: "", grams: "", kcalPer100g: null } }))
     await syncAdherence(checkedMeals, newSkipped)
   }
 
@@ -441,33 +473,77 @@ export default function DietPage() {
                         </div>
                       </div>
                     ))}
-                    {/* Add food input */}
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        placeholder="Alimento"
-                        value={foodInput[meal.id]?.name ?? ""}
-                        onChange={(e) => setFoodInput((prev) => ({ ...prev, [meal.id]: { ...prev[meal.id], name: e.target.value } }))}
-                        onKeyDown={(e) => e.key === "Enter" && handleAddFood(meal.id)}
-                        className="flex-1 bg-white/5 border border-white/10 rounded-lg text-xs px-2 py-1.5 text-white/70 placeholder:text-white/30 focus:outline-none focus:border-amber-400/40"
-                      />
-                      <input
-                        type="number"
-                        placeholder="kcal"
-                        min="1"
-                        value={foodInput[meal.id]?.kcal ?? ""}
-                        onChange={(e) => setFoodInput((prev) => ({ ...prev, [meal.id]: { ...prev[meal.id], kcal: e.target.value } }))}
-                        onKeyDown={(e) => e.key === "Enter" && handleAddFood(meal.id)}
-                        className="w-16 bg-white/5 border border-white/10 rounded-lg text-xs px-2 py-1.5 text-white/70 text-center placeholder:text-white/30 focus:outline-none focus:border-amber-400/40"
-                      />
-                      <Button
-                        size="sm"
-                        onClick={() => handleAddFood(meal.id)}
-                        disabled={!foodInput[meal.id]?.name || !foodInput[meal.id]?.kcal}
-                        className="h-7 w-7 p-0 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-400/30"
-                      >
-                        <Plus className="h-3.5 w-3.5" />
-                      </Button>
+                    {/* Add food input with autocomplete */}
+                    <div className="space-y-1">
+                      <div className="flex gap-2">
+                        <div className="flex-1 relative">
+                          <input
+                            type="text"
+                            placeholder="Buscar alimento..."
+                            value={foodInput[meal.id]?.name ?? ""}
+                            onChange={(e) => {
+                              const val = e.target.value
+                              setFoodInput((prev) => ({ ...prev, [meal.id]: { ...prev[meal.id], name: val, kcalPer100g: prev[meal.id]?.kcalPer100g ?? null } }))
+                              debouncedFoodSearch(meal.id, val)
+                            }}
+                            onKeyDown={(e) => e.key === "Enter" && handleAddFood(meal.id)}
+                            className="w-full bg-white/5 border border-white/10 rounded-lg text-xs px-2 py-1.5 text-white/70 placeholder:text-white/30 focus:outline-none focus:border-amber-400/40"
+                          />
+                          {/* Autocomplete dropdown */}
+                          {(foodSuggestions[meal.id]?.length ?? 0) > 0 && (
+                            <div className="absolute z-20 left-0 right-0 top-full mt-1 bg-zinc-900/95 border border-white/20 rounded-lg shadow-xl max-h-40 overflow-y-auto">
+                              {foodSuggestions[meal.id].map((item, idx) => (
+                                <button
+                                  key={idx}
+                                  onClick={() => {
+                                    setFoodInput((prev) => ({
+                                      ...prev,
+                                      [meal.id]: { name: item.name, grams: prev[meal.id]?.grams ?? "", kcalPer100g: item.kcal_100g },
+                                    }))
+                                    setFoodSuggestions((prev) => ({ ...prev, [meal.id]: [] }))
+                                  }}
+                                  className="w-full text-left px-3 py-2 text-xs hover:bg-white/10 flex justify-between items-center gap-2 border-b border-white/5 last:border-0"
+                                >
+                                  <span className="text-white/80 truncate">{item.name}</span>
+                                  <span className="text-amber-400 font-medium shrink-0">{item.kcal_100g} kcal/100g</span>
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                          {searchingFood[meal.id] && (
+                            <div className="absolute right-2 top-1/2 -translate-y-1/2">
+                              <div className="h-3 w-3 border border-amber-400/60 border-t-transparent rounded-full animate-spin" />
+                            </div>
+                          )}
+                        </div>
+                        <input
+                          type="number"
+                          placeholder="g"
+                          min="1"
+                          value={foodInput[meal.id]?.grams ?? ""}
+                          onChange={(e) => setFoodInput((prev) => ({ ...prev, [meal.id]: { ...prev[meal.id], grams: e.target.value, kcalPer100g: prev[meal.id]?.kcalPer100g ?? null } }))}
+                          onKeyDown={(e) => e.key === "Enter" && handleAddFood(meal.id)}
+                          className="w-14 bg-white/5 border border-white/10 rounded-lg text-xs px-2 py-1.5 text-white/70 text-center placeholder:text-white/30 focus:outline-none focus:border-amber-400/40"
+                        />
+                        <Button
+                          size="sm"
+                          onClick={() => handleAddFood(meal.id)}
+                          disabled={!foodInput[meal.id]?.name || !foodInput[meal.id]?.grams}
+                          className="h-7 w-7 p-0 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-400/30"
+                        >
+                          <Plus className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                      {/* Show calculated kcal preview */}
+                      {foodInput[meal.id]?.kcalPer100g != null && foodInput[meal.id]?.grams && (
+                        <p className="text-amber-400/60 text-[10px] pl-1">
+                          ≈ {Math.round((foodInput[meal.id].kcalPer100g! * parseInt(foodInput[meal.id].grams || "0")) / 100)} kcal
+                          ({foodInput[meal.id].kcalPer100g} kcal/100g)
+                        </p>
+                      )}
+                      {!foodInput[meal.id]?.kcalPer100g && (
+                        <p className="text-white/25 text-[10px] pl-1">Busca un alimento para autocompletar kcal</p>
+                      )}
                     </div>
                   </div>
                 )}
