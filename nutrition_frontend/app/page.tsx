@@ -9,8 +9,9 @@ import {
   Calendar, TrendingUp, Beef, Wheat, Droplet, Star, X,
 } from "lucide-react"
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts"
-import type { DashboardData } from "@/lib/api"
-import { fetchDashboard } from "@/lib/api"
+import type { DashboardData, GamificationStatus } from "@/lib/api"
+import { fetchDashboard, fetchGamification } from "@/lib/api"
+import { LevelBadge } from "@/components/level-badge"
 import { useCheatDay } from "@/context/CheatDayContext"
 
 // Mock data for development when API is unavailable
@@ -40,6 +41,7 @@ export default function DashboardPage() {
   const [data, setData]         = useState<DashboardData | null>(null)
   const [loading, setLoading]   = useState(true)
   const [showConfirm, setShowConfirm] = useState(false)
+  const [gamification, setGamification] = useState<GamificationStatus | null>(null)
 
   const { record, isCheatDay, isWeeklyLimitReached, activateCheatDay } = useCheatDay()
 
@@ -51,6 +53,7 @@ export default function DashboardPage() {
       .then(setData)
       .catch(() => setData(mockDashboardData))
       .finally(() => setLoading(false))
+    fetchGamification().then(setGamification).catch(() => null)
   }, [])
 
   if (loading) {
@@ -186,6 +189,30 @@ export default function DashboardPage() {
               </div>
             </div>
           </div>
+        )}
+
+        {/* Gamification card */}
+        {gamification && (
+          <Card className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-5">
+            <div className="flex items-center justify-between gap-4 flex-wrap">
+              <div className="flex-1 min-w-48">
+                <LevelBadge status={gamification} />
+              </div>
+              <div className="flex gap-3 text-center flex-wrap justify-end">
+                {[
+                  { label: "Entrenos",   value: gamification.breakdown.training,  color: "text-emerald-300" },
+                  { label: "Dieta",      value: gamification.breakdown.diet,      color: "text-amber-300"   },
+                  { label: "Combos",     value: gamification.breakdown.combo,     color: "text-violet-300"  },
+                  { label: "Rachas",     value: gamification.breakdown.streak,    color: "text-red-300"     },
+                ].map(({ label, value, color }) => (
+                  <div key={label} className="bg-white/5 rounded-xl px-3 py-2 min-w-16">
+                    <p className={`text-sm font-bold ${color}`}>+{value}</p>
+                    <p className="text-white/40 text-[10px]">{label}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </Card>
         )}
 
         {/* Calorie and Macro Cards */}

@@ -32,6 +32,9 @@ import {
   HardDrive,
   ChevronDown,
   ChevronRight,
+  Heart,
+  Activity,
+  Download,
 } from "lucide-react"
 import type { TrainingData, ExerciseRoutine, ExerciseImpact, GymHistoryData } from "@/lib/api"
 import { fetchTraining, logExerciseForDate, generateRoutine, deleteExerciseByDate, fetchGymHistory } from "@/lib/api"
@@ -65,6 +68,11 @@ const mockCalisthenicsRoutine: ExerciseRoutine[] = [
   { day: "Día 2 - Tren inferior", label: "Inferior", exercises: [{ name: "Sentadilla a una pierna", sets: "3x6-8", muscles: "Cuádriceps, Glúteos" }, { name: "Sentadillas con salto", sets: "4x15-20", muscles: "Piernas completo" }, { name: "Zancadas", sets: "3x12", muscles: "Cuádriceps, Glúteos" }, { name: "Elevaciones de gemelos", sets: "4x20-25", muscles: "Gemelos" }] },
   { day: "Día 3 - Core", label: "Core", exercises: [{ name: "Plancha", sets: "3x60s", muscles: "Core completo" }, { name: "Elevaciones de piernas", sets: "4x15-20", muscles: "Abdomen" }, { name: "Giros rusos", sets: "3x20", muscles: "Oblicuos" }, { name: "Mountain climbers", sets: "3x30s", muscles: "Core, Cardio" }] },
 ]
+
+// ── Constantes ───────────────────────────────────────────────────────────────
+// Pega aquí el enlace iCloud cuando compartas el Shortcut desde tu iPhone:
+// Shortcuts → ··· → Compartir → Copiar enlace iCloud
+const SHORTCUT_URL = "https://www.icloud.com/shortcuts/ce9f7daa9e0d4b50af2fe50cb9e63096"
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -286,6 +294,10 @@ export default function TrainingPage() {
   const training = data || mockTrainingData
   const maxKcal = Math.max(...training.history.map((h) => h.caloriesBurned), 1)
 
+  const lastHealthSync = training.history
+    .filter((h) => h.sources?.includes("apple_health"))
+    .sort((a, b) => b.date.localeCompare(a.date))[0] ?? null
+
   return (
     <AppLayout>
       <div className="space-y-6">
@@ -433,6 +445,91 @@ export default function TrainingPage() {
 
           {/* ── History Tab ── */}
           <TabsContent value="history">
+            <div className="space-y-4">
+
+            {/* Apple Health last sync card */}
+            <Card className="backdrop-blur-xl bg-red-950/30 border border-red-500/20 rounded-3xl p-5">
+              <div className="flex items-center justify-between gap-3 flex-wrap mb-4">
+                <div className="flex items-center gap-2">
+                  <Heart className="h-5 w-5 text-red-400" />
+                  <h3 className="text-lg font-semibold text-white">Último sync Apple Health</h3>
+                </div>
+                <a
+                  href={SHORTCUT_URL || undefined}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-disabled={!SHORTCUT_URL}
+                  tabIndex={SHORTCUT_URL ? undefined : -1}
+                  className={!SHORTCUT_URL ? "pointer-events-none" : ""}
+                >
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={!SHORTCUT_URL}
+                    className="bg-white/5 border-white/20 text-white/80 hover:bg-white/10 text-xs h-8 gap-1.5 disabled:opacity-40"
+                  >
+                    <Download className="h-3.5 w-3.5" />
+                    Descargar Shortcut
+                  </Button>
+                </a>
+              </div>
+
+              {lastHealthSync ? (
+                <div>
+                  <p className="text-white/50 text-xs mb-3">
+                    {new Date(lastHealthSync.date + "T12:00:00").toLocaleDateString("es-ES", {
+                      weekday: "long", day: "numeric", month: "long",
+                    })}
+                    {lastHealthSync.healthData?.workout_type && (
+                      <> · <span className="text-white/70">{lastHealthSync.healthData.workout_type}</span></>
+                    )}
+                  </p>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <div className="bg-white/5 rounded-2xl p-3 text-center">
+                      <Flame className="h-4 w-4 text-orange-400 mx-auto mb-1" />
+                      <p className="text-white font-semibold">{lastHealthSync.caloriesBurned}</p>
+                      <p className="text-white/40 text-xs">kcal activas</p>
+                    </div>
+                    {lastHealthSync.minutes > 0 && (
+                      <div className="bg-white/5 rounded-2xl p-3 text-center">
+                        <Clock className="h-4 w-4 text-emerald-400 mx-auto mb-1" />
+                        <p className="text-white font-semibold">{lastHealthSync.minutes}</p>
+                        <p className="text-white/40 text-xs">minutos</p>
+                      </div>
+                    )}
+                    {lastHealthSync.healthData?.steps && (
+                      <div className="bg-white/5 rounded-2xl p-3 text-center">
+                        <Activity className="h-4 w-4 text-blue-400 mx-auto mb-1" />
+                        <p className="text-white font-semibold">{lastHealthSync.healthData.steps.toLocaleString()}</p>
+                        <p className="text-white/40 text-xs">pasos</p>
+                      </div>
+                    )}
+                    {lastHealthSync.healthData?.heart_rate_avg && (
+                      <div className="bg-white/5 rounded-2xl p-3 text-center">
+                        <Heart className="h-4 w-4 text-red-400 mx-auto mb-1" />
+                        <p className="text-white font-semibold">{lastHealthSync.healthData.heart_rate_avg}</p>
+                        <p className="text-white/40 text-xs">ppm prom</p>
+                      </div>
+                    )}
+                  </div>
+                  {lastHealthSync.healthData?.heart_rate_max && (
+                    <p className="text-white/30 text-xs mt-2 text-right">
+                      FC máx: {lastHealthSync.healthData.heart_rate_max} ppm
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <div className="text-center py-3">
+                  <p className="text-white/40 text-sm">No hay datos de Apple Health todavía.</p>
+                  <p className="text-white/25 text-xs mt-1">
+                    {SHORTCUT_URL
+                      ? "Descarga el Shortcut y actívalo desde iOS tras cada entreno."
+                      : "Configura y comparte el Shortcut desde tu iPhone para activar la integración."}
+                  </p>
+                </div>
+              )}
+            </Card>
+
             <Card className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-6">
               <div className="flex items-center gap-2 mb-6">
                 <History className="h-5 w-5 text-emerald-400" />
@@ -539,6 +636,7 @@ export default function TrainingPage() {
                 </TableBody>
               </Table>
             </Card>
+            </div>
           </TabsContent>
 
           {/* ── Gym Sheets Tab ── */}

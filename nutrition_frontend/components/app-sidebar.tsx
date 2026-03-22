@@ -2,6 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
+import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import {
@@ -17,6 +18,9 @@ import {
   ChevronRight,
   X,
 } from "lucide-react"
+import { LevelBadge } from "@/components/level-badge"
+import type { GamificationStatus } from "@/lib/api"
+import { fetchGamification } from "@/lib/api"
 
 const navItems = [
   { href: "/", icon: LayoutDashboard, label: "Inicio" },
@@ -37,6 +41,11 @@ interface SidebarContentProps {
 
 function SidebarContent({ collapsed, onToggleCollapse, onClose, showClose }: SidebarContentProps) {
   const pathname = usePathname()
+  const [gamification, setGamification] = useState<GamificationStatus | null>(null)
+
+  useEffect(() => {
+    fetchGamification().then(setGamification).catch(() => null)
+  }, [])
 
   return (
     <Card
@@ -80,6 +89,13 @@ function SidebarContent({ collapsed, onToggleCollapse, onClose, showClose }: Sid
           </button>
         )}
       </div>
+
+      {/* Level badge */}
+      {gamification && (
+        <div className="mt-4">
+          <LevelBadge status={gamification} collapsed={collapsed} />
+        </div>
+      )}
 
       {/* Navigation */}
       <nav className="space-y-1 mt-4">

@@ -767,3 +767,29 @@ export async function fetchFavoriteCarbs(): Promise<FavoriteCarb[]> {
   const d = await get<any>("/diet/carbs")
   return d.carbs ?? []
 }
+
+// ── Gamificación ──────────────────────────────────────────────────────────────
+
+export interface GamificationStatus {
+  level: number
+  name: string
+  xp: number
+  xp_in_level: number
+  xp_to_next: number
+  xp_next_level: number
+  progress_pct: number
+  is_max_level: boolean
+  next_level_name: string | null
+  breakdown: {
+    training: number
+    diet: number
+    combo: number
+    weight: number
+    surveys: number
+    streak: number
+  }
+}
+
+export async function fetchGamification(): Promise<GamificationStatus> {
+  return get<GamificationStatus>("/gamification/status")
+}

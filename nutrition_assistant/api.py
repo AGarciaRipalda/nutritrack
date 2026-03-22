@@ -62,6 +62,7 @@ from training import (
     FULL_BODY_ROUTINE, PPL_ROUTINE, CALISTENIA, CALISTENIA_PLANS,
     _build_ppl_plan, _filter_exercises,
 )
+from gamification import gamification_status
 
 # ── App ───────────────────────────────────────────────────────────────────────
 app = FastAPI(
@@ -1319,3 +1320,14 @@ def get_calistenia_routine(
         "day_plan":         day_list,
         "protein_post":     round(profile["weight_kg"] * 0.3),
     }
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# GAMIFICACIÓN
+# ══════════════════════════════════════════════════════════════════════════════
+
+@app.get("/gamification/status", tags=["Gamificación"])
+def get_gamification_status():
+    """Devuelve el nivel, XP total, progreso al siguiente nivel y desglose de puntos."""
+    return gamification_status()
+
