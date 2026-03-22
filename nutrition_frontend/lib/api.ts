@@ -322,7 +322,7 @@ export async function fetchDashboard(): Promise<DashboardData> {
 
   return {
     dailyCalorieTarget: d.nutrition.daily_target,
-    caloriesConsumed:   0,   // no se rastrea en tiempo real
+    caloriesConsumed:   d.nutrition.consumed_kcal ?? 0,
     macros: {
       protein: { current: 0, target: macros.protein_g },
       carbs:   { current: 0, target: macros.carb_g },
@@ -363,8 +363,11 @@ export async function regenerateDay(): Promise<PlanDay & { stale: boolean }> {
   return transformPlanDay(d)
 }
 
-export async function updateAdherence(meals: Record<string, boolean>): Promise<void> {
-  await post("/adherence", { meals })
+export async function updateAdherence(
+  meals: Record<string, boolean>,
+  kcalMap: Record<string, number> = {},
+): Promise<{ consumed_kcal: number }> {
+  return post<{ consumed_kcal: number }>("/adherence", { meals, kcal_map: kcalMap })
 }
 
 export async function fetchWeeklyPlan(): Promise<WeeklyPlanResponse> {

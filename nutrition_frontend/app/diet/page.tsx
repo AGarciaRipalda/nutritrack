@@ -86,8 +86,12 @@ export default function DietPage() {
   }))
 
   const handleAdherenceChange = async (itemId: string, checked: boolean) => {
-    setCheckedMeals((prev) => ({ ...prev, [itemId]: checked }))
-    try { await updateAdherence({ [itemId]: checked }) } catch {}
+    const newChecked = { ...checkedMeals, [itemId]: checked }
+    setCheckedMeals(newChecked)
+    // Enviar estado completo de todas las comidas + kcal de cada una
+    const kcalMap: Record<string, number> = {}
+    ;(planDay?.meals ?? []).forEach((m) => { kcalMap[m.id] = m.kcal })
+    try { await updateAdherence(newChecked, kcalMap) } catch {}
   }
 
   if (loading) {

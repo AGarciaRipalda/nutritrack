@@ -194,8 +194,8 @@ class SurveyModel(BaseModel):
 
 
 class AdherenceModel(BaseModel):
-    # {meal_key: bool}
-    meals: dict
+    meals: dict                    # {meal_key: bool}
+    kcal_map: dict = {}            # {meal_key: kcal} — opcional, para calcular consumo real
 
 
 class PreferencesModel(BaseModel):
@@ -1040,22 +1040,48 @@ def get_adherence(days: int = 7):
 @app.post("/adherence", tags=["Adherencia"])
 def log_adherence_endpoint(data: AdherenceModel):
     """Registra la adherencia del día (qué comidas se han cumplido)."""
-    meals     = data.meals   # {meal_key: bool}
+    meals     = data.meals        # {meal_key: bool}
+    kcal_map  = data.kcal_map     # {meal_key: kcal}
     followed  = sum(1 for v in meals.values() if v)
     total     = len(meals)
     pct       = round(followed / total * 100) if total else 0
     today_iso = date.today().isoformat()
+
+    consumed_kcal = sum(
+        kcal_map.get(k, 0) for k, v in meals.items() if v
+    ) if kcal_map else None
 
     adh_log = {}
     if os.path.exists(ADHERENCE_FILE):
         with open(ADHERENCE_FILE) as f:
             adh_log = json.load(f)
 
-    adh_log[today_iso] = {"meals": meals, "pct": pct}
+    entry = {"meals": meals, "pct": pct}
+    if consumed_kcal is not None:
+        entry["consumed_kcal"] = round(consumed_kcal)
+
+    adh_log[today_iso] = entry
     with open(ADHERENCE_FILE, "w") as f:
         json.dump(adh_log, f, indent=2)
 
-    return {"ok": True, "pct": pct, "followed": followed, "total": total}
+    return {"ok": True, "pct": pct, "followed": followed, "total": total,
+            "consumed_kcal": entry.get("consumed_kcal", 0)}
+
+
+@app.get("/adherence/today", tags=["Adherencia"])
+def get_today_adherence():
+    """Devuelve las kcal consumidas y adherencia del día de hoy."""
+    today_iso = date.today().isoformat()
+    adh_log   = {}
+    if os.path.exists(ADHERENCE_FILE):
+        with open(ADHERENCE_FILE) as f:
+            adh_log = json.load(f)
+    entry = adh_log.get(today_iso, {})
+    return {
+        "pct":           entry.get("pct", 0),
+        "consumed_kcal": entry.get("consumed_kcal", 0),
+        "meals":         entry.get("meals", {}),
+    }
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1130,6 +1156,14 @@ def get_dashboard():
     profile  = load_profile()
     session  = _get_session()
     ex_data  = session.get("exercise_data") or {"burned_kcal": 0, "adjustment_kcal": 0, "exercises": []}
+
+    # Kcal consumidas hoy (desde adherencia)
+    today_iso = date.today().isoformat()
+    adh_log   = {}
+    if os.path.exists(ADHERENCE_FILE):
+        with open(ADHERENCE_FILE) as f:
+            adh_log = json.load(f)
+    consumed_kcal = adh_log.get(today_iso, {}).get("consumed_kcal", 0)
     today_tr = session.get("today_training") or {}
     ex_adj   = ex_data.get("adjustment_kcal", 0) + today_tr.get("bonus_kcal", 0)
 
@@ -1157,7 +1191,8 @@ def get_dashboard():
     return {
         "profile":      profile,
         "nutrition":    {"bmr": round(bmr), "tdee_ref": round(tdee),
-                         "daily_target": target, "macros": macros},
+                         "daily_target": target, "macros": macros,
+                         "consumed_kcal": consumed_kcal},
         "exercise_data": ex_data,
         "today_training": today_tr,
         "alerts":        alerts,
