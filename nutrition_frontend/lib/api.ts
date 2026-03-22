@@ -54,12 +54,22 @@ async function del(path: string): Promise<void> {
 
 // ── Tipos públicos (usados por los componentes de v0) ─────────────────────────
 
+export interface GoalBalance {
+  goal: "lose" | "maintain" | "gain"
+  targetAdjustment: number   // -300, 0, +300
+  consumedKcal: number
+  activeKcal: number
+  netBalance: number         // consumed - active
+  targetNet: number          // daily_target - active
+}
+
 export interface DashboardData {
   dailyCalorieTarget: number
   caloriesConsumed: number
   steps: number | null
   heartRateAvg: number | null
   activeCalories: number | null
+  goalBalance: GoalBalance
   macros: {
     protein: { current: number; target: number }
     carbs: { current: number; target: number }
@@ -352,6 +362,14 @@ export async function fetchDashboard(): Promise<DashboardData> {
           heartRateAvg:   exHealth?.heart_rate_avg ?? null,
         }
       : null,
+    goalBalance: {
+      goal:             d.goal_balance?.goal ?? d.profile?.goal ?? "maintain",
+      targetAdjustment: d.goal_balance?.target_adjustment ?? 0,
+      consumedKcal:     d.goal_balance?.consumed_kcal ?? 0,
+      activeKcal:       d.goal_balance?.active_kcal ?? 0,
+      netBalance:       d.goal_balance?.net_balance ?? 0,
+      targetNet:        d.goal_balance?.target_net ?? dailyCalorieTarget,
+    },
     alerts: d.alerts.map((a: any) => ({
       id:      a.type,
       type:    a.type.replace("_", "-") as any,

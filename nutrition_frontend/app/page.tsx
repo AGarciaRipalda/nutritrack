@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge"
 import {
   Flame, Dumbbell, Bell, Scale, ClipboardList,
   Calendar, TrendingUp, Beef, Wheat, Droplet, Star, X,
-  Footprints, Heart,
+  Footprints, Heart, Target, ArrowDown, ArrowUp, Minus,
 } from "lucide-react"
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts"
 import type { DashboardData, GamificationStatus } from "@/lib/api"
@@ -194,6 +194,111 @@ export default function DashboardPage() {
             </div>
           </Card>
         )}
+
+        {/* Goal Balance Card */}
+        {(() => {
+          const gb = dashboard.goalBalance
+          const goalLabels: Record<string, string> = {
+            lose: "Perder peso", maintain: "Mantener peso", gain: "Ganar músculo",
+          }
+          const goalColors: Record<string, string> = {
+            lose: "text-blue-400", maintain: "text-emerald-400", gain: "text-amber-400",
+          }
+          const GoalIcon = gb.goal === "lose" ? ArrowDown : gb.goal === "gain" ? ArrowUp : Minus
+
+          // For "lose": target is a deficit → consumed should be LESS than (active + base metabolism)
+          // We compare consumed vs daily target: if consumed < target → on track for deficit
+          // For "gain": consumed should be MORE than maintenance → consumed > target means surplus achieved
+          const consumed = gb.consumedKcal
+          const target = dashboard.dailyCalorieTarget
+          const active = gb.activeKcal
+          const diff = consumed - target  // negative = under target, positive = over target
+
+          let onTrack = false
+          let statusText = ""
+          let statusColor = ""
+
+          if (gb.goal === "lose") {
+            onTrack = diff <= 0
+            statusText = onTrack
+              ? `${Math.abs(diff)} kcal por debajo del objetivo`
+              : `${diff} kcal por encima del objetivo`
+            statusColor = onTrack ? "text-emerald-400" : "text-red-400"
+          } else if (gb.goal === "gain") {
+            onTrack = diff >= 0
+            statusText = onTrack
+              ? `+${diff} kcal por encima del objetivo`
+              : `${Math.abs(diff)} kcal por debajo del objetivo`
+            statusColor = onTrack ? "text-emerald-400" : "text-amber-400"
+          } else {
+            onTrack = Math.abs(diff) <= 150
+            statusText = onTrack
+              ? "Dentro del rango de mantenimiento"
+              : `${diff > 0 ? "+" : ""}${diff} kcal vs objetivo`
+            statusColor = onTrack ? "text-emerald-400" : "text-amber-400"
+          }
+
+          const targetAdj = Math.abs(gb.targetAdjustment)
+          const adjLabel = gb.goal === "lose"
+            ? `Déficit objetivo: ${targetAdj} kcal/día`
+            : gb.goal === "gain"
+              ? `Superávit objetivo: ${targetAdj} kcal/día`
+              : "Sin ajuste calórico"
+
+          // Progress: how much of the day's intake vs target
+          const pct = target > 0 ? Math.min(Math.round((consumed / target) * 100), 150) : 0
+          const barColor = onTrack
+            ? "from-emerald-400 to-emerald-600"
+            : "from-red-400 to-red-500"
+
+          return (
+            <Card className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <div className={`p-2.5 rounded-xl bg-white/10 ${goalColors[gb.goal]}`}>
+                    <Target className="h-6 w-6" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-white">{goalLabels[gb.goal]}</h3>
+                    <p className="text-white/50 text-sm">{adjLabel}</p>
+                  </div>
+                </div>
+                <GoalIcon className={`h-6 w-6 ${goalColors[gb.goal]}`} />
+              </div>
+
+              {/* Balance bars */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-white/60">Ingesta</span>
+                  <span className="text-white font-medium">{consumed.toLocaleString()} kcal</span>
+                </div>
+                <div className="w-full bg-white/10 rounded-full h-2.5">
+                  <div
+                    className={`bg-gradient-to-r ${barColor} h-2.5 rounded-full transition-all duration-500`}
+                    style={{ width: `${Math.min(pct, 100)}%` }}
+                  />
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-white/60">Objetivo diario</span>
+                  <span className="text-white/60">{target.toLocaleString()} kcal</span>
+                </div>
+
+                {active > 0 && (
+                  <div className="flex items-center justify-between text-sm pt-1 border-t border-white/10">
+                    <span className="text-white/60">Cal. activas hoy</span>
+                    <span className="text-orange-400 font-medium">{active.toLocaleString()} kcal</span>
+                  </div>
+                )}
+
+                {/* Status */}
+                <div className={`flex items-center gap-2 pt-2 ${statusColor}`}>
+                  <div className={`w-2 h-2 rounded-full ${onTrack ? "bg-emerald-400" : "bg-red-400"}`} />
+                  <span className="text-sm font-medium">{statusText}</span>
+                </div>
+              </div>
+            </Card>
+          )
+        })()}
 
         {/* Calorie and Macro Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">

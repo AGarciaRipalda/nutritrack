@@ -1238,6 +1238,17 @@ def get_dashboard():
         alerts.append({"type": "event", "message": f"Evento '{event['name']}' en {d_event} días",
                        "days": d_event})
 
+    # Active calories burned today (from Apple Health sync)
+    today_active_kcal = 0
+    today_entry = ex_history.get(today_iso, {})
+    hd = today_entry.get("health_data")
+    if hd and hd.get("active_calories"):
+        today_active_kcal = round(hd["active_calories"])
+    elif today_entry.get("burned_kcal", 0) > 0:
+        today_active_kcal = round(today_entry["burned_kcal"])
+
+    goal_adj = GOAL_ADJUSTMENTS.get(profile["goal"], 0)
+
     return {
         "profile":      profile,
         "nutrition":    {"bmr": round(bmr), "tdee_ref": round(tdee),
@@ -1245,6 +1256,15 @@ def get_dashboard():
                          "consumed_kcal": consumed_kcal},
         "exercise_data": ex_data,
         "today_health":  today_health,
+        "today_active_kcal": today_active_kcal,
+        "goal_balance": {
+            "goal":            profile["goal"],
+            "target_adjustment": goal_adj,
+            "consumed_kcal":   consumed_kcal,
+            "active_kcal":     today_active_kcal,
+            "net_balance":     consumed_kcal - today_active_kcal,
+            "target_net":      target - today_active_kcal,
+        },
         "today_training": today_tr,
         "alerts":        alerts,
         "session_has_exercise": session.get("exercise_data") is not None,
