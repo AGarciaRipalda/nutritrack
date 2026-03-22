@@ -195,7 +195,8 @@ class SurveyModel(BaseModel):
 
 class AdherenceModel(BaseModel):
     meals: dict                    # {meal_key: bool}
-    kcal_map: dict = {}            # {meal_key: kcal} — opcional, para calcular consumo real
+    kcal_map: dict = {}            # {meal_key: kcal}
+    skipped_meals: dict = {}       # {meal_key: {foods: [{name, kcal}]}}
 
 
 class PreferencesModel(BaseModel):
@@ -1047,9 +1048,19 @@ def log_adherence_endpoint(data: AdherenceModel):
     pct       = round(followed / total * 100) if total else 0
     today_iso = date.today().isoformat()
 
-    consumed_kcal = sum(
-        kcal_map.get(k, 0) for k, v in meals.items() if v
-    ) if kcal_map else None
+    # Kcal de comidas seguidas del plan
+    plan_kcal = sum(
+        kcal_map.get(k, 0) for k, v in meals.items()
+        if v and k not in data.skipped_meals
+    ) if kcal_map else 0
+
+    # Kcal de alimentos alternativos en comidas saltadas
+    replacement_kcal = sum(
+        sum(f.get("kcal", 0) for f in v.get("foods", []))
+        for v in data.skipped_meals.values()
+    )
+
+    consumed_kcal = round(plan_kcal + replacement_kcal) if (kcal_map or data.skipped_meals) else None
 
     adh_log = {}
     if os.path.exists(ADHERENCE_FILE):
@@ -1057,8 +1068,10 @@ def log_adherence_endpoint(data: AdherenceModel):
             adh_log = json.load(f)
 
     entry = {"meals": meals, "pct": pct}
+    if data.skipped_meals:
+        entry["skipped_meals"] = data.skipped_meals
     if consumed_kcal is not None:
-        entry["consumed_kcal"] = round(consumed_kcal)
+        entry["consumed_kcal"] = consumed_kcal
 
     adh_log[today_iso] = entry
     with open(ADHERENCE_FILE, "w") as f:

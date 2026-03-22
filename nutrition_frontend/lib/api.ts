@@ -366,8 +366,13 @@ export async function regenerateDay(): Promise<PlanDay & { stale: boolean }> {
 export async function updateAdherence(
   meals: Record<string, boolean>,
   kcalMap: Record<string, number> = {},
+  skippedMeals: Record<string, { foods: { name: string; kcal: number }[] }> = {},
 ): Promise<{ consumed_kcal: number }> {
-  return post<{ consumed_kcal: number }>("/adherence", { meals, kcal_map: kcalMap })
+  return post<{ consumed_kcal: number }>("/adherence", {
+    meals,
+    kcal_map: kcalMap,
+    skipped_meals: skippedMeals,
+  })
 }
 
 export async function fetchWeeklyPlan(): Promise<WeeklyPlanResponse> {

@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
 import {
   Shuffle, Coffee, Sun, Utensils, Cookie, Moon,
-  Lightbulb, CheckCircle2, Wheat, Scale, Star, X,
+  Lightbulb, CheckCircle2, Wheat, Scale, Star, X, Ban, Plus,
 } from "lucide-react"
 import type { PlanDay } from "@/lib/api"
 import { fetchTodaysPlan, swapMeal, updateAdherence, fetchFavoriteCarbs } from "@/lib/api"
@@ -51,6 +51,8 @@ export default function DietPage() {
   const [loading, setLoading]         = useState(true)
   const [swapping, setSwapping]       = useState<string | null>(null)
   const [checkedMeals, setCheckedMeals] = useState<Record<string, boolean>>({})
+  const [skippedMeals, setSkippedMeals] = useState<Record<string, { foods: { name: string; kcal: number }[] }>>({})
+  const [foodInput, setFoodInput] = useState<Record<string, { name: string; kcal: string }>>({})
   const [showCompModal, setShowCompModal] = useState(false)
 
   useEffect(() => {
@@ -85,13 +87,55 @@ export default function DietPage() {
     checked: checkedMeals[m.id] ?? false,
   }))
 
+  const syncAdherence = async (
+    newChecked: Record<string, boolean>,
+    newSkipped: Record<string, { foods: { name: string; kcal: number }[] }>,
+  ) => {
+    const kcalMap: Record<string, number> = {}
+    ;(planDay?.meals ?? []).forEach((m) => { kcalMap[m.id] = m.kcal })
+    try { await updateAdherence(newChecked, kcalMap, newSkipped) } catch {}
+  }
+
   const handleAdherenceChange = async (itemId: string, checked: boolean) => {
     const newChecked = { ...checkedMeals, [itemId]: checked }
     setCheckedMeals(newChecked)
-    // Enviar estado completo de todas las comidas + kcal de cada una
-    const kcalMap: Record<string, number> = {}
-    ;(planDay?.meals ?? []).forEach((m) => { kcalMap[m.id] = m.kcal })
-    try { await updateAdherence(newChecked, kcalMap) } catch {}
+    await syncAdherence(newChecked, skippedMeals)
+  }
+
+  const handleSkipMeal = async (mealId: string) => {
+    if (skippedMeals[mealId]) {
+      const { [mealId]: _, ...rest } = skippedMeals
+      setSkippedMeals(rest)
+      await syncAdherence(checkedMeals, rest)
+    } else {
+      const newChecked = { ...checkedMeals, [mealId]: false }
+      setCheckedMeals(newChecked)
+      const newSkipped = { ...skippedMeals, [mealId]: { foods: [] } }
+      setSkippedMeals(newSkipped)
+      await syncAdherence(newChecked, newSkipped)
+    }
+  }
+
+  const handleAddFood = async (mealId: string) => {
+    const input = foodInput[mealId]
+    if (!input?.name?.trim() || !input?.kcal) return
+    const kcal = parseInt(input.kcal)
+    if (isNaN(kcal) || kcal <= 0) return
+    const newSkipped = {
+      ...skippedMeals,
+      [mealId]: { foods: [...(skippedMeals[mealId]?.foods ?? []), { name: input.name.trim(), kcal }] },
+    }
+    setSkippedMeals(newSkipped)
+    setFoodInput((prev) => ({ ...prev, [mealId]: { name: "", kcal: "" } }))
+    await syncAdherence(checkedMeals, newSkipped)
+  }
+
+  const handleRemoveFood = async (mealId: string, index: number) => {
+    const foods = [...(skippedMeals[mealId]?.foods ?? [])]
+    foods.splice(index, 1)
+    const newSkipped = { ...skippedMeals, [mealId]: { foods } }
+    setSkippedMeals(newSkipped)
+    await syncAdherence(checkedMeals, newSkipped)
   }
 
   if (loading) {
@@ -109,10 +153,14 @@ export default function DietPage() {
   const { totalEffective, remaining, exceeded, overLimit, rebalancedTargets, effectiveKcalPerMeal } = derived
   const dailyTarget   = state.dailyTarget || day.totalKcal
 
-  // Kcal realmente consumidas = solo comidas marcadas
+  // Kcal realmente consumidas = comidas marcadas (no saltadas) + alimentos de reemplazo
+  const replacementKcal = Object.values(skippedMeals)
+    .flatMap((s) => s.foods)
+    .reduce((sum, f) => sum + f.kcal, 0)
   const consumedKcal    = day.meals
-    .filter((m) => checkedMeals[m.id])
+    .filter((m) => checkedMeals[m.id] && !skippedMeals[m.id])
     .reduce((sum, m) => sum + (effectiveKcalPerMeal[m.id] ?? m.kcal), 0)
+    + replacementKcal
   const consumedPct     = dailyTarget > 0 ? Math.min((consumedKcal / dailyTarget) * 100, cheatActive ? 130 : 110) : 0
   const consumedExceeded  = consumedKcal > dailyTarget
   const consumedOverLimit = consumedKcal > dailyTarget * 1.1
@@ -260,21 +308,28 @@ export default function DietPage() {
             // Rebalance hint for this meal
             const rebalHint = rebalancedTargets[meal.id]
 
+            const isSkipped = !!skippedMeals[meal.id]
+
             return (
               <Card
                 key={meal.id}
                 className={`backdrop-blur-xl border rounded-2xl p-4 transition-all duration-300 ${
-                  isMealOverLimit
+                  isSkipped
+                    ? "bg-amber-500/5 border-amber-400/20"
+                    : isMealOverLimit
                     ? "bg-red-500/10 border-red-400/30"
                     : "bg-white/10 border-white/20 hover:bg-white/15"
                 }`}
               >
                 {/* Header: icon + label + kcal */}
                 <div className="flex items-center gap-2 border-b border-white/10 pb-3 mb-3">
-                  <div className="p-2 bg-emerald-500/20 rounded-lg border border-emerald-400/30 shrink-0">
-                    <MealIcon className="h-4 w-4 text-emerald-400" />
+                  <div className={`p-2 rounded-lg border shrink-0 ${isSkipped ? "bg-amber-500/10 border-amber-400/20" : "bg-emerald-500/20 border-emerald-400/30"}`}>
+                    <MealIcon className={`h-4 w-4 ${isSkipped ? "text-amber-400/60" : "text-emerald-400"}`} />
                   </div>
-                  <span className="text-white/60 text-sm font-medium flex-1">{label}</span>
+                  <span className={`text-sm font-medium flex-1 ${isSkipped ? "text-white/40 line-through" : "text-white/60"}`}>{label}</span>
+                  {isSkipped && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-400/30 leading-none mr-1">Saltada</span>
+                  )}
                   <div className="flex flex-col items-end shrink-0 gap-0.5">
                     <Badge
                       className={`text-sm px-2 py-0.5 border ${
@@ -367,17 +422,87 @@ export default function DietPage() {
                   </div>
                 )}
 
-                {/* Swap button */}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleSwap(meal.id)}
-                  disabled={swapping === meal.id}
-                  className="w-full bg-white/5 border-white/20 text-white hover:bg-white/10 hover:border-white/30"
-                >
-                  <Shuffle className={`mr-2 h-4 w-4 ${swapping === meal.id ? "animate-spin" : ""}`} />
-                  Cambiar plato
-                </Button>
+                {/* Replacement food form — only when skipped */}
+                {isSkipped && (
+                  <div className="mb-3 space-y-2">
+                    <p className="text-amber-300/60 text-xs">¿Qué comiste en su lugar?</p>
+                    {/* Listed replacement foods */}
+                    {(skippedMeals[meal.id]?.foods ?? []).map((food, i) => (
+                      <div key={i} className="flex items-center justify-between bg-white/5 rounded-lg px-3 py-1.5">
+                        <span className="text-white/70 text-sm">{food.name}</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-orange-400 text-xs font-medium">{food.kcal} kcal</span>
+                          <button
+                            onClick={() => handleRemoveFood(meal.id, i)}
+                            className="text-white/30 hover:text-white/60 leading-none"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                    {/* Add food input */}
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        placeholder="Alimento"
+                        value={foodInput[meal.id]?.name ?? ""}
+                        onChange={(e) => setFoodInput((prev) => ({ ...prev, [meal.id]: { ...prev[meal.id], name: e.target.value } }))}
+                        onKeyDown={(e) => e.key === "Enter" && handleAddFood(meal.id)}
+                        className="flex-1 bg-white/5 border border-white/10 rounded-lg text-xs px-2 py-1.5 text-white/70 placeholder:text-white/30 focus:outline-none focus:border-amber-400/40"
+                      />
+                      <input
+                        type="number"
+                        placeholder="kcal"
+                        min="1"
+                        value={foodInput[meal.id]?.kcal ?? ""}
+                        onChange={(e) => setFoodInput((prev) => ({ ...prev, [meal.id]: { ...prev[meal.id], kcal: e.target.value } }))}
+                        onKeyDown={(e) => e.key === "Enter" && handleAddFood(meal.id)}
+                        className="w-16 bg-white/5 border border-white/10 rounded-lg text-xs px-2 py-1.5 text-white/70 text-center placeholder:text-white/30 focus:outline-none focus:border-amber-400/40"
+                      />
+                      <Button
+                        size="sm"
+                        onClick={() => handleAddFood(meal.id)}
+                        disabled={!foodInput[meal.id]?.name || !foodInput[meal.id]?.kcal}
+                        className="h-7 w-7 p-0 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-400/30"
+                      >
+                        <Plus className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Swap + Skip buttons */}
+                <div className="flex gap-2">
+                  {!isSkipped && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleSwap(meal.id)}
+                      disabled={swapping === meal.id}
+                      className="flex-1 bg-white/5 border-white/20 text-white hover:bg-white/10 hover:border-white/30"
+                    >
+                      <Shuffle className={`mr-2 h-4 w-4 ${swapping === meal.id ? "animate-spin" : ""}`} />
+                      Cambiar plato
+                    </Button>
+                  )}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleSkipMeal(meal.id)}
+                    className={`${isSkipped ? "flex-1" : ""} border text-xs h-9 ${
+                      isSkipped
+                        ? "bg-white/5 border-white/20 text-white/60 hover:bg-white/10"
+                        : "bg-amber-500/10 border-amber-400/20 text-amber-300/70 hover:bg-amber-500/20"
+                    }`}
+                  >
+                    {isSkipped ? (
+                      <><Shuffle className="mr-1.5 h-3.5 w-3.5" />Restaurar comida</>
+                    ) : (
+                      <><Ban className="mr-1.5 h-3.5 w-3.5" />Saltar</>
+                    )}
+                  </Button>
+                </div>
               </Card>
             )
           })}
@@ -390,21 +515,42 @@ export default function DietPage() {
             <h3 className="text-xl font-semibold text-white">Seguimiento de adherencia</h3>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {adherenceItems.map((item) => (
-              <label
-                key={item.id}
-                className="flex items-center gap-3 p-4 bg-white/5 rounded-xl border border-white/10 hover:bg-white/10 transition-all cursor-pointer"
-              >
-                <Checkbox
-                  checked={item.checked}
-                  onCheckedChange={(checked) => handleAdherenceChange(item.id, checked as boolean)}
-                  className="border-white/30 data-[state=checked]:bg-emerald-500 data-[state=checked]:border-emerald-500"
-                />
-                <span className={`text-white ${item.checked ? "line-through opacity-60" : ""}`}>
-                  {item.label}
-                </span>
-              </label>
-            ))}
+            {adherenceItems.map((item) => {
+              const isItemSkipped = !!skippedMeals[item.id]
+              const replacementFoods = skippedMeals[item.id]?.foods ?? []
+              const replacementTotal = replacementFoods.reduce((s, f) => s + f.kcal, 0)
+              return (
+                <label
+                  key={item.id}
+                  className={`flex items-center gap-3 p-4 rounded-xl border transition-all ${
+                    isItemSkipped
+                      ? "bg-amber-500/5 border-amber-400/15 cursor-default"
+                      : "bg-white/5 border-white/10 hover:bg-white/10 cursor-pointer"
+                  }`}
+                >
+                  {isItemSkipped ? (
+                    <Ban className="h-4 w-4 text-amber-400/50 shrink-0" />
+                  ) : (
+                    <Checkbox
+                      checked={item.checked}
+                      onCheckedChange={(checked) => handleAdherenceChange(item.id, checked as boolean)}
+                      className="border-white/30 data-[state=checked]:bg-emerald-500 data-[state=checked]:border-emerald-500"
+                    />
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <span className={`text-sm ${isItemSkipped ? "text-white/30 line-through" : item.checked ? "text-white line-through opacity-60" : "text-white"}`}>
+                      {item.label}
+                    </span>
+                    {isItemSkipped && replacementTotal > 0 && (
+                      <p className="text-amber-300/50 text-xs mt-0.5">{replacementFoods.map(f => f.name).join(", ")} · {replacementTotal} kcal</p>
+                    )}
+                    {isItemSkipped && replacementTotal === 0 && (
+                      <p className="text-white/25 text-xs mt-0.5">Sin reemplazo registrado</p>
+                    )}
+                  </div>
+                </label>
+              )
+            })}
           </div>
         </Card>
 
