@@ -903,3 +903,16 @@ export async function fetchTodayBonusKcal(): Promise<number> {
   const d = await get<{ bonus_kcal: number; training_type: string | null }>("/exercise/today-training")
   return d.bonus_kcal ?? 0
 }
+
+// ── Report Archive ─────────────────────────────────────────────────────────
+
+export interface ArchivedReport {
+  filename: string
+  week: string
+  url: string
+}
+
+export async function getReportsList(): Promise<ArchivedReport[]> {
+  const d = await get<{ reports: ArchivedReport[] }>("/reports")
+  return d.reports
+}

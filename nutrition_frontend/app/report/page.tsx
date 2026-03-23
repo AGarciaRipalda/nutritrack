@@ -20,8 +20,8 @@ import {
   Send,
   Download,
 } from "lucide-react"
-import type { WeeklyReportData } from "@/lib/api"
-import { fetchWeeklyReport, submitSensationsSurvey, getReportPdfUrl } from "@/lib/api"
+import type { WeeklyReportData, ArchivedReport } from "@/lib/api"
+import { fetchWeeklyReport, submitSensationsSurvey, getReportPdfUrl, getReportsList } from "@/lib/api"
 
 const sensationLabels = {
   energy: ["Muy baja", "Baja", "Moderada", "Alta", "Muy alta"],
@@ -41,12 +41,14 @@ export default function ReportPage() {
   })
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
+  const [archivedReports, setArchivedReports] = useState<ArchivedReport[]>([])
 
   useEffect(() => {
     fetchWeeklyReport()
       .then(setData)
       .catch((err) => console.error("Report fetch failed:", err))
       .finally(() => setLoading(false))
+    getReportsList().then(setArchivedReports).catch(() => [])
   }, [])
 
   const handleSubmitSurvey = async () => {
@@ -278,6 +280,36 @@ export default function ReportPage() {
             ))}
           </div>
         </Card>
+
+        {/* Archived Reports */}
+        {archivedReports.length > 0 && (
+          <Card className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-6">
+            <h3 className="text-lg font-semibold text-white mb-4">Reportes anteriores</h3>
+            <div className="space-y-2">
+              {archivedReports.map((report) => (
+                <div
+                  key={report.filename}
+                  className="flex items-center justify-between p-3 bg-white/5 rounded-xl border border-white/10"
+                >
+                  <div className="flex items-center gap-3">
+                    <FileBarChart className="h-4 w-4 text-white/50" />
+                    <span className="text-white/80 text-sm">Semana {report.week}</span>
+                  </div>
+                  <a
+                    href={report.url}
+                    download={report.filename}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-white/10 hover:bg-white/20 text-white/70 hover:text-white rounded-lg border border-white/10 transition-colors"
+                  >
+                    <Download className="h-3.5 w-3.5" />
+                    Descargar
+                  </a>
+                </div>
+              ))}
+            </div>
+          </Card>
+        )}
       </div>
     </AppLayout>
   )

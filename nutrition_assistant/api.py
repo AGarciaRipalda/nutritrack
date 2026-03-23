@@ -91,6 +91,7 @@ _cache: dict = {}
 
 # ── File paths ────────────────────────────────────────────────────────────────
 CHEATDAY_FILE = DATA_DIR / "cheatday_history.json"
+REPORTS_DIR = DATA_DIR / "reports"
 
 
 def _load_cheatdays() -> list:
@@ -1566,11 +1567,54 @@ def download_report_pdf():
 
     doc.build(story)
 
+    # Archive the PDF with a week-based filename
+    import shutil as _shutil
+    import re as _re
+
+    week_str = date.today().strftime("%Y-W%W")
+    REPORTS_DIR.mkdir(parents=True, exist_ok=True)
+    archive_path = REPORTS_DIR / f"report_{week_str}.pdf"
+    _shutil.copy2(tmp.name, str(archive_path))
+
     return FileResponse(
         tmp.name,
         media_type="application/pdf",
         filename=f"informe_semanal_{date.today().isoformat()}.pdf",
     )
+
+
+@app.get("/reports", tags=["Informe"])
+def list_reports(request: Request):
+    """Lista todos los reportes PDF archivados, ordenados por fecha descendente."""
+    if not os.path.exists(REPORTS_DIR):
+        return {"reports": []}
+    files = sorted(
+        [f for f in os.listdir(REPORTS_DIR) if f.endswith(".pdf")],
+        reverse=True,
+    )
+    base_url = str(request.base_url).rstrip("/")
+    return {
+        "reports": [
+            {
+                "filename": f,
+                "week":     f.replace("report_", "").replace(".pdf", ""),
+                "url":      f"{base_url}/reports/{f}",
+            }
+            for f in files
+        ]
+    }
+
+
+@app.get("/reports/{filename}", tags=["Informe"])
+def download_archived_report(filename: str):
+    """Sirve un reporte PDF archivado por nombre de archivo."""
+    import re
+    if not re.match(r'^report_\d{4}-W\d{2}\.pdf$', filename):
+        raise HTTPException(400, "Nombre de archivo no válido")
+    path = REPORTS_DIR / filename
+    if not os.path.exists(path):
+        raise HTTPException(404, "Reporte no encontrado")
+    return FileResponse(str(path), media_type="application/pdf", filename=filename)
 
 
 # ══════════════════════════════════════════════════════════════════════════════

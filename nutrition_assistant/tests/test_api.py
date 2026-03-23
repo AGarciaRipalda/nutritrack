@@ -104,3 +104,32 @@ def test_post_and_get_cheatday(tmp_path):
         records = r2.json()["records"]
         assert len(records) == 1
         assert records[0]["date"] == "2026-03-20"
+
+
+def test_get_reports_empty(tmp_path):
+    """GET /reports returns empty list when no reports saved."""
+    import api as _api
+    from unittest.mock import patch
+    with patch.object(_api, "REPORTS_DIR", tmp_path / "reports"):
+        r = client.get("/reports")
+        assert r.status_code == 200
+        assert r.json()["reports"] == []
+
+def test_get_reports_after_download(tmp_path):
+    """After calling /report/download, GET /reports returns one entry."""
+    import api as _api
+    from unittest.mock import patch
+    reports_dir = tmp_path / "reports"
+    reports_dir.mkdir()
+
+    with patch.object(_api, "REPORTS_DIR", reports_dir):
+        r = client.get("/report/download")
+        assert r.status_code == 200
+
+        r2 = client.get("/reports")
+        assert r2.status_code == 200
+        reports = r2.json()["reports"]
+        assert len(reports) == 1
+        assert reports[0]["filename"].startswith("report_")
+        assert reports[0]["filename"].endswith(".pdf")
+        assert "url" in reports[0]
