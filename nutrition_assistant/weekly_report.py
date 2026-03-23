@@ -7,28 +7,29 @@ Combina: ejercicio, peso, adherencia y sensaciones para dar una recomendación.
 import json
 import os
 from datetime import date, timedelta
+from data_dir import DATA_DIR
 
-from exercise_history import HISTORY_FILE as EX_FILE
-from weight_tracker import HISTORY_FILE as W_FILE, EXPECTED_WEEKLY_CHANGE
-from adherence import ADHERENCE_FILE, weekly_adherence
+from exercise_history import _load as load_exercise_history
+from weight_tracker import _load as load_weight_hist, EXPECTED_WEEKLY_CHANGE
+from adherence import weekly_adherence
 from weekly_survey import last_survey_scores
 
 
-def _load(path) -> dict | list:
-    p = str(path)
-    if not os.path.exists(p):
-        return {} if p.endswith(".json") and "history" in p.lower() else []
-    with open(p, "r", encoding="utf-8") as f:
-        return json.load(f)
+def _use_db():
+    try:
+        from database import is_db_available
+        return is_db_available()
+    except ImportError:
+        return False
 
 
 def _last_week_exercise() -> tuple[int, int]:
     """Devuelve (días_entrenados, kcal_totales) de los últimos 7 días."""
-    history = _load(EX_FILE)
+    history = load_exercise_history()
     today   = date.today()
     days, kcal = 0, 0
     for i in range(7):
-        iso = (today - timedelta(days=i + 1)).isoformat()  # semana pasada
+        iso = (today - timedelta(days=i + 1)).isoformat()
         entry = history.get(iso, {})
         if entry.get("burned_kcal", 0) > 0:
             days += 1
@@ -38,13 +39,11 @@ def _last_week_exercise() -> tuple[int, int]:
 
 def _weight_change() -> tuple[float | None, float | None]:
     """Devuelve (peso_hace_7_dias, peso_hoy) o (None, None) si no hay datos."""
-    history = _load(W_FILE)
+    history = load_weight_hist()
     if not history or not isinstance(history, list):
         return None, None
     today = date.today()
-    # Peso más reciente
     last = history[-1]["weight_kg"] if history else None
-    # Peso de hace ~7 días
     prev = None
     for entry in reversed(history[:-1]):
         d = date.fromisoformat(entry["date"])
@@ -59,23 +58,19 @@ def _recommendation(goal: str, adherence: int, ex_days: int,
     """Genera una recomendación concreta basada en los datos de la semana."""
     tips = []
 
-    # Adherencia
     if adherence < 60:
         tips.append("Tu adherencia fue baja esta semana. ¿El plan es demasiado estricto? "
                     "Prueba a añadir más favoritos o ajustar las porciones.")
     elif adherence >= 85:
         tips.append("Excelente adherencia al plan. ¡Sigue así!")
 
-    # Ejercicio
     if ex_days == 0:
         tips.append("No registraste ejercicio esta semana. Incluso caminar 30 min/día "
                     "puede marcar la diferencia.")
     elif ex_days >= 5:
         tips.append(f"Entrenaste {ex_days} días. Asegúrate de descansar al menos 2 días/semana.")
 
-    # Peso vs objetivo
     if weight_change is not None:
-        expected_weekly = EXPECTED_WEEKLY_CHANGE.get(goal, 0)
         if goal == "lose" and weight_change > 0.1:
             tips.append(f"Tu peso subió {weight_change:+.1f} kg esta semana. "
                         "Considera reducir 100-150 kcal en la cena.")
@@ -91,7 +86,6 @@ def _recommendation(goal: str, adherence: int, ex_days: int,
         else:
             tips.append(f"Cambio de peso: {weight_change:+.1f} kg — dentro del rango esperado.")
 
-    # Sensaciones
     energia = survey.get("energia", 0)
     sueno   = survey.get("sueno", 0)
     if energia and energia <= 2:
@@ -109,18 +103,35 @@ def _recommendation(goal: str, adherence: int, ex_days: int,
 
 def needs_weekly_report() -> bool:
     """True si hoy es lunes y aún no se ha mostrado el informe esta semana."""
-    report_flag = "weekly_report_shown.json"
     week = date.today().strftime("%G-W%V")
+
+    if _use_db():
+        from database import fetchone
+        row = fetchone("SELECT week FROM weekly_report_marks WHERE week = %s", (week,))
+        return row is None and date.today().weekday() == 0
+
+    report_flag = str(DATA_DIR / "weekly_report_shown.json")
     if not os.path.exists(report_flag):
-        return date.today().weekday() == 0  # solo lunes
+        return date.today().weekday() == 0
     with open(report_flag, "r") as f:
         shown = json.load(f).get("week")
     return shown != week and date.today().weekday() == 0
 
 
 def mark_report_shown() -> None:
-    with open("weekly_report_shown.json", "w") as f:
-        json.dump({"week": date.today().strftime("%G-W%V")}, f)
+    week = date.today().strftime("%G-W%V")
+
+    if _use_db():
+        from database import execute
+        execute("""
+            INSERT INTO weekly_report_marks (week) VALUES (%s)
+            ON CONFLICT (week) DO NOTHING
+        """, (week,))
+        return
+
+    report_flag = str(DATA_DIR / "weekly_report_shown.json")
+    with open(report_flag, "w") as f:
+        json.dump({"week": week}, f)
 
 
 def print_weekly_report(goal: str) -> None:
@@ -135,12 +146,10 @@ def print_weekly_report(goal: str) -> None:
     print("║" + "  INFORME SEMANAL".center(54) + "║")
     print("╚" + "═"*54 + "╝")
 
-    # Ejercicio
     print(f"\n  🏃 Ejercicio")
     print(f"     Días entrenados: {ex_days}/7")
     print(f"     Kcal quemadas:   {ex_kcal} kcal")
 
-    # Peso
     print(f"\n  ⚖️  Peso")
     if curr_w:
         print(f"     Peso actual:     {curr_w:.1f} kg")
@@ -150,12 +159,10 @@ def print_weekly_report(goal: str) -> None:
     else:
         print("     Sin datos de peso esta semana.")
 
-    # Adherencia
     print(f"\n  🍽️  Adherencia al plan")
     bar = "█" * (adherence // 10) + "░" * (10 - adherence // 10)
     print(f"     {bar}  {adherence}%")
 
-    # Sensaciones
     if survey:
         print(f"\n  💭 Sensaciones (encuesta)")
         labels = {"energia": "Energía", "hambre": "Sin hambre",
@@ -165,7 +172,6 @@ def print_weekly_report(goal: str) -> None:
             if v:
                 print(f"     {lbl:<22} {'★'*v}{'☆'*(5-v)} ({v}/5)")
 
-    # Recomendación
     print(f"\n  💡 Recomendaciones para esta semana:")
     rec = _recommendation(goal, adherence, ex_days, weight_change, survey)
     print(rec)

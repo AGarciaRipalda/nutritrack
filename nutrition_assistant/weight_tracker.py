@@ -1,8 +1,6 @@
 """
 Registro semanal de peso y seguimiento de progreso.
-Guarda el historial en weight_history.json.
-Una vez por semana, al arrancar, pide el peso actual.
-Muestra si el ritmo real está alineado con el objetivo.
+Guarda el historial en weight_history.json o PostgreSQL.
 """
 
 import json
@@ -12,7 +10,6 @@ from data_dir import DATA_DIR
 
 HISTORY_FILE = DATA_DIR / "weight_history.json"
 
-# Ritmo esperado de cambio semanal en kg según objetivo
 EXPECTED_WEEKLY_CHANGE = {
     "lose":     -0.5,
     "maintain":  0.0,
@@ -20,8 +17,24 @@ EXPECTED_WEEKLY_CHANGE = {
 }
 
 
+def _use_db():
+    try:
+        from database import is_db_available
+        return is_db_available()
+    except ImportError:
+        return False
+
+
 def _load() -> list:
     """Devuelve lista de {date, weight_kg} ordenada por fecha."""
+    if _use_db():
+        from database import fetchall
+        rows = fetchall("SELECT date, week, weight_kg FROM weight_history ORDER BY date")
+        return [
+            {"date": str(r["date"]), "week": r["week"], "weight_kg": float(r["weight_kg"])}
+            for r in rows
+        ]
+
     if not os.path.exists(HISTORY_FILE):
         return []
     with open(HISTORY_FILE, "r", encoding="utf-8") as f:
@@ -29,12 +42,29 @@ def _load() -> list:
 
 
 def _save(history: list) -> None:
+    if _use_db():
+        from database import execute
+        for entry in history:
+            execute("""
+                INSERT INTO weight_history (date, week, weight_kg)
+                VALUES (%s, %s, %s)
+                ON CONFLICT (date) DO UPDATE SET
+                    week = EXCLUDED.week,
+                    weight_kg = EXCLUDED.weight_kg
+            """, (entry["date"], entry.get("week", ""), entry["weight_kg"]))
+        return
+
     with open(HISTORY_FILE, "w", encoding="utf-8") as f:
         json.dump(history, f, indent=2, ensure_ascii=False)
 
 
 def _last_record_week() -> str | None:
     """Devuelve la semana ISO del último registro, o None si no hay datos."""
+    if _use_db():
+        from database import fetchone
+        row = fetchone("SELECT week FROM weight_history ORDER BY date DESC LIMIT 1")
+        return row["week"] if row else None
+
     history = _load()
     if not history:
         return None
@@ -69,13 +99,24 @@ def ask_and_record_weight(profile: dict) -> float:
             pass
         print("  ⚠ Introduce un peso válido (30-300 kg).")
 
-    history = _load()
-    history.append({
+    entry = {
         "date":      date.today().isoformat(),
         "week":      date.today().strftime("%G-W%V"),
         "weight_kg": weight,
-    })
-    _save(history)
+    }
+
+    if _use_db():
+        from database import execute
+        execute("""
+            INSERT INTO weight_history (date, week, weight_kg)
+            VALUES (%s, %s, %s)
+            ON CONFLICT (date) DO UPDATE SET
+                week = EXCLUDED.week, weight_kg = EXCLUDED.weight_kg
+        """, (entry["date"], entry["week"], entry["weight_kg"]))
+    else:
+        history = _load()
+        history.append(entry)
+        _save(history)
 
     profile["weight_kg"] = weight
     return weight
@@ -98,10 +139,9 @@ def print_weight_progress(goal: str) -> None:
     print(f"  Ritmo esperado: {expected:+.1f} kg/semana")
     print("-"*52)
 
-    for i, entry in enumerate(history[-8:]):   # máx. 8 semanas
+    for i, entry in enumerate(history[-8:]):
         w    = entry["weight_kg"]
         d    = entry["date"]
-        bar  = "█" * int((w - 50) / 2) if w > 50 else ""   # barra visual relativa
         prev = history[history.index(entry) - 1]["weight_kg"] if i > 0 else w
         diff = w - prev
         arrow = ("↓" if diff < -0.05 else "↑" if diff > 0.05 else "→")
@@ -117,7 +157,6 @@ def print_weight_progress(goal: str) -> None:
         )
         total_change   = last["weight_kg"] - first["weight_kg"]
         real_weekly    = total_change / weeks_elapsed
-        expected_total = expected * weeks_elapsed
 
         print(f"  Cambio real:     {total_change:+.1f} kg en {weeks_elapsed:.0f} semanas")
         print(f"  Ritmo real:      {real_weekly:+.2f} kg/semana")

@@ -3,7 +3,7 @@ Planificación nutricional para eventos y competiciones.
 - Permite registrar la fecha de un evento próximo.
 - La semana previa al evento: avisa y sugiere aumentar carbohidratos +15%.
 - El día del evento: plan ligero (fácil digestión, bajo en fibra).
-- Datos guardados en competition.json.
+- Datos guardados en competition.json o PostgreSQL.
 """
 
 import json
@@ -14,7 +14,23 @@ from data_dir import DATA_DIR
 COMPETITION_FILE = DATA_DIR / "competition.json"
 
 
+def _use_db():
+    try:
+        from database import is_db_available
+        return is_db_available()
+    except ImportError:
+        return False
+
+
 def _load() -> dict:
+    if _use_db():
+        from database import fetchone
+        row = fetchone("SELECT name, date FROM events WHERE date >= %s ORDER BY date LIMIT 1",
+                       (date.today().isoformat(),))
+        if row:
+            return {"name": row["name"], "date": str(row["date"])}
+        return {}
+
     if not os.path.exists(COMPETITION_FILE):
         return {}
     with open(COMPETITION_FILE, "r", encoding="utf-8") as f:
@@ -22,6 +38,12 @@ def _load() -> dict:
 
 
 def _save(data: dict) -> None:
+    if _use_db():
+        from database import execute
+        execute("INSERT INTO events (name, date) VALUES (%s, %s)",
+                (data.get("name", "Evento"), data["date"]))
+        return
+
     with open(COMPETITION_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
 
@@ -33,7 +55,7 @@ def get_event() -> dict | None:
         return None
     event_date = date.fromisoformat(data["date"])
     if event_date < date.today():
-        return None  # evento ya pasado
+        return None
     return data
 
 
@@ -89,19 +111,16 @@ def event_calorie_adjustment(base_target: int) -> tuple[int, str]:
         return base_target, ""
 
     if days == 0:
-        # Día del evento: plan muy ligero (-200 kcal, fácil digestión)
         return base_target - 200, (
             f"⚡ HOY ES EL DÍA DEL EVENTO: {event['name']}!\n"
             "  Plan ligero: evita fibra alta y alimentos nuevos."
         )
     elif days <= 2:
-        # Víspera: carga de glucógeno (+150 kcal en carbos)
         return base_target + 150, (
             f"  🏁 El evento '{event['name']}' es en {days} día(s).\n"
             "  Carga de glucógeno: prioriza los carbohidratos hoy."
         )
     elif days <= 7:
-        # Semana previa: +15% en carbohidratos (aprox +100 kcal)
         extra = round(base_target * 0.08)
         return base_target + extra, (
             f"  📅 Quedan {days} días para '{event['name']}'.\n"

@@ -12,18 +12,57 @@ from data_dir import DATA_DIR
 PREFERENCES_FILE = DATA_DIR / "preferences.json"
 
 
+def _use_db():
+    try:
+        from database import is_db_available
+        return is_db_available()
+    except ImportError:
+        return False
+
+
 def _load() -> dict:
+    if _use_db():
+        from database import fetchone
+        row = fetchone("SELECT excluded, favorites, disliked FROM food_preferences ORDER BY id LIMIT 1")
+        if row:
+            return {
+                "excluded": list(row.get("excluded") or []),
+                "favorites": list(row.get("favorites") or []),
+                "disliked": list(row.get("disliked") or []),
+            }
+        return {"excluded": [], "favorites": [], "disliked": []}
+
     if not os.path.exists(PREFERENCES_FILE):
         return {"excluded": [], "favorites": [], "disliked": []}
     with open(PREFERENCES_FILE, "r", encoding="utf-8") as f:
         data = json.load(f)
-    # Compatibilidad con versión anterior (solo tenía "excluded")
     data.setdefault("favorites", [])
     data.setdefault("disliked", [])
     return data
 
 
 def _save(data: dict) -> None:
+    if _use_db():
+        from database import fetchone, execute
+        row = fetchone("SELECT id FROM food_preferences ORDER BY id LIMIT 1")
+        if row:
+            execute("""
+                UPDATE food_preferences SET
+                    excluded = %s, favorites = %s, disliked = %s, updated_at = NOW()
+                WHERE id = %s
+            """, (sorted(data.get("excluded", [])),
+                  sorted(data.get("favorites", [])),
+                  sorted(data.get("disliked", [])),
+                  row["id"]))
+        else:
+            execute("""
+                INSERT INTO food_preferences (excluded, favorites, disliked)
+                VALUES (%s, %s, %s)
+            """, (sorted(data.get("excluded", [])),
+                  sorted(data.get("favorites", [])),
+                  sorted(data.get("disliked", []))))
+        return
+
     with open(PREFERENCES_FILE, "w", encoding="utf-8") as f:
         json.dump({k: sorted(v) for k, v in data.items()},
                   f, indent=2, ensure_ascii=False)

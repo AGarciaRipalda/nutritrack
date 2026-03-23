@@ -1,3 +1,11 @@
+"""
+Almacenamiento del perfil y la sesión del usuario.
+
+Estrategia dual:
+  - Si DATABASE_URL está configurada → PostgreSQL (producción)
+  - Si no → archivos JSON en DATA_DIR (desarrollo local)
+"""
+
 import json
 import os
 from datetime import date
@@ -18,7 +26,46 @@ DEFAULT_PROFILE = {
 }
 
 
+# ── Helpers ───────────────────────────────────────────────────────────────────
+
+def _use_db():
+    """True si PostgreSQL está disponible."""
+    try:
+        from database import is_db_available
+        return is_db_available()
+    except ImportError:
+        return False
+
+
+def _today() -> str:
+    return date.today().isoformat()
+
+
+def _this_week() -> str:
+    return date.today().strftime("%G-W%V")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# PERFIL
+# ══════════════════════════════════════════════════════════════════════════════
+
 def load_profile() -> dict:
+    if _use_db():
+        from database import fetchone
+        row = fetchone("SELECT * FROM user_profiles ORDER BY id LIMIT 1")
+        if row:
+            return {
+                "name": row["name"],
+                "gender": row["gender"],
+                "age": row["age"],
+                "height_cm": row["height_cm"],
+                "weight_kg": float(row["weight_kg"]),
+                "activity_level": row["activity_level"],
+                "goal": row["goal"],
+                "week_start_day": row["week_start_day"],
+            }
+
+    # Fallback: JSON
     if os.path.exists(PROFILE_FILE):
         with open(PROFILE_FILE, "r", encoding="utf-8") as f:
             return json.load(f)
@@ -26,18 +73,35 @@ def load_profile() -> dict:
 
 
 def save_profile(profile: dict) -> None:
-    with open(PROFILE_FILE, "w", encoding="utf-8") as f:
-        json.dump(profile, f, indent=2, ensure_ascii=False)
-    print(f"  Perfil guardado en '{PROFILE_FILE}'.", flush=True)
+    if _use_db():
+        from database import fetchone, execute
+        row = fetchone("SELECT id FROM user_profiles ORDER BY id LIMIT 1")
+        if row:
+            execute("""
+                UPDATE user_profiles SET
+                    name=%(name)s, gender=%(gender)s, age=%(age)s,
+                    height_cm=%(height_cm)s, weight_kg=%(weight_kg)s,
+                    activity_level=%(activity_level)s, goal=%(goal)s,
+                    week_start_day=%(week_start_day)s, updated_at=NOW()
+                WHERE id=%(id)s
+            """, {**profile, "id": row["id"]})
+        else:
+            execute("""
+                INSERT INTO user_profiles (name, gender, age, height_cm, weight_kg,
+                                           activity_level, goal, week_start_day)
+                VALUES (%(name)s, %(gender)s, %(age)s, %(height_cm)s, %(weight_kg)s,
+                        %(activity_level)s, %(goal)s, %(week_start_day)s)
+            """, profile)
+    else:
+        with open(PROFILE_FILE, "w", encoding="utf-8") as f:
+            json.dump(profile, f, indent=2, ensure_ascii=False)
+
+    print(f"  Perfil guardado.", flush=True)
 
 
-def _today() -> str:
-    return date.today().isoformat()          # "2026-03-19"
-
-
-def _this_week() -> str:
-    return date.today().strftime("%G-W%V")   # "2026-W12"
-
+# ══════════════════════════════════════════════════════════════════════════════
+# SESIÓN
+# ══════════════════════════════════════════════════════════════════════════════
 
 def load_session() -> dict:
     """
@@ -52,10 +116,28 @@ def load_session() -> dict:
         "adaptive_day": None,
         "week_plan": None,
         "today_training": None,
-        "exercise_adj": {},       # NEW — always loaded, not date-scoped
-        "weekly_history": [],     # NEW — always loaded, not date-scoped
+        "exercise_adj": {},
+        "weekly_history": [],
     }
 
+    if _use_db():
+        from database import fetchone
+        from psycopg2.extras import Json
+        row = fetchone("SELECT * FROM sessions ORDER BY id DESC LIMIT 1")
+        if row:
+            today = _today()
+            week = _this_week()
+            if str(row.get("saved_date", "")) == today:
+                result["exercise_data"] = row.get("exercise_data")
+                result["adaptive_day"] = row.get("adaptive_day")
+                result["today_training"] = row.get("today_training")
+            if str(row.get("saved_week", "")) == week:
+                result["week_plan"] = row.get("week_plan")
+            result["exercise_adj"] = row.get("exercise_adj") or {}
+            result["weekly_history"] = row.get("weekly_history") or []
+        return result
+
+    # Fallback: JSON
     if not os.path.exists(SESSION_FILE):
         return result
 
@@ -63,23 +145,23 @@ def load_session() -> dict:
         session = json.load(f)
 
     today = _today()
-    week  = _this_week()
+    week = _this_week()
 
     if session.get("saved_date") == today:
-        result["exercise_data"]  = session.get("exercise_data")
-        result["adaptive_day"]   = session.get("adaptive_day")
+        result["exercise_data"] = session.get("exercise_data")
+        result["adaptive_day"] = session.get("adaptive_day")
         result["today_training"] = session.get("today_training")
 
     if session.get("saved_week") == week:
         result["week_plan"] = session.get("week_plan")
 
-    result["exercise_adj"]    = session.get("exercise_adj", {})
-    result["weekly_history"]  = session.get("weekly_history", [])
+    result["exercise_adj"] = session.get("exercise_adj", {})
+    result["weekly_history"] = session.get("weekly_history", [])
 
     return result
 
 
-_MISSING = object()  # centinela para distinguir "no pasado" de "None explícito"
+_MISSING = object()
 
 
 def save_session(exercise_data=_MISSING,
@@ -91,8 +173,48 @@ def save_session(exercise_data=_MISSING,
     """
     Persiste el estado de la sesión actual.
     Solo actualiza los campos que se pasen explícitamente.
-    Pasar None limpia el campo (lo elimina de la sesión).
     """
+    if _use_db():
+        from database import fetchone, execute, get_cursor
+        from psycopg2.extras import Json
+
+        row = fetchone("SELECT id FROM sessions ORDER BY id DESC LIMIT 1")
+        today = _today()
+        week = _this_week()
+
+        fields_to_update = {}
+        for key, value in [("exercise_data", exercise_data),
+                           ("adaptive_day", adaptive_day),
+                           ("today_training", today_training),
+                           ("week_plan", week_plan),
+                           ("exercise_adj", exercise_adj),
+                           ("weekly_history", weekly_history)]:
+            if value is _MISSING:
+                continue
+            fields_to_update[key] = Json(value)
+
+        if row:
+            if fields_to_update:
+                set_clause = ", ".join(f"{k} = %({k})s" for k in fields_to_update)
+                fields_to_update["id"] = row["id"]
+                fields_to_update["saved_date"] = today
+                fields_to_update["saved_week"] = week
+                execute(
+                    f"UPDATE sessions SET saved_date=%(saved_date)s, saved_week=%(saved_week)s, "
+                    f"{set_clause}, updated_at=NOW() WHERE id=%(id)s",
+                    fields_to_update
+                )
+        else:
+            cols = ["saved_date", "saved_week"] + list(fields_to_update.keys())
+            vals = {**fields_to_update, "saved_date": today, "saved_week": week}
+            placeholders = ", ".join(f"%({c})s" for c in cols)
+            execute(
+                f"INSERT INTO sessions ({', '.join(cols)}) VALUES ({placeholders})",
+                vals
+            )
+        return
+
+    # Fallback: JSON
     session = {}
     if os.path.exists(SESSION_FILE):
         with open(SESSION_FILE, "r", encoding="utf-8") as f:
@@ -101,16 +223,16 @@ def save_session(exercise_data=_MISSING,
     session["saved_date"] = _today()
     session["saved_week"] = _this_week()
 
-    for key, value in [("exercise_data",  exercise_data),
-                       ("adaptive_day",   adaptive_day),
+    for key, value in [("exercise_data", exercise_data),
+                       ("adaptive_day", adaptive_day),
                        ("today_training", today_training),
-                       ("week_plan",      week_plan),
-                       ("exercise_adj",   exercise_adj),    # NEW
-                       ("weekly_history", weekly_history)]: # NEW
+                       ("week_plan", week_plan),
+                       ("exercise_adj", exercise_adj),
+                       ("weekly_history", weekly_history)]:
         if value is _MISSING:
             continue
         if value is None:
-            session.pop(key, None)   # limpiar el campo
+            session.pop(key, None)
         else:
             session[key] = value
 
@@ -120,6 +242,21 @@ def save_session(exercise_data=_MISSING,
 
 def save_exercise_adj(date_iso: str, extra_kcal: int, source: str) -> None:
     """Record exercise adjustment for a specific date."""
+    if _use_db():
+        from database import fetchone, execute
+        from psycopg2.extras import Json
+
+        row = fetchone("SELECT id, exercise_adj FROM sessions ORDER BY id DESC LIMIT 1")
+        if row:
+            adj = row.get("exercise_adj") or {}
+            adj[date_iso] = {"extra_kcal": extra_kcal, "source": source}
+            execute(
+                "UPDATE sessions SET exercise_adj = %s, updated_at = NOW() WHERE id = %s",
+                (Json(adj), row["id"])
+            )
+        return
+
+    # Fallback: JSON
     session = {}
     if os.path.exists(SESSION_FILE):
         with open(SESSION_FILE, "r", encoding="utf-8") as f:
@@ -135,6 +272,14 @@ def save_exercise_adj(date_iso: str, extra_kcal: int, source: str) -> None:
 
 def load_weekly_history() -> list:
     """Returns list of WeeklyHistorySummary dicts, newest-first, max 12."""
+    if _use_db():
+        from database import fetchone
+        row = fetchone("SELECT weekly_history FROM sessions ORDER BY id DESC LIMIT 1")
+        if row:
+            return row.get("weekly_history") or []
+        return []
+
+    # Fallback: JSON
     if not os.path.exists(SESSION_FILE):
         return []
     with open(SESSION_FILE, "r", encoding="utf-8") as f:
@@ -144,15 +289,31 @@ def load_weekly_history() -> list:
 
 def save_weekly_history(summary: dict) -> None:
     """Prepend a new WeeklyHistorySummary; cap list at 12 entries."""
+    if _use_db():
+        from database import fetchone, execute
+        from psycopg2.extras import Json
+
+        row = fetchone("SELECT id, weekly_history FROM sessions ORDER BY id DESC LIMIT 1")
+        if row:
+            history = row.get("weekly_history") or []
+            history = [h for h in history if h.get("week_start") != summary.get("week_start")]
+            history.insert(0, summary)
+            history = history[:12]
+            execute(
+                "UPDATE sessions SET weekly_history = %s, updated_at = NOW() WHERE id = %s",
+                (Json(history), row["id"])
+            )
+        return
+
+    # Fallback: JSON
     session = {}
     if os.path.exists(SESSION_FILE):
         with open(SESSION_FILE, "r", encoding="utf-8") as f:
             session = json.load(f)
     history = session.get("weekly_history", [])
-    # Remove existing entry for same week_start if present
     history = [h for h in history if h.get("week_start") != summary.get("week_start")]
     history.insert(0, summary)
-    history = history[:12]  # cap at 12 weeks
+    history = history[:12]
     session["weekly_history"] = history
     session.setdefault("saved_date", _today())
     session.setdefault("saved_week", _this_week())
