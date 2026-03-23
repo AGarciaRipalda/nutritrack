@@ -401,6 +401,28 @@ export default function DashboardPage() {
                 </div>
               </div>
             </div>
+            <div className="mt-4 space-y-2 border-t border-white/10 pt-3">
+              {[
+                { label: "Proteína", current: dashboard.macros.protein.current, target: dashboard.macros.protein.target },
+                { label: "Carbos",   current: dashboard.macros.carbs.current,   target: dashboard.macros.carbs.target },
+                { label: "Grasas",   current: dashboard.macros.fat.current,     target: dashboard.macros.fat.target },
+              ].map(({ label, current, target }) => {
+                const pct = target > 0 ? Math.min(Math.round((current / target) * 100), 100) : 0
+                const barColor = pct >= 90 ? "bg-emerald-400" : pct >= 70 ? "bg-amber-400" : "bg-red-400"
+                const textColor = pct >= 90 ? "text-emerald-400" : pct >= 70 ? "text-amber-400" : "text-red-400"
+                return (
+                  <div key={label} className="space-y-0.5">
+                    <div className="flex justify-between text-xs">
+                      <span className="text-white/50">{label}</span>
+                      <span className={textColor}>{pct}%</span>
+                    </div>
+                    <div className="w-full bg-white/10 rounded-full h-1">
+                      <div className={`${barColor} h-1 rounded-full`} style={{ width: `${pct}%` }} />
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
           </Card>
 
           {/* Activity & Exercise */}

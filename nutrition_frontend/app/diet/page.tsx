@@ -10,10 +10,41 @@ import {
   Shuffle, Coffee, Sun, Utensils, Cookie, Moon,
   Lightbulb, CheckCircle2, Wheat, Scale, Star, X, Ban, Plus,
 } from "lucide-react"
-import type { PlanDay, FoodSearchResult } from "@/lib/api"
-import { fetchTodaysPlan, swapMeal, updateAdherence, fetchFavoriteCarbs, searchFood, fetchTodayBonusKcal } from "@/lib/api"
+import type { PlanDay, FoodSearchResult, DashboardData } from "@/lib/api"
+import { fetchTodaysPlan, swapMeal, updateAdherence, fetchFavoriteCarbs, searchFood, fetchTodayBonusKcal, fetchDashboard } from "@/lib/api"
 import { useDietDay } from "@/context/DietDayContext"
 import { useCheatDay } from "@/context/CheatDayContext"
+
+function MacroBar({ label, current, target }: {
+  label: string
+  current: number
+  target: number
+}) {
+  const pct = target > 0 ? Math.min(Math.round((current / target) * 100), 100) : 0
+  const barColor =
+    pct >= 90 ? "from-emerald-400 to-emerald-600" :
+    pct >= 70 ? "from-amber-400 to-amber-600" :
+                "from-red-400 to-red-600"
+  const textColor =
+    pct >= 90 ? "text-emerald-400" :
+    pct >= 70 ? "text-amber-400" :
+                "text-red-400"
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center justify-between text-xs">
+        <span className="text-white/60">{label}</span>
+        <span className={`font-semibold ${textColor}`}>{pct}%</span>
+      </div>
+      <div className="w-full bg-white/10 rounded-full h-1.5">
+        <div
+          className={`bg-gradient-to-r ${barColor} h-1.5 rounded-full transition-all duration-500`}
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+      <p className="text-white/40 text-xs text-right">{current}g / {target}g</p>
+    </div>
+  )
+}
 
 const today = new Date().toISOString().slice(0, 10)
 const mockPlanDay: PlanDay = {
@@ -49,6 +80,7 @@ export default function DietPage() {
   const [planDay, setPlanDay]         = useState<(PlanDay & { stale?: boolean }) | null>(null)
   const [stale, setStale]             = useState(false)
   const [bonusKcal, setBonusKcal]     = useState(0)
+  const [macros, setMacros]           = useState<DashboardData["macros"] | null>(null)
   const [loading, setLoading]         = useState(true)
   const [swapping, setSwapping]       = useState<string | null>(null)
   const [checkedMeals, setCheckedMeals] = useState<Record<string, boolean>>({})
@@ -97,6 +129,7 @@ export default function DietPage() {
       })
       .catch(() => setPlanDay(mockPlanDay))
       .finally(() => setLoading(false))
+    fetchDashboard().then((d) => setMacros(d.macros)).catch(() => null)
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSwap = async (mealId: string) => {
@@ -280,6 +313,27 @@ export default function DietPage() {
               )}
             </div>
           </div>
+
+          {macros && (
+            <div className="mt-4 space-y-3">
+              <p className="text-white/50 text-xs font-medium uppercase tracking-wide">Cumplimiento de macros</p>
+              <MacroBar
+                label="Proteína"
+                current={macros.protein.current}
+                target={macros.protein.target}
+              />
+              <MacroBar
+                label="Carbohidratos"
+                current={macros.carbs.current}
+                target={macros.carbs.target}
+              />
+              <MacroBar
+                label="Grasas"
+                current={macros.fat.current}
+                target={macros.fat.target}
+              />
+            </div>
+          )}
         </Card>
 
         {/* Cheat day active banner */}
