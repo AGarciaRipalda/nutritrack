@@ -21,9 +21,11 @@ import {
   CheckCircle2,
   AlertCircle,
   Download,
+  ChevronDown,
 } from "lucide-react"
-import type { SettingsData, UserProfile, FoodPreferences, UpcomingEvent } from "@/lib/api"
-import { fetchSettings, updateProfile, updateFoodPreferences, saveEvent, deleteEvent, getExportUrl } from "@/lib/api"
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
+import type { SettingsData, UserProfile, FoodPreferences, UpcomingEvent, MicronutrientGoals } from "@/lib/api"
+import { fetchSettings, updateProfile, updateFoodPreferences, saveEvent, deleteEvent, getExportUrl, getMicronutrientGoals, updateMicronutrientGoals } from "@/lib/api"
 
 const mockSettingsData: SettingsData = {
   profile: {
@@ -53,6 +55,9 @@ export default function SettingsPage() {
   const [preferences, setPreferences] = useState<FoodPreferences | null>(null)
   const [newTag, setNewTag] = useState({ excluded: "", favorites: "", disliked: "" })
   const [newEvent, setNewEvent] = useState({ name: "", date: "" })
+  const [microGoals, setMicroGoals] = useState<MicronutrientGoals | null>(null)
+  const [microOpen, setMicroOpen] = useState(false)
+  const [savingMicro, setSavingMicro] = useState(false)
   const [exportFrom, setExportFrom] = useState(() => {
     const d = new Date()
     d.setMonth(d.getMonth() - 1)
@@ -76,7 +81,18 @@ export default function SettingsPage() {
         setPreferences(mockSettingsData.foodPreferences)
       })
       .finally(() => setLoading(false))
+    getMicronutrientGoals().then(setMicroGoals).catch(() => null)
   }, [])
+
+  const handleSaveMicroGoals = async () => {
+    if (!microGoals) return
+    setSavingMicro(true)
+    try {
+      await updateMicronutrientGoals(microGoals)
+    } finally {
+      setSavingMicro(false)
+    }
+  }
 
   const showStatus = (ok: boolean) => {
     setSaveStatus(ok ? "saved" : "error")
@@ -605,6 +621,56 @@ export default function SettingsPage() {
             </a>
           </div>
         </Card>
+        {microGoals && (
+          <Card className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-6">
+            <Collapsible open={microOpen} onOpenChange={setMicroOpen}>
+              <CollapsibleTrigger className="flex items-center justify-between w-full">
+                <h3 className="text-lg font-semibold text-white">Objetivos de micronutrientes</h3>
+                <ChevronDown className={`h-5 w-5 text-white/50 transition-transform ${microOpen ? "rotate-180" : ""}`} />
+              </CollapsibleTrigger>
+              <CollapsibleContent className="mt-4">
+                <p className="text-white/50 text-sm mb-4">
+                  Valores pre-rellenados con IDR recomendadas. Puedes personalizar cada uno.
+                </p>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  {([
+                    { key: "fiber_g",         label: "Fibra (g/día)" },
+                    { key: "sodium_mg",       label: "Sodio (mg/día)" },
+                    { key: "potassium_mg",    label: "Potasio (mg/día)" },
+                    { key: "calcium_mg",      label: "Calcio (mg/día)" },
+                    { key: "iron_mg",         label: "Hierro (mg/día)" },
+                    { key: "magnesium_mg",    label: "Magnesio (mg/día)" },
+                    { key: "zinc_mg",         label: "Zinc (mg/día)" },
+                    { key: "vitamin_c_mg",    label: "Vitamina C (mg/día)" },
+                    { key: "vitamin_d_mcg",   label: "Vitamina D (mcg/día)" },
+                    { key: "vitamin_a_mcg",   label: "Vitamina A (mcg/día)" },
+                    { key: "vitamin_b12_mcg", label: "Vitamina B12 (mcg/día)" },
+                  ] as { key: keyof MicronutrientGoals; label: string }[]).map(({ key, label }) => (
+                    <div key={key} className="space-y-1">
+                      <Label className="text-white/60 text-xs">{label}</Label>
+                      <Input
+                        type="number"
+                        min={0}
+                        value={microGoals[key] ?? ""}
+                        onChange={(e) => setMicroGoals(prev =>
+                          prev ? { ...prev, [key]: e.target.value ? Number(e.target.value) : null } : prev
+                        )}
+                        className="bg-white/5 border-white/20 text-white text-sm h-8"
+                      />
+                    </div>
+                  ))}
+                </div>
+                <Button
+                  onClick={handleSaveMicroGoals}
+                  disabled={savingMicro}
+                  className="mt-4 bg-emerald-600 hover:bg-emerald-700"
+                >
+                  {savingMicro ? "Guardando..." : "Guardar objetivos"}
+                </Button>
+              </CollapsibleContent>
+            </Collapsible>
+          </Card>
+        )}
       </div>
     </AppLayout>
   )

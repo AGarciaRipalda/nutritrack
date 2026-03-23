@@ -98,6 +98,48 @@ def calculate_macros(weight_kg: float, target_kcal: int, goal: str = "maintain")
     }
 
 
+# RDA reference values (EU NRV / NIH DRI — adult averages)
+_RDA_BASE = {
+    "fiber_g":          25,
+    "sodium_mg":        2000,
+    "potassium_mg":     3500,
+    "vitamin_a_mcg":    800,
+    "vitamin_c_mg":     80,
+    "vitamin_d_mcg":    15,
+    "vitamin_b12_mcg":  2.4,
+    "calcium_mg":       1000,
+    "iron_mg":          8,
+    "magnesium_mg":     375,
+    "zinc_mg":          10,
+}
+
+_RDA_FEMALE_OVERRIDES = {
+    "iron_mg":   18,
+    "calcium_mg": 1000,
+    "zinc_mg":   8,
+}
+
+def calculate_rda(gender: str, age: int, weight_kg: float) -> dict:
+    """Returns RDA per day based on profile (EU NRV baseline)."""
+    rda = dict(_RDA_BASE)
+
+    if gender == "female":
+        rda.update(_RDA_FEMALE_OVERRIDES)
+        if age >= 51:
+            rda["iron_mg"] = 8
+            rda["calcium_mg"] = 1200
+
+    if age >= 70:
+        rda["calcium_mg"] = 1200
+        rda["vitamin_d_mcg"] = 20
+
+    # Note: protein_g uses "maintain" factor regardless of user goal (RDA baseline)
+    protein_factor = PROTEIN_FACTORS.get("maintain", 2.0)
+    rda["protein_g"] = round(weight_kg * protein_factor)
+
+    return {k: round(v, 1) if isinstance(v, float) else v for k, v in rda.items()}
+
+
 def print_nutrition_report(profile: dict, exercise_data: dict = None) -> None:
     gender   = profile["gender"]
     age      = profile["age"]

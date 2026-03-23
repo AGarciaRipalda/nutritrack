@@ -944,3 +944,28 @@ export function getExportUrl(params: {
   })
   return `${API_BASE}/export?${q}`
 }
+
+// ── Micronutrient Goals ───────────────────────────────────────────────────
+
+export interface MicronutrientGoals {
+  fiber_g?: number | null
+  sodium_mg?: number | null
+  potassium_mg?: number | null
+  vitamin_a_mcg?: number | null
+  vitamin_c_mg?: number | null
+  vitamin_d_mcg?: number | null
+  vitamin_b12_mcg?: number | null
+  calcium_mg?: number | null
+  iron_mg?: number | null
+  magnesium_mg?: number | null
+  zinc_mg?: number | null
+  protein_g?: number | null
+}
+
+export async function getMicronutrientGoals(): Promise<MicronutrientGoals> {
+  return get<MicronutrientGoals>("/profile/micronutrient-goals")
+}
+
+export async function updateMicronutrientGoals(goals: MicronutrientGoals): Promise<void> {
+  await put<{ ok: boolean }>("/profile/micronutrient-goals", goals)
+}

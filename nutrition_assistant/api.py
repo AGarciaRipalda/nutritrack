@@ -33,7 +33,7 @@ from storage import (
 )
 from calculator import (
     calculate_bmr, calculate_tdee, calculate_daily_target,
-    calculate_macros, ACTIVITY_LEVELS, GOAL_ADJUSTMENTS,
+    calculate_macros, calculate_rda, ACTIVITY_LEVELS, GOAL_ADJUSTMENTS,
 )
 from diet import (
     generate_week_plan, get_day_from_plan,
@@ -262,6 +262,41 @@ def update_profile(data: ProfileModel):
     profile = data.model_dump()
     save_profile(profile)
     return {"ok": True, "profile": profile}
+
+
+class MicronutrientGoalsModel(BaseModel):
+    fiber_g:          Optional[float] = None
+    sodium_mg:        Optional[float] = None
+    potassium_mg:     Optional[float] = None
+    vitamin_a_mcg:    Optional[float] = None
+    vitamin_c_mg:     Optional[float] = None
+    vitamin_d_mcg:    Optional[float] = None
+    vitamin_b12_mcg:  Optional[float] = None
+    calcium_mg:       Optional[float] = None
+    iron_mg:          Optional[float] = None
+    magnesium_mg:     Optional[float] = None
+    zinc_mg:          Optional[float] = None
+
+@app.put("/profile/micronutrient-goals", tags=["Perfil"])
+def update_micronutrient_goals(data: MicronutrientGoalsModel):
+    """Guarda objetivos de micronutrientes personalizados en user_profile.json."""
+    profile = load_profile()
+    goals = {k: v for k, v in data.model_dump().items() if v is not None}
+    profile["micronutrient_goals"] = goals
+    save_profile(profile)
+    return {"ok": True, "micronutrient_goals": goals}
+
+@app.get("/profile/micronutrient-goals", tags=["Perfil"])
+def get_micronutrient_goals():
+    """Devuelve objetivos de micronutrientes (custom si existen, RDA por defecto si no)."""
+    profile = load_profile()
+    custom = profile.get("micronutrient_goals", {})
+    rda = calculate_rda(
+        gender=profile.get("gender", "male"),
+        age=profile.get("age", 30),
+        weight_kg=profile.get("weight_kg", 70),
+    )
+    return {**rda, **custom}
 
 
 @app.get("/profile/nutrition", tags=["Perfil"])

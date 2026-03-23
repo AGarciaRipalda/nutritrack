@@ -216,3 +216,30 @@ def test_food_search_includes_micronutrients():
         assert "potassium_mg" in result
         assert "calcium_mg" in result
         assert "iron_mg" in result
+
+
+def test_calculate_rda_male():
+    """RDA values are reasonable for an adult male."""
+    from calculator import calculate_rda
+    rda = calculate_rda(gender="male", age=30, weight_kg=80)
+    assert rda["calcium_mg"] == 1000
+    assert rda["iron_mg"] == 8
+    assert rda["vitamin_c_mg"] == 80
+    assert isinstance(rda["protein_g"], (int, float))
+
+
+def test_put_micronutrient_goals(tmp_path):
+    """PUT /profile/micronutrient-goals saves and returns goals."""
+    from unittest.mock import patch
+    import storage
+    with patch.object(storage, "PROFILE_FILE", str(tmp_path / "profile.json")):
+        client.put("/profile", json={
+            "name": "Test", "gender": "male", "age": 30,
+            "height_cm": 175, "weight_kg": 80,
+            "activity_level": 2, "goal": "maintain", "week_start_day": 0
+        })
+        goals = {"calcium_mg": 1200, "iron_mg": 10, "vitamin_c_mg": 100,
+                 "fiber_g": 30, "sodium_mg": 2000}
+        r = client.put("/profile/micronutrient-goals", json=goals)
+        assert r.status_code == 200
+        assert r.json()["ok"] is True
