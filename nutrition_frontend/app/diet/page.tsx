@@ -8,10 +8,10 @@ import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
 import {
   Shuffle, Coffee, Sun, Utensils, Cookie, Moon,
-  Lightbulb, CheckCircle2, Wheat, Scale, Star, X, Ban, Plus,
+  Lightbulb, CheckCircle2, Wheat, Scale, Star, X, Ban, Plus, AlertTriangle,
 } from "lucide-react"
 import type { PlanDay, FoodSearchResult } from "@/lib/api"
-import { fetchTodaysPlan, swapMeal, updateAdherence, fetchFavoriteCarbs, searchFood, fetchTodayBonusKcal, fetchDashboard } from "@/lib/api"
+import { fetchTodaysPlan, swapMeal, updateAdherence, fetchFavoriteCarbs, searchFood, fetchTodayBonusKcal, fetchDashboard, regenerateDay } from "@/lib/api"
 import { useDietDay } from "@/context/DietDayContext"
 import { useCheatDay } from "@/context/CheatDayContext"
 
@@ -79,6 +79,7 @@ export default function DietPage() {
 
   const [planDay, setPlanDay]         = useState<(PlanDay & { stale?: boolean }) | null>(null)
   const [stale, setStale]             = useState(false)
+  const [regenerating, setRegenerating] = useState(false)
   const [bonusKcal, setBonusKcal]     = useState(0)
   const [macroTargets, setMacroTargets] = useState<{ protein: number; carbs: number; fat: number } | null>(null)
   const [loading, setLoading]         = useState(true)
@@ -148,6 +149,22 @@ export default function DietPage() {
       init(updated.date, target, updated.meals, carbs)
     } catch {}
     setSwapping(null)
+  }
+
+  const handleRegenerateFromStale = async () => {
+    setRegenerating(true)
+    try {
+      const updated = await regenerateDay()
+      setPlanDay(updated)
+      setStale(updated.stale ?? false)
+      // Re-initialize diet context with new plan
+      const target = updated.exerciseAdj?.adjustedTotal ?? updated.totalKcal
+      init(updated.date, target, updated.meals, state.favoriteCarbs)
+    } catch {
+      // silent — plan stays as-is if regeneration fails
+    } finally {
+      setRegenerating(false)
+    }
   }
 
   // Macro compliance estimation (proportional to calorie consumption)
@@ -254,9 +271,23 @@ export default function DietPage() {
 
         {/* Stale banner */}
         {stale && (
-          <div className="bg-amber-500/20 border border-amber-400/30 rounded-2xl p-4 flex items-center justify-between">
-            <span className="text-amber-300 text-sm">Tu plan es de la semana pasada. ¿Regenerar ahora?</span>
-            <a href="/weekly-plan" className="text-amber-400 text-sm font-semibold hover:underline ml-4">Ver plan →</a>
+          <div className="bg-amber-500/20 border border-amber-400/30 rounded-2xl p-4 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-amber-400 shrink-0" />
+              <span className="text-amber-300 text-sm">Tu plan está desactualizado</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleRegenerateFromStale}
+                disabled={regenerating}
+                className="px-3 py-1.5 text-xs font-semibold bg-amber-500/30 hover:bg-amber-500/50 text-amber-300 rounded-lg border border-amber-400/30 transition-colors disabled:opacity-50"
+              >
+                {regenerating ? "Regenerando..." : "Regenerar"}
+              </button>
+              <a href="/weekly-plan" className="text-amber-400/70 text-xs hover:underline">
+                Ver plan →
+              </a>
+            </div>
           </div>
         )}
 
