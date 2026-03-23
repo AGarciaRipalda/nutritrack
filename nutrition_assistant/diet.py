@@ -760,6 +760,18 @@ def _scale_meal(template_data: dict, target_kcal: float, meal_key: str) -> dict:
         "timing_note": "",
         "fixedKcal":  fixed,
         "targetKcal": round(target_kcal),
+        # Micronutrients — populated when food data is available; None otherwise
+        "fiber_g":          None,
+        "sodium_mg":        None,
+        "potassium_mg":     None,
+        "vitamin_a_mcg":    None,
+        "vitamin_c_mg":     None,
+        "vitamin_d_mcg":    None,
+        "vitamin_b12_mcg":  None,
+        "calcium_mg":       None,
+        "iron_mg":          None,
+        "magnesium_mg":     None,
+        "zinc_mg":          None,
     }
 
 

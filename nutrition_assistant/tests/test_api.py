@@ -175,3 +175,44 @@ def test_adherence_metrics_7days():
         assert "current_streak" in body
         assert isinstance(body["daily_trend"], list)
         assert len(body["daily_trend"]) == 7
+
+
+def test_food_search_includes_micronutrients():
+    """Food search results include micronutrient fields (may be null)."""
+    from unittest.mock import patch, MagicMock
+    import urllib.request
+    import json as _json
+
+    mock_response = {
+        "products": [{
+            "product_name": "Arroz cocido",
+            "nutriments": {
+                "energy-kcal_100g": 130,
+                "fiber_100g": 0.3,
+                "sodium_100g": 0.001,
+                "potassium_100g": 0.035,
+                "vitamin-a_100g": None,
+                "vitamin-c_100g": 0,
+                "calcium_100g": 0.01,
+                "iron_100g": 0.002,
+            },
+            "image_small_url": None,
+        }]
+    }
+
+    class FakeResp:
+        def read(self): return _json.dumps(mock_response).encode()
+        def __enter__(self): return self
+        def __exit__(self, *a): pass
+
+    with patch("urllib.request.urlopen", return_value=FakeResp()):
+        r = client.get("/food/search?q=arroz")
+        assert r.status_code == 200
+        results = r.json()["results"]
+        assert len(results) == 1
+        result = results[0]
+        assert "fiber_g" in result
+        assert "sodium_mg" in result
+        assert "potassium_mg" in result
+        assert "calcium_mg" in result
+        assert "iron_mg" in result
