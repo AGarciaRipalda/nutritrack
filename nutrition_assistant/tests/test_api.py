@@ -77,7 +77,6 @@ def test_exercise_logged_but_no_plan_auto_generates_and_applies_adj(tmp_path):
 
 
 def test_post_and_get_cheatday(tmp_path):
-    import json
     from unittest.mock import patch
 
     cheatday_file = tmp_path / "cheatday_history.json"
