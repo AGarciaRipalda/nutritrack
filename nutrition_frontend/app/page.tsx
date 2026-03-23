@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
 import { AppLayout } from "@/components/app-layout"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -22,6 +23,17 @@ export default function DashboardPage() {
   const [loading, setLoading]   = useState(true)
   const [showConfirm, setShowConfirm] = useState(false)
   const [gamification, setGamification] = useState<GamificationStatus | null>(null)
+
+  const router = useRouter()
+
+  const alertRoutes: Record<string, string> = {
+    "weigh-in":      "/progress",
+    "weigh_in":      "/progress",
+    "survey":        "/report",
+    "weekly-report": "/report",
+    "weekly_report": "/report",
+    "event":         "/weekly-plan",
+  }
 
   const { record, isCheatDay, isWeeklyLimitReached, activateCheatDay } = useCheatDay()
 
@@ -501,6 +513,7 @@ export default function DashboardPage() {
           <div className="space-y-3">
             {dashboard.alerts.map((alert) => {
               const AlertIcon = getAlertIcon(alert.type)
+              const route = alertRoutes[alert.type]
               return (
                 <div
                   key={alert.id}
@@ -512,11 +525,21 @@ export default function DashboardPage() {
                     </div>
                     <span className="text-white">{alert.message}</span>
                   </div>
-                  {alert.dueDate && (
-                    <Badge className="bg-white/10 text-white/80 border-white/20">
-                      {new Date(alert.dueDate).toLocaleDateString()}
-                    </Badge>
-                  )}
+                  <div className="flex items-center gap-2 shrink-0">
+                    {alert.dueDate && (
+                      <Badge className="bg-white/10 text-white/80 border-white/20">
+                        {new Date(alert.dueDate).toLocaleDateString()}
+                      </Badge>
+                    )}
+                    {route && (
+                      <button
+                        onClick={() => router.push(route)}
+                        className="px-3 py-1.5 text-xs font-medium bg-white/10 hover:bg-white/20 text-white/80 hover:text-white rounded-lg border border-white/10 transition-colors shrink-0"
+                      >
+                        Ir ahora →
+                      </button>
+                    )}
+                  </div>
                 </div>
               )
             })}
