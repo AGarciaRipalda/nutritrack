@@ -18,6 +18,7 @@ import {
   Tooltip,
   ResponsiveContainer,
   Legend,
+  ReferenceLine,
 } from "recharts"
 import type { ProgressData, WeightStats } from "@/lib/api"
 import { fetchProgress, logWeight, fetchWeightStats } from "@/lib/api"
@@ -109,7 +110,6 @@ export default function ProgressPage() {
     date: new Date(entry.date).toLocaleDateString("es-ES", { month: "short", day: "numeric" }),
     weight: entry.weight,
     trend: progress.trendLine[index]?.weight || entry.weight,
-    weeklyAvg,
   }))
 
   const currentWeight = progress.weightHistory[progress.weightHistory.length - 1]?.weight || 0
@@ -236,16 +236,15 @@ export default function ProgressPage() {
                   strokeDasharray="5 5"
                   dot={false}
                 />
-                <Line
-                  type="monotone"
-                  dataKey="weeklyAvg"
-                  name="Media 7 días"
-                  stroke="#f59e0b"
-                  strokeWidth={2}
-                  strokeDasharray="6 3"
-                  dot={false}
-                  connectNulls
-                />
+                {weeklyAvg !== null && (
+                  <ReferenceLine
+                    y={weeklyAvg}
+                    stroke="#f59e0b"
+                    strokeDasharray="6 3"
+                    strokeWidth={2}
+                    label={{ value: `Media: ${weeklyAvg} kg`, fill: "rgba(245,158,11,0.8)", fontSize: 11, position: "insideTopRight" }}
+                  />
+                )}
               </LineChart>
             </ResponsiveContainer>
             <p className="mt-3 text-center text-sm text-white/60 italic">
