@@ -8,6 +8,7 @@ import {
   Flame, Dumbbell, Bell, Scale, ClipboardList,
   Calendar, TrendingUp, Beef, Wheat, Droplet, Star, X,
   Footprints, Heart, Target, ArrowDown, ArrowUp, Minus,
+  Lightbulb,
 } from "lucide-react"
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts"
 import type { DashboardData, GamificationStatus } from "@/lib/api"
@@ -16,6 +17,40 @@ import { LevelBadge } from "@/components/level-badge"
 import { useCheatDay } from "@/context/CheatDayContext"
 
 const todayISO = new Date().toISOString().slice(0, 10)
+
+type TipVariant = "steps" | "protein" | "good"
+
+interface CoachTip {
+  variant: TipVariant
+  message: string
+  Icon: React.ElementType
+}
+
+function deriveCoachTip(
+  steps: number | null,
+  proteinCurrent: number,
+  proteinTarget: number
+): CoachTip {
+  if (steps !== null && steps < 5000) {
+    return {
+      variant: "steps",
+      message: "Hoy toca moverse un poco más para mantener el déficit",
+      Icon: Footprints,
+    }
+  }
+  if (proteinTarget > 0 && proteinCurrent / proteinTarget < 0.5) {
+    return {
+      variant: "protein",
+      message: "Añade una fuente de proteína en tu próxima comida para proteger tu masa muscular",
+      Icon: Beef,
+    }
+  }
+  return {
+    variant: "good",
+    message: "Ritmo perfecto. La clave de estas 8 semanas es la consistencia",
+    Icon: TrendingUp,
+  }
+}
 
 export default function DashboardPage() {
   const [data, setData]         = useState<DashboardData | null>(null)
@@ -48,6 +83,14 @@ export default function DashboardPage() {
 
   const dashboard = data
   const calorieProgress = Math.round((dashboard.caloriesConsumed / dashboard.dailyCalorieTarget) * 100)
+
+  const coachTip = dashboard
+    ? deriveCoachTip(
+        dashboard.steps,
+        dashboard.macros.protein.current,
+        dashboard.macros.protein.target
+      )
+    : null
 
   const macroData = [
     { name: "Proteínas", value: dashboard.macros.protein.current, color: "#f87171" },
@@ -470,6 +513,22 @@ export default function DashboardPage() {
             })}
           </div>
         </Card>
+
+        {/* Smart Coach Tips Card */}
+        {coachTip && (
+          <div className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-6 transition-all duration-300 hover:bg-white/15">
+            <div className="flex items-center gap-2 mb-3">
+              <Lightbulb className="h-5 w-5 text-yellow-400" />
+              <h3 className="text-white font-semibold text-sm tracking-wide uppercase">
+                Consejo de tu Coach IA
+              </h3>
+            </div>
+            <div className="flex items-start gap-3">
+              {(() => { const { Icon: TipIcon } = coachTip; return <TipIcon className="h-6 w-6 text-white/60 mt-0.5 shrink-0" /> })()}
+              <p className="text-white/80 text-sm leading-relaxed">{coachTip.message}</p>
+            </div>
+          </div>
+        )}
       </div>
     </AppLayout>
   )
