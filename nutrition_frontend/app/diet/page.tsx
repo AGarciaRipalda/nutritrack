@@ -78,7 +78,7 @@ export default function DietPage() {
   }, [])
 
   useEffect(() => {
-    Promise.all([fetchTodaysPlan(), fetchFavoriteCarbs(), fetchTodayBonusKcal()])
+    Promise.all([fetchTodaysPlan(), fetchFavoriteCarbs(), fetchTodayBonusKcal().catch(() => 0)])
       .then(([d, carbs, bonus]) => {
         setBonusKcal(bonus)
         setStale(d.stale ?? false)
@@ -233,7 +233,7 @@ export default function DietPage() {
               )}
               {bonusKcal > 0 && (
                 <p className="text-emerald-300 text-sm mt-1">
-                  ＋{bonusKcal} kcal por entrenamiento de hoy
+                  +{bonusKcal} kcal por entrenamiento de hoy
                 </p>
               )}
             </div>
