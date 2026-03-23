@@ -702,6 +702,17 @@ export async function logWeight(weight: number): Promise<void> {
   await post("/weight", { weight_kg: weight })
 }
 
+// ── Weight Stats ──────────────────────────────────────────────────────────
+
+export interface WeightStats {
+  weekly_avg: number | null
+  entries_count: number
+}
+
+export async function fetchWeightStats(): Promise<WeightStats> {
+  return get<WeightStats>("/weight/stats")
+}
+
 export async function fetchWeeklyReport(): Promise<WeeklyReportData> {
   const [reportRaw, surveyRaw] = await Promise.all([
     get<any>("/report/weekly"),

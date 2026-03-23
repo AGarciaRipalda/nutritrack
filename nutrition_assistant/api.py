@@ -1026,6 +1026,27 @@ def add_weight(data: WeightModel):
     return {"ok": True, "entry": entry}
 
 
+@app.get("/weight/stats", tags=["Peso"])
+def get_weight_stats():
+    """
+    Devuelve la media de peso de los últimos 7 días (anti-ansiedad).
+    """
+    all_entries = load_weight_history()
+    today = date.today()
+    cutoff = today - timedelta(days=6)
+
+    last_7 = [
+        e for e in all_entries
+        if cutoff <= date.fromisoformat(e["date"]) <= today
+    ]
+
+    if not last_7:
+        return {"weekly_avg": None, "entries_count": 0}
+
+    avg = sum(e["weight_kg"] for e in last_7) / len(last_7)
+    return {"weekly_avg": round(avg, 2), "entries_count": len(last_7)}
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # ADHERENCIA
 # ══════════════════════════════════════════════════════════════════════════════

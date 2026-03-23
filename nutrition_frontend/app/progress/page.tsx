@@ -19,8 +19,8 @@ import {
   ResponsiveContainer,
   Legend,
 } from "recharts"
-import type { ProgressData } from "@/lib/api"
-import { fetchProgress, logWeight } from "@/lib/api"
+import type { ProgressData, WeightStats } from "@/lib/api"
+import { fetchProgress, logWeight, fetchWeightStats } from "@/lib/api"
 
 const mockProgressData: ProgressData = {
   weightHistory: [
@@ -56,10 +56,17 @@ export default function ProgressPage() {
   const [loading, setLoading] = useState(true)
   const [weight, setWeight] = useState("")
   const [logging, setLogging] = useState(false)
+  const [weeklyAvg, setWeeklyAvg] = useState<number | null>(null)
 
   useEffect(() => {
-    fetchProgress()
-      .then(setData)
+    Promise.all([
+      fetchProgress(),
+      fetchWeightStats().catch(() => ({ weekly_avg: null, entries_count: 0 })),
+    ])
+      .then(([progressResult, statsResult]) => {
+        setData(progressResult)
+        setWeeklyAvg(statsResult.weekly_avg)
+      })
       .catch(() => setData(mockProgressData))
       .finally(() => setLoading(false))
   }, [])
@@ -102,6 +109,7 @@ export default function ProgressPage() {
     date: new Date(entry.date).toLocaleDateString("es-ES", { month: "short", day: "numeric" }),
     weight: entry.weight,
     trend: progress.trendLine[index]?.weight || entry.weight,
+    weeklyAvg,
   }))
 
   const currentWeight = progress.weightHistory[progress.weightHistory.length - 1]?.weight || 0
@@ -228,8 +236,21 @@ export default function ProgressPage() {
                   strokeDasharray="5 5"
                   dot={false}
                 />
+                <Line
+                  type="monotone"
+                  dataKey="weeklyAvg"
+                  name="Media 7 días"
+                  stroke="#f59e0b"
+                  strokeWidth={2}
+                  strokeDasharray="6 3"
+                  dot={false}
+                  connectNulls
+                />
               </LineChart>
             </ResponsiveContainer>
+            <p className="mt-3 text-center text-sm text-white/60 italic">
+              Tu progreso real es tu media, no el dato de hoy
+            </p>
           </div>
         </Card>
 
