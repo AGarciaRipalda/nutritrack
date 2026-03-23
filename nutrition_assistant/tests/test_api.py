@@ -148,6 +148,18 @@ def test_export_xlsx():
     assert "spreadsheetml" in r.headers.get("content-type", "") or \
            "octet-stream" in r.headers.get("content-type", "")
 
+def test_micronutrients_history_returns_structure():
+    """GET /micronutrients/history returns daily array."""
+    r = client.get("/micronutrients/history?days=7")
+    assert r.status_code == 200
+    body = r.json()
+    assert "history" in body
+    assert isinstance(body["history"], list)
+    assert len(body["history"]) == 7
+    for entry in body["history"]:
+        assert "date" in entry
+        assert "totals" in entry
+
 def test_adherence_metrics_7days():
     """GET /adherence/metrics?days=7 returns expected keys."""
     from unittest.mock import patch

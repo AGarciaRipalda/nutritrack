@@ -993,3 +993,13 @@ export interface MicronutrientsToday {
 export async function getMicronutrientsToday(): Promise<MicronutrientsToday> {
   return get<MicronutrientsToday>("/micronutrients/today")
 }
+
+export interface MicronutrientsHistoryEntry {
+  date: string
+  totals: MicronutrientTotals
+}
+
+export async function getMicronutrientsHistory(days: 7 | 30 = 7): Promise<MicronutrientsHistoryEntry[]> {
+  const d = await get<{ history: MicronutrientsHistoryEntry[] }>(`/micronutrients/history?days=${days}`)
+  return d.history
+}

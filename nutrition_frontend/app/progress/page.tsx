@@ -6,6 +6,8 @@ import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { TrendingUp, Scale, Plus, CheckCircle } from "lucide-react"
 import {
   LineChart,
@@ -19,8 +21,8 @@ import {
   ResponsiveContainer,
   Legend,
 } from "recharts"
-import type { ProgressData, AdherenceMetrics } from "@/lib/api"
-import { fetchProgress, logWeight, getAdherenceMetrics } from "@/lib/api"
+import type { ProgressData, AdherenceMetrics, MicronutrientsHistoryEntry, MicronutrientGoals } from "@/lib/api"
+import { fetchProgress, logWeight, getAdherenceMetrics, getMicronutrientsHistory, getMicronutrientGoals } from "@/lib/api"
 
 const mockProgressData: ProgressData = {
   weightHistory: [
@@ -58,6 +60,10 @@ export default function ProgressPage() {
   const [logging, setLogging] = useState(false)
   const [metrics, setMetrics] = useState<AdherenceMetrics | null>(null)
   const [metricsDays, setMetricsDays] = useState<7 | 30>(7)
+  const [microHistory, setMicroHistory] = useState<MicronutrientsHistoryEntry[]>([])
+  const [microGoals, setMicroGoals] = useState<MicronutrientGoals | null>(null)
+  const [microDays, setMicroDays] = useState<7 | 30>(7)
+  const [selectedNutrient, setSelectedNutrient] = useState("calcium_mg")
 
   useEffect(() => {
     fetchProgress()
@@ -70,6 +76,11 @@ export default function ProgressPage() {
   useEffect(() => {
     getAdherenceMetrics(metricsDays).then(setMetrics).catch(() => null)
   }, [metricsDays])
+
+  useEffect(() => {
+    getMicronutrientsHistory(microDays).then(setMicroHistory).catch(() => [])
+    getMicronutrientGoals().then(setMicroGoals).catch(() => null)
+  }, [microDays])
 
   const handleLogWeight = async () => {
     if (!weight) return
@@ -129,200 +140,303 @@ export default function ProgressPage() {
           </div>
         </Card>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 md:gap-6">
-          <Card className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-white/60 text-sm">Peso actual</p>
-                <p className="text-3xl font-bold text-white">{currentWeight} kg</p>
-              </div>
-              <Scale className="h-8 w-8 text-blue-400" />
-            </div>
-          </Card>
-          <Card className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-white/60 text-sm">Cambio total</p>
-                <p className={`text-3xl font-bold ${weightChange <= 0 ? "text-emerald-400" : "text-red-400"}`}>
-                  {weightChange > 0 ? "+" : ""}{weightChange.toFixed(1)} kg
-                </p>
-              </div>
-              <TrendingUp className={`h-8 w-8 ${weightChange <= 0 ? "text-emerald-400" : "text-red-400"}`} />
-            </div>
-          </Card>
-          <Card className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-white/60 text-sm">Adherencia media</p>
-                <p className="text-3xl font-bold text-white">
-                  {Math.round(
-                    progress.adherenceByWeek.reduce((sum, w) => sum + w.adherence, 0) /
-                      progress.adherenceByWeek.length
-                  )}%
-                </p>
-              </div>
-              <CheckCircle className="h-8 w-8 text-emerald-400" />
-            </div>
-          </Card>
-        </div>
+        <Tabs defaultValue="weight">
+          <TabsList className="bg-white/10 border border-white/20 mb-4">
+            <TabsTrigger value="weight" className="text-white/70 data-[state=active]:text-white">
+              Peso y Adherencia
+            </TabsTrigger>
+            <TabsTrigger value="micros" className="text-white/70 data-[state=active]:text-white">
+              Micronutrientes
+            </TabsTrigger>
+          </TabsList>
 
-        {/* Weight Registration Form */}
-        <Card className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-6">
-          <h3 className="text-xl font-semibold text-white mb-4">Registrar peso de hoy</h3>
-          <div className="flex gap-4 items-end">
-            <div className="flex-1 max-w-xs space-y-2">
-              <Label className="text-white/80">Peso (kg)</Label>
-              <div className="relative">
-                <Scale className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/40" />
-                <Input
-                  type="number"
-                  step="0.1"
-                  placeholder="79.5"
-                  value={weight}
-                  onChange={(e) => setWeight(e.target.value)}
-                  className="pl-10 bg-white/5 border-white/20 text-white placeholder:text-white/40"
-                />
-              </div>
-            </div>
-            <Button
-              onClick={handleLogWeight}
-              disabled={!weight || logging}
-              className="bg-emerald-500 hover:bg-emerald-600 text-white"
-            >
-              <Plus className="mr-2 h-4 w-4" />
-              {logging ? "Registrando..." : "Registrar peso"}
-            </Button>
-          </div>
-        </Card>
-
-        {/* Weight Chart */}
-        <Card className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-6">
-          <h3 className="text-xl font-semibold text-white mb-6">Progreso de peso</h3>
-          <div className="h-80">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={weightChartData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
-                <XAxis dataKey="date" stroke="rgba(255,255,255,0.6)" tick={{ fill: "rgba(255,255,255,0.6)" }} />
-                <YAxis
-                  stroke="rgba(255,255,255,0.6)"
-                  tick={{ fill: "rgba(255,255,255,0.6)" }}
-                  domain={["dataMin - 1", "dataMax + 1"]}
-                />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: "rgba(0,0,0,0.8)",
-                    border: "1px solid rgba(255,255,255,0.2)",
-                    borderRadius: "8px",
-                  }}
-                  labelStyle={{ color: "white" }}
-                />
-                <Legend />
-                <Line
-                  type="monotone"
-                  dataKey="weight"
-                  name="Peso real"
-                  stroke="#60a5fa"
-                  strokeWidth={2}
-                  dot={{ fill: "#60a5fa", strokeWidth: 2 }}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="trend"
-                  name="Línea de tendencia"
-                  stroke="#34d399"
-                  strokeWidth={2}
-                  strokeDasharray="5 5"
-                  dot={false}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        </Card>
-
-        {/* Adherence Chart */}
-        <Card className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-6">
-          <h3 className="text-xl font-semibold text-white mb-6">Adherencia semanal</h3>
-          <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={progress.adherenceByWeek}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
-                <XAxis dataKey="week" stroke="rgba(255,255,255,0.6)" tick={{ fill: "rgba(255,255,255,0.6)" }} />
-                <YAxis
-                  stroke="rgba(255,255,255,0.6)"
-                  tick={{ fill: "rgba(255,255,255,0.6)" }}
-                  domain={[0, 100]}
-                />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: "rgba(0,0,0,0.8)",
-                    border: "1px solid rgba(255,255,255,0.2)",
-                    borderRadius: "8px",
-                  }}
-                  labelStyle={{ color: "white" }}
-                  formatter={(value: number) => [`${value}%`, "Adherencia"]}
-                />
-                <Bar dataKey="adherence" fill="#34d399" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </Card>
-
-        {metrics && (
-          <Card className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-white">Métricas de adherencia</h3>
-              <div className="flex gap-2">
-                {([7, 30] as const).map((d) => (
-                  <button
-                    key={d}
-                    onClick={() => setMetricsDays(d)}
-                    className={`px-3 py-1 text-xs rounded-lg border transition-colors ${
-                      metricsDays === d
-                        ? "bg-emerald-500/20 border-emerald-400/30 text-emerald-300"
-                        : "bg-white/5 border-white/10 text-white/50 hover:bg-white/10"
-                    }`}
-                  >
-                    {d} días
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Streak */}
-            <div className="mb-4 p-3 bg-white/5 rounded-xl border border-white/10">
-              <p className="text-white/50 text-xs">Racha actual (&gt;80% adherencia)</p>
-              <p className="text-2xl font-bold text-emerald-400">{metrics.current_streak} días</p>
-            </div>
-
-            {/* Daily trend sparkline */}
-            <p className="text-white/50 text-xs mb-2">Tendencia diaria</p>
-            <ResponsiveContainer width="100%" height={80}>
-              <LineChart data={metrics.daily_trend.filter(d => d.pct !== null)}>
-                <Line type="monotone" dataKey="pct" stroke="#34d399" strokeWidth={2} dot={false} />
-                <Tooltip
-                  formatter={(val: number) => [`${val}%`, "Adherencia"]}
-                  contentStyle={{ background: "rgba(0,0,0,0.8)", border: "none", borderRadius: 8 }}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-
-            {/* Most skipped */}
-            {metrics.most_skipped.length > 0 && (
-              <div className="mt-4">
-                <p className="text-white/50 text-xs mb-2">Comidas más saltadas</p>
-                <div className="space-y-1">
-                  {metrics.most_skipped.map(({ meal, skips }) => (
-                    <div key={meal} className="flex justify-between text-sm">
-                      <span className="text-white/70 capitalize">{meal.replaceAll("_", " ")}</span>
-                      <span className="text-red-400">{skips} veces</span>
+          <TabsContent value="weight">
+            <div className="space-y-6">
+              {/* Stats Cards */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 md:gap-6">
+                <Card className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-white/60 text-sm">Peso actual</p>
+                      <p className="text-3xl font-bold text-white">{currentWeight} kg</p>
                     </div>
+                    <Scale className="h-8 w-8 text-blue-400" />
+                  </div>
+                </Card>
+                <Card className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-white/60 text-sm">Cambio total</p>
+                      <p className={`text-3xl font-bold ${weightChange <= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                        {weightChange > 0 ? "+" : ""}{weightChange.toFixed(1)} kg
+                      </p>
+                    </div>
+                    <TrendingUp className={`h-8 w-8 ${weightChange <= 0 ? "text-emerald-400" : "text-red-400"}`} />
+                  </div>
+                </Card>
+                <Card className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-white/60 text-sm">Adherencia media</p>
+                      <p className="text-3xl font-bold text-white">
+                        {Math.round(
+                          progress.adherenceByWeek.reduce((sum, w) => sum + w.adherence, 0) /
+                            progress.adherenceByWeek.length
+                        )}%
+                      </p>
+                    </div>
+                    <CheckCircle className="h-8 w-8 text-emerald-400" />
+                  </div>
+                </Card>
+              </div>
+
+              {/* Weight Registration Form */}
+              <Card className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-6">
+                <h3 className="text-xl font-semibold text-white mb-4">Registrar peso de hoy</h3>
+                <div className="flex gap-4 items-end">
+                  <div className="flex-1 max-w-xs space-y-2">
+                    <Label className="text-white/80">Peso (kg)</Label>
+                    <div className="relative">
+                      <Scale className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/40" />
+                      <Input
+                        type="number"
+                        step="0.1"
+                        placeholder="79.5"
+                        value={weight}
+                        onChange={(e) => setWeight(e.target.value)}
+                        className="pl-10 bg-white/5 border-white/20 text-white placeholder:text-white/40"
+                      />
+                    </div>
+                  </div>
+                  <Button
+                    onClick={handleLogWeight}
+                    disabled={!weight || logging}
+                    className="bg-emerald-500 hover:bg-emerald-600 text-white"
+                  >
+                    <Plus className="mr-2 h-4 w-4" />
+                    {logging ? "Registrando..." : "Registrar peso"}
+                  </Button>
+                </div>
+              </Card>
+
+              {/* Weight Chart */}
+              <Card className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-6">
+                <h3 className="text-xl font-semibold text-white mb-6">Progreso de peso</h3>
+                <div className="h-80">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={weightChartData}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
+                      <XAxis dataKey="date" stroke="rgba(255,255,255,0.6)" tick={{ fill: "rgba(255,255,255,0.6)" }} />
+                      <YAxis
+                        stroke="rgba(255,255,255,0.6)"
+                        tick={{ fill: "rgba(255,255,255,0.6)" }}
+                        domain={["dataMin - 1", "dataMax + 1"]}
+                      />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: "rgba(0,0,0,0.8)",
+                          border: "1px solid rgba(255,255,255,0.2)",
+                          borderRadius: "8px",
+                        }}
+                        labelStyle={{ color: "white" }}
+                      />
+                      <Legend />
+                      <Line
+                        type="monotone"
+                        dataKey="weight"
+                        name="Peso real"
+                        stroke="#60a5fa"
+                        strokeWidth={2}
+                        dot={{ fill: "#60a5fa", strokeWidth: 2 }}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="trend"
+                        name="Línea de tendencia"
+                        stroke="#34d399"
+                        strokeWidth={2}
+                        strokeDasharray="5 5"
+                        dot={false}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              </Card>
+
+              {/* Adherence Chart */}
+              <Card className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-6">
+                <h3 className="text-xl font-semibold text-white mb-6">Adherencia semanal</h3>
+                <div className="h-64">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={progress.adherenceByWeek}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
+                      <XAxis dataKey="week" stroke="rgba(255,255,255,0.6)" tick={{ fill: "rgba(255,255,255,0.6)" }} />
+                      <YAxis
+                        stroke="rgba(255,255,255,0.6)"
+                        tick={{ fill: "rgba(255,255,255,0.6)" }}
+                        domain={[0, 100]}
+                      />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: "rgba(0,0,0,0.8)",
+                          border: "1px solid rgba(255,255,255,0.2)",
+                          borderRadius: "8px",
+                        }}
+                        labelStyle={{ color: "white" }}
+                        formatter={(value: number) => [`${value}%`, "Adherencia"]}
+                      />
+                      <Bar dataKey="adherence" fill="#34d399" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </Card>
+
+              {metrics && (
+                <Card className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-semibold text-white">Métricas de adherencia</h3>
+                    <div className="flex gap-2">
+                      {([7, 30] as const).map((d) => (
+                        <button
+                          key={d}
+                          onClick={() => setMetricsDays(d)}
+                          className={`px-3 py-1 text-xs rounded-lg border transition-colors ${
+                            metricsDays === d
+                              ? "bg-emerald-500/20 border-emerald-400/30 text-emerald-300"
+                              : "bg-white/5 border-white/10 text-white/50 hover:bg-white/10"
+                          }`}
+                        >
+                          {d} días
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Streak */}
+                  <div className="mb-4 p-3 bg-white/5 rounded-xl border border-white/10">
+                    <p className="text-white/50 text-xs">Racha actual (&gt;80% adherencia)</p>
+                    <p className="text-2xl font-bold text-emerald-400">{metrics.current_streak} días</p>
+                  </div>
+
+                  {/* Daily trend sparkline */}
+                  <p className="text-white/50 text-xs mb-2">Tendencia diaria</p>
+                  <ResponsiveContainer width="100%" height={80}>
+                    <LineChart data={metrics.daily_trend.filter(d => d.pct !== null)}>
+                      <Line type="monotone" dataKey="pct" stroke="#34d399" strokeWidth={2} dot={false} />
+                      <Tooltip
+                        formatter={(val: number) => [`${val}%`, "Adherencia"]}
+                        contentStyle={{ background: "rgba(0,0,0,0.8)", border: "none", borderRadius: 8 }}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+
+                  {/* Most skipped */}
+                  {metrics.most_skipped.length > 0 && (
+                    <div className="mt-4">
+                      <p className="text-white/50 text-xs mb-2">Comidas más saltadas</p>
+                      <div className="space-y-1">
+                        {metrics.most_skipped.map(({ meal, skips }) => (
+                          <div key={meal} className="flex justify-between text-sm">
+                            <span className="text-white/70 capitalize">{meal.replaceAll("_", " ")}</span>
+                            <span className="text-red-400">{skips} veces</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </Card>
+              )}
+            </div>
+          </TabsContent>
+
+          <TabsContent value="micros">
+            <Card className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-6">
+              <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
+                <h3 className="text-lg font-semibold text-white">Micronutrientes</h3>
+                <div className="flex gap-2 flex-wrap">
+                  <Select value={selectedNutrient} onValueChange={setSelectedNutrient}>
+                    <SelectTrigger className="bg-white/5 border-white/20 text-white w-44 h-8 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {[
+                        { key: "calcium_mg",    label: "Calcio (mg)" },
+                        { key: "iron_mg",       label: "Hierro (mg)" },
+                        { key: "fiber_g",       label: "Fibra (g)" },
+                        { key: "vitamin_c_mg",  label: "Vitamina C (mg)" },
+                        { key: "vitamin_d_mcg", label: "Vitamina D (mcg)" },
+                        { key: "magnesium_mg",  label: "Magnesio (mg)" },
+                        { key: "zinc_mg",       label: "Zinc (mg)" },
+                        { key: "potassium_mg",  label: "Potasio (mg)" },
+                        { key: "sodium_mg",     label: "Sodio (mg)" },
+                      ].map(({ key, label }) => (
+                        <SelectItem key={key} value={key}>{label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {([7, 30] as const).map((d) => (
+                    <button
+                      key={d}
+                      onClick={() => setMicroDays(d)}
+                      className={`px-3 py-1 text-xs rounded-lg border transition-colors ${
+                        microDays === d
+                          ? "bg-emerald-500/20 border-emerald-400/30 text-emerald-300"
+                          : "bg-white/5 border-white/10 text-white/50 hover:bg-white/10"
+                      }`}
+                    >
+                      {d} días
+                    </button>
                   ))}
                 </div>
               </div>
-            )}
-          </Card>
-        )}
+
+              {microHistory.length > 0 ? (
+                <>
+                  <ResponsiveContainer width="100%" height={200}>
+                    <LineChart data={microHistory.map(e => ({
+                      date: e.date.slice(5),
+                      value: (e.totals as Record<string, number | null>)[selectedNutrient],
+                    }))}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
+                      <XAxis dataKey="date" tick={{ fill: "rgba(255,255,255,0.5)", fontSize: 11 }} />
+                      <YAxis tick={{ fill: "rgba(255,255,255,0.5)", fontSize: 11 }} />
+                      <Tooltip
+                        formatter={(val: number | null) => [val !== null ? val : "sin datos", selectedNutrient]}
+                        contentStyle={{ background: "rgba(0,0,0,0.8)", border: "none", borderRadius: 8 }}
+                      />
+                      {microGoals && (
+                        <Line
+                          type="monotone"
+                          dataKey={() => (microGoals as Record<string, number | undefined>)[selectedNutrient] ?? null}
+                          stroke="rgba(255,255,255,0.3)"
+                          strokeDasharray="4 4"
+                          dot={false}
+                          name="Objetivo"
+                        />
+                      )}
+                      <Line
+                        type="monotone"
+                        dataKey="value"
+                        stroke="#34d399"
+                        strokeWidth={2}
+                        dot={{ fill: "#34d399", r: 3 }}
+                        connectNulls={false}
+                        name={selectedNutrient}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                  <p className="text-white/30 text-xs mt-2 text-center">
+                    Línea discontinua = objetivo diario · Solo comidas con datos OpenFoodFacts
+                  </p>
+                </>
+              ) : (
+                <p className="text-white/40 text-sm text-center py-8">
+                  Sin datos de micronutrientes aún. Registra alimentos con búsqueda para empezar.
+                </p>
+              )}
+            </Card>
+          </TabsContent>
+        </Tabs>
       </div>
     </AppLayout>
   )

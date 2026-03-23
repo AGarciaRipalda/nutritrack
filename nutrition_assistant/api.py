@@ -1230,6 +1230,38 @@ def micronutrients_today(x_user_timezone: str | None = Header(None)):
     return {"totals": totals, "goals": goals}
 
 
+@app.get("/micronutrients/history", tags=["Micronutrientes"])
+def micronutrients_history(days: int = Query(7, ge=7, le=30)):
+    """
+    Devuelve el historial de micronutrientes de los últimos `days` días.
+    Cada entrada: { date, totals: { nutrient: value|null } }
+    """
+    adh_log = {}
+    if os.path.exists(ADHERENCE_FILE):
+        with open(ADHERENCE_FILE) as f:
+            adh_log = json.load(f)
+
+    today = date.today()
+    history = []
+
+    for i in range(days - 1, -1, -1):
+        iso = (today - timedelta(days=i)).isoformat()
+        entry = adh_log.get(iso, {})
+        totals = {k: None for k in MICRO_KEYS}
+        skipped = entry.get("skipped_meals", {})
+
+        for meal_data in skipped.values():
+            for food in meal_data.get("foods", []):
+                for key in MICRO_KEYS:
+                    val = food.get(key)
+                    if val is not None:
+                        totals[key] = (totals[key] or 0) + val
+
+        history.append({"date": iso, "totals": totals})
+
+    return {"history": history}
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # ENCUESTA SEMANAL
 # ══════════════════════════════════════════════════════════════════════════════
