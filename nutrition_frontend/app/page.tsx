@@ -84,13 +84,11 @@ export default function DashboardPage() {
   const dashboard = data
   const calorieProgress = Math.round((dashboard.caloriesConsumed / dashboard.dailyCalorieTarget) * 100)
 
-  const coachTip = dashboard
-    ? deriveCoachTip(
-        dashboard.steps,
-        dashboard.macros.protein.current,
-        dashboard.macros.protein.target
-      )
-    : null
+  const coachTip = deriveCoachTip(
+    dashboard.steps,
+    dashboard.macros.protein.current,
+    dashboard.macros.protein.target
+  )
 
   const macroData = [
     { name: "Proteínas", value: dashboard.macros.protein.current, color: "#f87171" },
@@ -123,6 +121,8 @@ export default function DashboardPage() {
         return "bg-white/20 text-white border-white/30"
     }
   }
+
+  const TipIcon = coachTip.Icon
 
   return (
     <AppLayout>
@@ -515,20 +515,18 @@ export default function DashboardPage() {
         </Card>
 
         {/* Smart Coach Tips Card */}
-        {coachTip && (
-          <div className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-6 transition-all duration-300 hover:bg-white/15">
-            <div className="flex items-center gap-2 mb-3">
-              <Lightbulb className="h-5 w-5 text-yellow-400" />
-              <h3 className="text-white font-semibold text-sm tracking-wide uppercase">
-                Consejo de tu Coach IA
-              </h3>
-            </div>
-            <div className="flex items-start gap-3">
-              {(() => { const { Icon: TipIcon } = coachTip; return <TipIcon className="h-6 w-6 text-white/60 mt-0.5 shrink-0" /> })()}
-              <p className="text-white/80 text-sm leading-relaxed">{coachTip.message}</p>
-            </div>
+        <div className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-6 transition-all duration-300 hover:bg-white/15">
+          <div className="flex items-center gap-2 mb-3">
+            <Lightbulb className="h-5 w-5 text-yellow-400" />
+            <h3 className="text-white font-semibold text-sm tracking-wide uppercase">
+              Consejo de tu Coach IA
+            </h3>
           </div>
-        )}
+          <div className="flex items-start gap-3">
+            <TipIcon className="h-6 w-6 text-white/60 mt-0.5 shrink-0" />
+            <p className="text-white/80 text-sm leading-relaxed">{coachTip.message}</p>
+          </div>
+        </div>
       </div>
     </AppLayout>
   )
