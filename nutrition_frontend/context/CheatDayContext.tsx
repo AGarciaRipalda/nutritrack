@@ -1,9 +1,10 @@
 "use client"
 
 import {
-  createContext, useContext, useState,
+  createContext, useContext, useState, useEffect,
   useCallback, type ReactNode,
 } from "react"
+import { saveCheatDay, getCheatDays, type CheatDayRecordAPI } from "@/lib/api"
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -21,12 +22,12 @@ const lsKey = (weekStart: string) => `nutritrack_cheatday_${weekStart}`
 export interface CompensationEntry { date: string; reduction: number }
 
 export interface CheatDayRecord {
-  date:         string               // "2026-03-20"
-  weekStart:    string               // "2026-03-16"
+  date:         string
+  weekStart:    string
   active:       boolean
-  excess:       number               // kcal over target (filled after the day)
+  excess:       number
   compensating: boolean
-  compensation: CompensationEntry[]  // next 3 days' reductions
+  compensation: CompensationEntry[]
 }
 
 interface CheatDayContextValue {
@@ -44,7 +45,36 @@ interface CheatDayContextValue {
 
 const Ctx = createContext<CheatDayContextValue | null>(null)
 
-function loadRecord(): CheatDayRecord | null {
+function toAPIRecord(rec: CheatDayRecord): CheatDayRecordAPI {
+  return {
+    id:           rec.date,
+    date:         rec.date,
+    weekStart:    rec.weekStart,
+    active:       rec.active,
+    excess:       rec.excess,
+    compensating: rec.compensating,
+    compensation: rec.compensation.map(c => ({
+      date:         c.date,
+      extra_deficit: c.reduction,
+    })),
+  }
+}
+
+function fromAPIRecord(r: CheatDayRecordAPI): CheatDayRecord {
+  return {
+    date:         r.date,
+    weekStart:    r.weekStart,
+    active:       r.active,
+    excess:       r.excess,
+    compensating: r.compensating,
+    compensation: r.compensation.map(c => ({
+      date:      c.date,
+      reduction: c.extra_deficit,
+    })),
+  }
+}
+
+function loadFromLocalStorage(): CheatDayRecord | null {
   if (typeof window === "undefined") return null
   const today     = new Date().toISOString().slice(0, 10)
   const weekStart = getMonday(today)
@@ -55,14 +85,39 @@ function loadRecord(): CheatDayRecord | null {
 }
 
 export function CheatDayProvider({ children }: { children: ReactNode }) {
-  const [record, setRecord] = useState<CheatDayRecord | null>(loadRecord)
+  const [record, setRecord] = useState<CheatDayRecord | null>(loadFromLocalStorage)
+
+  // Sync with backend on mount
+  useEffect(() => {
+    getCheatDays()
+      .then((backendRecords) => {
+        if (backendRecords.length > 0) {
+          // Backend wins — find record for current week
+          const today     = new Date().toISOString().slice(0, 10)
+          const weekStart = getMonday(today)
+          const thisWeek  = backendRecords.find(r => r.weekStart === weekStart)
+          if (thisWeek) {
+            const rec = fromAPIRecord(thisWeek)
+            setRecord(rec)
+            try { localStorage.setItem(lsKey(rec.weekStart), JSON.stringify(rec)) } catch {}
+          }
+        } else {
+          // Backend empty — migrate localStorage data if present
+          const lsRecord = loadFromLocalStorage()
+          if (lsRecord) {
+            saveCheatDay(toAPIRecord(lsRecord)).catch(console.error)
+          }
+        }
+      })
+      .catch(console.error)
+  }, [])
 
   const persist = useCallback((rec: CheatDayRecord) => {
     setRecord(rec)
     try { localStorage.setItem(lsKey(rec.weekStart), JSON.stringify(rec)) } catch {}
+    saveCheatDay(toAPIRecord(rec)).catch(console.error)
   }, [])
 
-  /** True if there is any cheat day record for this week (regardless of date). */
   const isWeeklyLimitReached = useCallback((date: string) => {
     if (typeof window === "undefined") return false
     try { return !!localStorage.getItem(lsKey(getMonday(date))) } catch { return false }
@@ -73,18 +128,15 @@ export function CheatDayProvider({ children }: { children: ReactNode }) {
     [record],
   )
 
-  /** Activate comodín for today. One per week — caller must check limit first. */
   const activateCheatDay = useCallback((date: string) => {
     persist({ date, weekStart: getMonday(date), active: true, excess: 0, compensating: false, compensation: [] })
   }, [persist])
 
-  /** Called from diet page when we know the final excess. */
   const finalizeExcess = useCallback((excess: number) => {
     if (!record) return
     persist({ ...record, excess })
   }, [record, persist])
 
-  /** Build compensation plan: distribute excess over next 3 days. */
   const setupCompensation = useCallback((fromDate: string) => {
     if (!record) return
     const perDay = Math.round(record.excess / 3)
@@ -102,7 +154,6 @@ export function CheatDayProvider({ children }: { children: ReactNode }) {
     persist({ ...record, compensating: false, compensation: [] })
   }, [record, persist])
 
-  /** Returns the kcal reduction for a given date (0 if not in plan). */
   const getCompensationReduction = useCallback((date: string) => {
     if (!record?.compensating) return 0
     return record.compensation.find((c) => c.date === date)?.reduction ?? 0

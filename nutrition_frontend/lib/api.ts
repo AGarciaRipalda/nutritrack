@@ -870,3 +870,24 @@ export async function searchFood(query: string): Promise<FoodSearchResult[]> {
   const d = await get<{ results: FoodSearchResult[] }>(`/food/search?q=${encodeURIComponent(query)}`)
   return d.results
 }
+
+// ── CheatDay Sync ─────────────────────────────────────────────────────────
+
+export interface CheatDayRecordAPI {
+  id: string
+  date: string
+  weekStart: string
+  active: boolean
+  excess: number
+  compensating: boolean
+  compensation: { date: string; extra_deficit: number }[]
+}
+
+export async function saveCheatDay(record: CheatDayRecordAPI): Promise<void> {
+  await post<{ ok: boolean }>("/cheatday", record)
+}
+
+export async function getCheatDays(): Promise<CheatDayRecordAPI[]> {
+  const d = await get<{ records: CheatDayRecordAPI[] }>("/cheatday")
+  return d.records
+}

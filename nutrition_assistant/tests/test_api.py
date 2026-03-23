@@ -74,3 +74,34 @@ def test_exercise_logged_but_no_plan_auto_generates_and_applies_adj(tmp_path):
     assert "exerciseAdj" in body, "exerciseAdj must be present when exercise_adj[today] is set"
     assert body["exerciseAdj"]["extraKcal"] == 400
     assert body["exerciseAdj"]["source"] == "running 30min"
+
+
+def test_post_and_get_cheatday(tmp_path):
+    import json
+    from unittest.mock import patch
+
+    cheatday_file = tmp_path / "cheatday_history.json"
+    payload = {
+        "id": "2026-03-20",
+        "date": "2026-03-20",
+        "weekStart": "2026-03-16",
+        "active": True,
+        "excess": 450,
+        "compensating": True,
+        "compensation": [
+            {"date": "2026-03-21", "extra_deficit": 150},
+            {"date": "2026-03-22", "extra_deficit": 150},
+            {"date": "2026-03-23", "extra_deficit": 150},
+        ],
+    }
+
+    with patch("api.CHEATDAY_FILE", cheatday_file):
+        r = client.post("/cheatday", json=payload)
+        assert r.status_code == 200
+        assert r.json()["ok"] is True
+
+        r2 = client.get("/cheatday")
+        assert r2.status_code == 200
+        records = r2.json()["records"]
+        assert len(records) == 1
+        assert records[0]["date"] == "2026-03-20"

@@ -47,6 +47,7 @@ from weight_tracker import (
     _load as load_weight_history, _save as save_weight_history,
 )
 from adherence import ADHERENCE_FILE, weekly_adherence
+from data_dir import DATA_DIR
 from weekly_survey import (
     needs_survey, last_survey_scores,
     _load as load_surveys, _save as save_surveys, QUESTIONS,
@@ -87,6 +88,21 @@ app.add_middleware(
 
 # ── Estado en memoria (evita leer JSON en cada request) ──────────────────────
 _cache: dict = {}
+
+# ── File paths ────────────────────────────────────────────────────────────────
+CHEATDAY_FILE = DATA_DIR / "cheatday_history.json"
+
+
+def _load_cheatdays() -> list:
+    if not os.path.exists(CHEATDAY_FILE):
+        return []
+    with open(CHEATDAY_FILE, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+def _save_cheatdays(records: list) -> None:
+    with open(CHEATDAY_FILE, "w", encoding="utf-8") as f:
+        json.dump(records, f, indent=2, ensure_ascii=False)
 
 
 def _get_session():
@@ -1598,3 +1614,34 @@ def search_food(q: str = Query(..., min_length=2, description="Nombre del alimen
 
     return {"results": results}
 
+
+# ══════════════════════════════════════════════════════════════════════════════
+# CHEAT DAY SYNC
+# ══════════════════════════════════════════════════════════════════════════════
+
+class CompensationEntryModel(BaseModel):
+    date: str
+    extra_deficit: int
+
+class CheatDayRecordModel(BaseModel):
+    id: str
+    date: str
+    weekStart: str
+    active: bool
+    excess: int
+    compensating: bool
+    compensation: list[CompensationEntryModel]
+
+@app.post("/cheatday", tags=["Comodín"])
+def save_cheat_day(record: CheatDayRecordModel):
+    """Persiste o actualiza un registro de comodín."""
+    records = _load_cheatdays()
+    records = [r for r in records if r.get("id") != record.id]
+    records.append(record.model_dump())
+    _save_cheatdays(records)
+    return {"ok": True}
+
+@app.get("/cheatday", tags=["Comodín"])
+def get_cheat_days():
+    """Devuelve el historial de comodines."""
+    return {"records": _load_cheatdays()}
