@@ -132,6 +132,30 @@ export default function DashboardPage() {
           )}
         </Card>
 
+        {/* Compensation banner */}
+        {record?.compensating && (() => {
+          const today = new Date().toISOString().slice(0, 10)
+          const activeEntries = record.compensation.filter(c => c.date >= today)
+          if (activeEntries.length === 0) return null
+          const daysRemaining = activeEntries.length
+          const extraDeficit = activeEntries[0]?.reduction ?? 0
+          const endDate = activeEntries.at(-1)?.date ?? ""
+          return (
+            <Card className="backdrop-blur-xl bg-orange-500/10 border border-orange-400/30 rounded-3xl p-5">
+              <div className="flex items-start gap-3">
+                <ArrowDown className="h-5 w-5 text-orange-400 mt-0.5 shrink-0" />
+                <div>
+                  <p className="text-orange-300 font-semibold text-sm">Compensación activa</p>
+                  <p className="text-white/70 text-sm mt-1">
+                    {daysRemaining} {daysRemaining === 1 ? "día restante" : "días restantes"} ·{" "}
+                    -{extraDeficit} kcal/día · hasta el {endDate}
+                  </p>
+                </div>
+              </div>
+            </Card>
+          )
+        })()}
+
         {/* Comodín confirmation modal */}
         {showConfirm && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
