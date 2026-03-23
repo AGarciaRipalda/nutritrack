@@ -8,10 +8,11 @@ import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
 import {
   Shuffle, Coffee, Sun, Utensils, Cookie, Moon,
-  Lightbulb, CheckCircle2, Wheat, Scale, Star, X, Ban, Plus, AlertTriangle,
+  Lightbulb, CheckCircle2, Wheat, Scale, Star, X, Ban, Plus, AlertTriangle, ChevronDown,
 } from "lucide-react"
-import type { PlanDay, FoodSearchResult } from "@/lib/api"
-import { fetchTodaysPlan, swapMeal, updateAdherence, fetchFavoriteCarbs, searchFood, fetchTodayBonusKcal, fetchDashboard, regenerateDay } from "@/lib/api"
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
+import type { PlanDay, FoodSearchResult, MicronutrientsToday, MicronutrientTotals } from "@/lib/api"
+import { fetchTodaysPlan, swapMeal, updateAdherence, fetchFavoriteCarbs, searchFood, fetchTodayBonusKcal, fetchDashboard, regenerateDay, getMicronutrientsToday } from "@/lib/api"
 import { useDietDay } from "@/context/DietDayContext"
 import { useCheatDay } from "@/context/CheatDayContext"
 
@@ -91,6 +92,8 @@ export default function DietPage() {
   const [foodSuggestions, setFoodSuggestions] = useState<Record<string, FoodSearchResult[]>>({})
   const [searchingFood, setSearchingFood] = useState<Record<string, boolean>>({})
   const searchTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
+  const [micronutrients, setMicronutrients] = useState<MicronutrientsToday | null>(null)
+  const [microOpen, setMicroOpen] = useState(false)
 
   const debouncedFoodSearch = useCallback((mealId: string, query: string) => {
     if (searchTimers.current[mealId]) clearTimeout(searchTimers.current[mealId])
@@ -135,6 +138,7 @@ export default function DietPage() {
       carbs:   d.macros.carbs.target,
       fat:     d.macros.fat.target,
     })).catch(() => null)
+    getMicronutrientsToday().then(setMicronutrients).catch(() => null)
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSwap = async (mealId: string) => {
@@ -193,6 +197,7 @@ export default function DietPage() {
     const newChecked = { ...checkedMeals, [itemId]: checked }
     setCheckedMeals(newChecked)
     await syncAdherence(newChecked, skippedMeals)
+    getMicronutrientsToday().then(setMicronutrients).catch(() => null)
   }
 
   const handleSkipMeal = async (mealId: string) => {
@@ -377,6 +382,61 @@ export default function DietPage() {
             </div>
           )}
         </Card>
+
+        {micronutrients && (
+          <Card className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-5">
+            <Collapsible open={microOpen} onOpenChange={setMicroOpen}>
+              <CollapsibleTrigger className="flex items-center justify-between w-full">
+                <h3 className="text-base font-semibold text-white">Micronutrientes del día</h3>
+                <ChevronDown className={`h-4 w-4 text-white/50 transition-transform ${microOpen ? "rotate-180" : ""}`} />
+              </CollapsibleTrigger>
+              <CollapsibleContent className="mt-3">
+                <div className="space-y-2">
+                  {([
+                    { key: "fiber_g",         label: "Fibra",        unit: "g" },
+                    { key: "calcium_mg",      label: "Calcio",       unit: "mg" },
+                    { key: "iron_mg",         label: "Hierro",       unit: "mg" },
+                    { key: "vitamin_c_mg",    label: "Vitamina C",   unit: "mg" },
+                    { key: "vitamin_d_mcg",   label: "Vitamina D",   unit: "mcg" },
+                    { key: "magnesium_mg",    label: "Magnesio",     unit: "mg" },
+                    { key: "zinc_mg",         label: "Zinc",         unit: "mg" },
+                    { key: "potassium_mg",    label: "Potasio",      unit: "mg" },
+                    { key: "sodium_mg",       label: "Sodio",        unit: "mg" },
+                    { key: "vitamin_a_mcg",   label: "Vitamina A",   unit: "mcg" },
+                    { key: "vitamin_b12_mcg", label: "Vitamina B12", unit: "mcg" },
+                  ] as { key: keyof MicronutrientTotals; label: string; unit: string }[]).map(({ key, label, unit }) => {
+                    const current = micronutrients.totals[key]
+                    const goal = (micronutrients.goals as Record<string, number>)[key]
+                    if (current === null) {
+                      return (
+                        <div key={key} className="flex justify-between text-xs">
+                          <span className="text-white/50">{label}</span>
+                          <span className="text-white/30 italic">sin datos</span>
+                        </div>
+                      )
+                    }
+                    const pct = goal > 0 ? Math.min(Math.round((current / goal) * 100), 100) : 0
+                    const barColor = pct >= 90 ? "bg-emerald-400" : pct >= 70 ? "bg-amber-400" : "bg-red-400"
+                    return (
+                      <div key={key} className="space-y-0.5">
+                        <div className="flex justify-between text-xs">
+                          <span className="text-white/60">{label}</span>
+                          <span className="text-white/70">{current}{unit} / {goal}{unit}</span>
+                        </div>
+                        <div className="w-full bg-white/10 rounded-full h-1">
+                          <div className={`${barColor} h-1 rounded-full`} style={{ width: `${pct}%` }} />
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+                <p className="text-white/30 text-xs mt-3">
+                  * Solo incluye alimentos de comidas saltadas registrados manualmente
+                </p>
+              </CollapsibleContent>
+            </Collapsible>
+          </Card>
+        )}
 
         {/* Cheat day active banner */}
         {cheatActive && (

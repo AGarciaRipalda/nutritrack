@@ -7,7 +7,7 @@ Documentación automática en: http://localhost:8000/docs
 import csv
 import io
 import os, json
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from typing import Optional, List
 import zoneinfo
 
@@ -1179,6 +1179,55 @@ def get_today_adherence():
 def adherence_metrics(days: int = Query(7, ge=7, le=30, description="Number of days to aggregate (7–30)")):
     """Agrega métricas de adherencia: cumplimiento por comida, tendencia, racha, comidas problemáticas."""
     return get_adherence_metrics(days)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# MICRONUTRIENTES
+# ══════════════════════════════════════════════════════════════════════════════
+
+MICRO_KEYS = [
+    "fiber_g", "sodium_mg", "potassium_mg",
+    "vitamin_a_mcg", "vitamin_c_mg", "vitamin_d_mcg", "vitamin_b12_mcg",
+    "calcium_mg", "iron_mg", "magnesium_mg", "zinc_mg",
+]
+
+@app.get("/micronutrients/today", tags=["Micronutrientes"])
+def micronutrients_today(x_user_timezone: str | None = Header(None)):
+    """
+    Suma los micronutrientes de las comidas consumidas hoy.
+    Los valores de comidas del plan son null (no tenemos datos por comida).
+    Solo se suman los alimentos de 'skipped_meals' que provienen de búsquedas.
+    """
+    tz = x_user_timezone or "UTC"
+    try:
+        today_iso = datetime.now(zoneinfo.ZoneInfo(tz)).date().isoformat()
+    except Exception:
+        today_iso = date.today().isoformat()
+
+    adh_log = {}
+    if os.path.exists(ADHERENCE_FILE):
+        with open(ADHERENCE_FILE) as f:
+            adh_log = json.load(f)
+
+    totals = {k: None for k in MICRO_KEYS}
+    today_entry = adh_log.get(today_iso, {})
+    skipped = today_entry.get("skipped_meals", {})
+
+    for meal_id, meal_data in skipped.items():
+        for food in meal_data.get("foods", []):
+            for key in MICRO_KEYS:
+                val = food.get(key)
+                if val is not None:
+                    totals[key] = (totals[key] or 0) + val
+
+    profile = load_profile()
+    goals = profile.get("micronutrient_goals") or calculate_rda(
+        gender=profile.get("gender", "male"),
+        age=profile.get("age", 30),
+        weight_kg=profile.get("weight_kg", 70),
+    )
+
+    return {"totals": totals, "goals": goals}
 
 
 # ══════════════════════════════════════════════════════════════════════════════

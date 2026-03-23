@@ -968,3 +968,28 @@ export async function getMicronutrientGoals(): Promise<MicronutrientGoals> {
 export async function updateMicronutrientGoals(goals: MicronutrientGoals): Promise<void> {
   await put<{ ok: boolean }>("/profile/micronutrient-goals", goals)
 }
+
+// ── Micronutrient Tracking ────────────────────────────────────────────────
+
+export interface MicronutrientTotals {
+  fiber_g: number | null
+  sodium_mg: number | null
+  potassium_mg: number | null
+  vitamin_a_mcg: number | null
+  vitamin_c_mg: number | null
+  vitamin_d_mcg: number | null
+  vitamin_b12_mcg: number | null
+  calcium_mg: number | null
+  iron_mg: number | null
+  magnesium_mg: number | null
+  zinc_mg: number | null
+}
+
+export interface MicronutrientsToday {
+  totals: MicronutrientTotals
+  goals: MicronutrientGoals
+}
+
+export async function getMicronutrientsToday(): Promise<MicronutrientsToday> {
+  return get<MicronutrientsToday>("/micronutrients/today")
+}
