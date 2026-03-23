@@ -1137,7 +1137,7 @@ def get_today_adherence():
 
 
 @app.get("/adherence/metrics", tags=["Adherencia"])
-def adherence_metrics(days: int = Query(7, ge=7, le=30, description="7 or 30 days")):
+def adherence_metrics(days: int = Query(7, ge=7, le=30, description="Number of days to aggregate (7–30)")):
     """Agrega métricas de adherencia: cumplimiento por comida, tendencia, racha, comidas problemáticas."""
     return get_adherence_metrics(days)
 

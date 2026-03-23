@@ -314,7 +314,7 @@ export default function ProgressPage() {
                 <div className="space-y-1">
                   {metrics.most_skipped.map(({ meal, skips }) => (
                     <div key={meal} className="flex justify-between text-sm">
-                      <span className="text-white/70 capitalize">{meal.replace("_", " ")}</span>
+                      <span className="text-white/70 capitalize">{meal.replaceAll("_", " ")}</span>
                       <span className="text-red-400">{skips} veces</span>
                     </div>
                   ))}

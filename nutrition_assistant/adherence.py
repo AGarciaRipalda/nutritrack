@@ -137,9 +137,8 @@ def get_metrics(days: int = 7) -> dict:
     # Streak: iterate newest-first
     for iso in reversed(dates):
         entry = log.get(iso)
-        if entry:
-            pct = entry.get("pct", 0)
-            if not streak_broken and pct >= 80:
+        if not streak_broken:
+            if entry and entry.get("pct", 0) >= 80:
                 streak += 1
             else:
                 streak_broken = True
