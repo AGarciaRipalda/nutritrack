@@ -28,6 +28,10 @@ export default function DashboardPage() {
   const cheatActive  = isCheatDay(todayISO)
   const weeklyUsed   = isWeeklyLimitReached(todayISO) && !cheatActive
 
+  const activeCompensationEntries = record?.compensating
+    ? (record.compensation ?? []).filter(c => c.date >= todayISO)
+    : []
+
   useEffect(() => {
     fetchDashboard()
       .then(setData)
@@ -133,28 +137,22 @@ export default function DashboardPage() {
         </Card>
 
         {/* Compensation banner */}
-        {record?.compensating && (() => {
-          const today = new Date().toISOString().slice(0, 10)
-          const activeEntries = record.compensation.filter(c => c.date >= today)
-          if (activeEntries.length === 0) return null
-          const daysRemaining = activeEntries.length
-          const extraDeficit = activeEntries[0]?.reduction ?? 0
-          const endDate = activeEntries.at(-1)?.date ?? ""
-          return (
-            <Card className="backdrop-blur-xl bg-orange-500/10 border border-orange-400/30 rounded-3xl p-5">
-              <div className="flex items-start gap-3">
-                <ArrowDown className="h-5 w-5 text-orange-400 mt-0.5 shrink-0" />
-                <div>
-                  <p className="text-orange-300 font-semibold text-sm">Compensación activa</p>
-                  <p className="text-white/70 text-sm mt-1">
-                    {daysRemaining} {daysRemaining === 1 ? "día restante" : "días restantes"} ·{" "}
-                    -{extraDeficit} kcal/día · hasta el {endDate}
-                  </p>
-                </div>
+        {record?.compensating && activeCompensationEntries.length > 0 && (
+          <Card className="backdrop-blur-xl bg-orange-500/10 border border-orange-400/30 rounded-3xl p-5">
+            <div className="flex items-start gap-3">
+              <ArrowDown className="h-5 w-5 text-orange-400 mt-0.5 shrink-0" />
+              <div>
+                <p className="text-orange-300 font-semibold text-sm">Compensación activa</p>
+                <p className="text-white/70 text-sm mt-1">
+                  {activeCompensationEntries.length}{" "}
+                  {activeCompensationEntries.length === 1 ? "día restante" : "días restantes"} ·{" "}
+                  -{activeCompensationEntries[0]?.reduction ?? 0} kcal/día · hasta el{" "}
+                  {activeCompensationEntries.at(-1)?.date ?? ""}
+                </p>
               </div>
-            </Card>
-          )
-        })()}
+            </div>
+          </Card>
+        )}
 
         {/* Comodín confirmation modal */}
         {showConfirm && (
