@@ -342,17 +342,22 @@ export async function fetchDashboard(): Promise<DashboardData> {
   // includes it from the backend (TDEE + exercise adjustment).
   const dailyCalorieTarget = d.nutrition.daily_target
 
+  // Macro compliance estimation: derive consumed macros proportionally from calorie consumption
+  const targetKcal   = macros?.target_kcal ?? dailyCalorieTarget ?? 0
+  const consumedKcal = d.nutrition?.consumed_kcal ?? 0
+  const macroRatio   = targetKcal > 0 ? Math.min(consumedKcal / targetKcal, 1) : 0
+
   return {
     dailyCalorieTarget,
-    caloriesConsumed:   d.nutrition.consumed_kcal ?? 0,
+    caloriesConsumed:   consumedKcal,
     // Today's health data from Apple Health sync
     steps:              todayHealth?.steps ?? exHealth?.steps ?? null,
     heartRateAvg:       todayHealth?.heart_rate_avg ?? exHealth?.heart_rate_avg ?? null,
     activeCalories:     todayHealth?.active_calories ?? exHealth?.active_calories ?? null,
     macros: {
-      protein: { current: 0, target: macros.protein_g },
-      carbs:   { current: 0, target: macros.carb_g },
-      fat:     { current: 0, target: macros.fat_g },
+      protein: { current: Math.round((macros?.protein_g ?? 0) * macroRatio), target: macros?.protein_g ?? 0 },
+      carbs:   { current: Math.round((macros?.carb_g    ?? 0) * macroRatio), target: macros?.carb_g    ?? 0 },
+      fat:     { current: Math.round((macros?.fat_g     ?? 0) * macroRatio), target: macros?.fat_g     ?? 0 },
     },
     exerciseYesterday: ex?.burned_kcal > 0
       ? {

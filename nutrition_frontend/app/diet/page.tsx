@@ -10,7 +10,7 @@ import {
   Shuffle, Coffee, Sun, Utensils, Cookie, Moon,
   Lightbulb, CheckCircle2, Wheat, Scale, Star, X, Ban, Plus,
 } from "lucide-react"
-import type { PlanDay, FoodSearchResult, DashboardData } from "@/lib/api"
+import type { PlanDay, FoodSearchResult } from "@/lib/api"
 import { fetchTodaysPlan, swapMeal, updateAdherence, fetchFavoriteCarbs, searchFood, fetchTodayBonusKcal, fetchDashboard } from "@/lib/api"
 import { useDietDay } from "@/context/DietDayContext"
 import { useCheatDay } from "@/context/CheatDayContext"
@@ -80,7 +80,7 @@ export default function DietPage() {
   const [planDay, setPlanDay]         = useState<(PlanDay & { stale?: boolean }) | null>(null)
   const [stale, setStale]             = useState(false)
   const [bonusKcal, setBonusKcal]     = useState(0)
-  const [macros, setMacros]           = useState<DashboardData["macros"] | null>(null)
+  const [macroTargets, setMacroTargets] = useState<{ protein: number; carbs: number; fat: number } | null>(null)
   const [loading, setLoading]         = useState(true)
   const [swapping, setSwapping]       = useState<string | null>(null)
   const [checkedMeals, setCheckedMeals] = useState<Record<string, boolean>>({})
@@ -129,7 +129,11 @@ export default function DietPage() {
       })
       .catch(() => setPlanDay(mockPlanDay))
       .finally(() => setLoading(false))
-    fetchDashboard().then((d) => setMacros(d.macros)).catch(() => null)
+    fetchDashboard().then((d) => setMacroTargets({
+      protein: d.macros.protein.target,
+      carbs:   d.macros.carbs.target,
+      fat:     d.macros.fat.target,
+    })).catch(() => null)
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSwap = async (mealId: string) => {
@@ -145,6 +149,13 @@ export default function DietPage() {
     } catch {}
     setSwapping(null)
   }
+
+  // Macro compliance estimation (proportional to calorie consumption)
+  const dailyTargetKcal = planDay?.exerciseAdj?.adjustedTotal ?? planDay?.totalKcal ?? 0
+  const consumedKcalValue = (planDay?.meals ?? [])
+    .filter((m) => checkedMeals[m.id])
+    .reduce((sum, m) => sum + (m.adjustedKcal ?? m.kcal), 0)
+  const macroRatio = dailyTargetKcal > 0 ? Math.min(consumedKcalValue / dailyTargetKcal, 1) : 0
 
   const adherenceItems = (planDay?.meals ?? []).map((m) => ({
     id: m.id,
@@ -314,23 +325,23 @@ export default function DietPage() {
             </div>
           </div>
 
-          {macros && (
+          {macroTargets && (
             <div className="mt-4 space-y-3">
               <p className="text-white/50 text-xs font-medium uppercase tracking-wide">Cumplimiento de macros</p>
               <MacroBar
                 label="Proteína"
-                current={macros.protein.current}
-                target={macros.protein.target}
+                current={Math.round(macroTargets.protein * macroRatio)}
+                target={macroTargets.protein}
               />
               <MacroBar
                 label="Carbohidratos"
-                current={macros.carbs.current}
-                target={macros.carbs.target}
+                current={Math.round(macroTargets.carbs * macroRatio)}
+                target={macroTargets.carbs}
               />
               <MacroBar
                 label="Grasas"
-                current={macros.fat.current}
-                target={macros.fat.target}
+                current={Math.round(macroTargets.fat * macroRatio)}
+                target={macroTargets.fat}
               />
             </div>
           )}
