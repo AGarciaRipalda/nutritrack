@@ -1569,7 +1569,6 @@ def download_report_pdf():
 
     # Archive the PDF with a week-based filename
     import shutil as _shutil
-    import re as _re
 
     week_str = date.today().strftime("%Y-W%W")
     REPORTS_DIR.mkdir(parents=True, exist_ok=True)
