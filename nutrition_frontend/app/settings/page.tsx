@@ -89,6 +89,9 @@ export default function SettingsPage() {
     setSavingMicro(true)
     try {
       await updateMicronutrientGoals(microGoals)
+      showStatus(true)
+    } catch {
+      showStatus(false)
     } finally {
       setSavingMicro(false)
     }

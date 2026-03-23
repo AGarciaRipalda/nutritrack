@@ -959,7 +959,6 @@ export interface MicronutrientGoals {
   iron_mg?: number | null
   magnesium_mg?: number | null
   zinc_mg?: number | null
-  protein_g?: number | null
 }
 
 export async function getMicronutrientGoals(): Promise<MicronutrientGoals> {

@@ -281,8 +281,10 @@ class MicronutrientGoalsModel(BaseModel):
 def update_micronutrient_goals(data: MicronutrientGoalsModel):
     """Guarda objetivos de micronutrientes personalizados en user_profile.json."""
     profile = load_profile()
-    goals = {k: v for k, v in data.model_dump().items() if v is not None}
-    profile["micronutrient_goals"] = goals
+    goals_update = {k: v for k, v in data.model_dump().items() if v is not None}
+    existing = profile.get("micronutrient_goals", {})
+    profile["micronutrient_goals"] = {**existing, **goals_update}
+    goals = profile["micronutrient_goals"]
     save_profile(profile)
     return {"ok": True, "micronutrient_goals": goals}
 

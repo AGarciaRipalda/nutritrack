@@ -133,10 +133,6 @@ def calculate_rda(gender: str, age: int, weight_kg: float) -> dict:
         rda["calcium_mg"] = 1200
         rda["vitamin_d_mcg"] = 20
 
-    # Note: protein_g uses "maintain" factor regardless of user goal (RDA baseline)
-    protein_factor = PROTEIN_FACTORS.get("maintain", 2.0)
-    rda["protein_g"] = round(weight_kg * protein_factor)
-
     return {k: round(v, 1) if isinstance(v, float) else v for k, v in rda.items()}
 
 

@@ -225,7 +225,7 @@ def test_calculate_rda_male():
     assert rda["calcium_mg"] == 1000
     assert rda["iron_mg"] == 8
     assert rda["vitamin_c_mg"] == 80
-    assert isinstance(rda["protein_g"], (int, float))
+    assert "protein_g" not in rda
 
 
 def test_put_micronutrient_goals(tmp_path):
