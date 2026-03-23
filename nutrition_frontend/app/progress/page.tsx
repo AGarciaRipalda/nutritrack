@@ -78,8 +78,11 @@ export default function ProgressPage() {
   }, [metricsDays])
 
   useEffect(() => {
-    getMicronutrientsHistory(microDays).then(setMicroHistory).catch(() => [])
     getMicronutrientGoals().then(setMicroGoals).catch(() => null)
+  }, [])
+
+  useEffect(() => {
+    getMicronutrientsHistory(microDays).then(setMicroHistory).catch(() => setMicroHistory([]))
   }, [microDays])
 
   const handleLogWeight = async () => {
@@ -369,6 +372,8 @@ export default function ProgressPage() {
                         { key: "zinc_mg",       label: "Zinc (mg)" },
                         { key: "potassium_mg",  label: "Potasio (mg)" },
                         { key: "sodium_mg",     label: "Sodio (mg)" },
+                        { key: "vitamin_a_mcg",   label: "Vitamina A (mcg)" },
+                        { key: "vitamin_b12_mcg", label: "Vitamina B12 (mcg)" },
                       ].map(({ key, label }) => (
                         <SelectItem key={key} value={key}>{label}</SelectItem>
                       ))}
@@ -390,12 +395,18 @@ export default function ProgressPage() {
                 </div>
               </div>
 
-              {microHistory.length > 0 ? (
+              {(() => {
+                const hasAnyMicroData = microHistory.some(
+                  (e) => (e.totals as Record<string, number | null>)[selectedNutrient] !== null
+                )
+                return hasAnyMicroData
+              })() ? (
                 <>
                   <ResponsiveContainer width="100%" height={200}>
                     <LineChart data={microHistory.map(e => ({
                       date: e.date.slice(5),
                       value: (e.totals as Record<string, number | null>)[selectedNutrient],
+                      goal: microGoals ? ((microGoals as Record<string, number | undefined>)[selectedNutrient] ?? null) : null,
                     }))}>
                       <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
                       <XAxis dataKey="date" tick={{ fill: "rgba(255,255,255,0.5)", fontSize: 11 }} />
@@ -407,7 +418,7 @@ export default function ProgressPage() {
                       {microGoals && (
                         <Line
                           type="monotone"
-                          dataKey={() => (microGoals as Record<string, number | undefined>)[selectedNutrient] ?? null}
+                          dataKey="goal"
                           stroke="rgba(255,255,255,0.3)"
                           strokeDasharray="4 4"
                           dot={false}
