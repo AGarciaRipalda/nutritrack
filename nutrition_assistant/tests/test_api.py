@@ -133,3 +133,31 @@ def test_get_reports_after_download(tmp_path):
         assert reports[0]["filename"].startswith("report_")
         assert reports[0]["filename"].endswith(".pdf")
         assert "url" in reports[0]
+
+def test_adherence_metrics_7days():
+    """GET /adherence/metrics?days=7 returns expected keys."""
+    from unittest.mock import patch
+    import adherence as adh_module
+    from datetime import date, timedelta
+
+    log = {}
+    today = date.today()
+    for i in range(7):
+        d = (today - timedelta(days=i)).isoformat()
+        log[d] = {
+            "meals": {
+                "desayuno": True, "almuerzo": True, "cena": i % 2 == 0,
+            },
+            "pct": 100 if i % 2 == 0 else 67,
+        }
+
+    with patch.object(adh_module, "_load", return_value=log):
+        r = client.get("/adherence/metrics?days=7")
+        assert r.status_code == 200
+        body = r.json()
+        assert "meal_compliance" in body
+        assert "daily_trend" in body
+        assert "most_skipped" in body
+        assert "current_streak" in body
+        assert isinstance(body["daily_trend"], list)
+        assert len(body["daily_trend"]) == 7

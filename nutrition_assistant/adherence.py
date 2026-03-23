@@ -114,3 +114,69 @@ def print_adherence_summary() -> None:
         else:
             print("  ⚠ Adherencia baja. Revisa si el plan es demasiado restrictivo.")
     print("="*52)
+
+
+def get_metrics(days: int = 7) -> dict:
+    """
+    Agrega métricas de adherencia para los últimos `days` días.
+    Devuelve:
+      - meal_compliance: % cumplimiento por tipo de comida
+      - daily_trend: lista de {date, pct} para sparkline
+      - most_skipped: lista de comidas más saltadas [{meal, skips}]
+      - current_streak: días consecutivos con adherencia >80%
+    """
+    log   = _load()
+    today = date.today()
+    dates = [(today - timedelta(days=i)).isoformat() for i in range(days - 1, -1, -1)]
+
+    meal_totals: dict = {}
+    meal_done:   dict = {}
+    streak = 0
+    streak_broken = False
+
+    # Streak: iterate newest-first
+    for iso in reversed(dates):
+        entry = log.get(iso)
+        if entry:
+            pct = entry.get("pct", 0)
+            if not streak_broken and pct >= 80:
+                streak += 1
+            else:
+                streak_broken = True
+
+    # Meal compliance and trend: oldest-first
+    for iso in dates:
+        entry = log.get(iso)
+        if entry:
+            for meal_id, done in entry.get("meals", {}).items():
+                meal_totals[meal_id] = meal_totals.get(meal_id, 0) + 1
+                if done:
+                    meal_done[meal_id] = meal_done.get(meal_id, 0) + 1
+
+    daily_trend = [
+        {"date": iso, "pct": log[iso]["pct"] if iso in log else None}
+        for iso in dates
+    ]
+
+    meal_compliance = {
+        meal_id: round(meal_done.get(meal_id, 0) / total * 100)
+        for meal_id, total in meal_totals.items()
+        if total > 0
+    }
+
+    meal_skip_counts = {
+        meal_id: total - meal_done.get(meal_id, 0)
+        for meal_id, total in meal_totals.items()
+    }
+    most_skipped = sorted(
+        [{"meal": k, "skips": v} for k, v in meal_skip_counts.items() if v > 0],
+        key=lambda x: x["skips"],
+        reverse=True,
+    )[:3]
+
+    return {
+        "meal_compliance": meal_compliance,
+        "daily_trend":     daily_trend,
+        "most_skipped":    most_skipped,
+        "current_streak":  streak,
+    }

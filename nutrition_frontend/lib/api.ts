@@ -916,3 +916,16 @@ export async function getReportsList(): Promise<ArchivedReport[]> {
   const d = await get<{ reports: ArchivedReport[] }>("/reports")
   return d.reports
 }
+
+// ── Adherence Metrics ─────────────────────────────────────────────────────
+
+export interface AdherenceMetrics {
+  meal_compliance: Record<string, number>
+  daily_trend: { date: string; pct: number | null }[]
+  most_skipped: { meal: string; skips: number }[]
+  current_streak: number
+}
+
+export async function getAdherenceMetrics(days: 7 | 30 = 7): Promise<AdherenceMetrics> {
+  return get<AdherenceMetrics>(`/adherence/metrics?days=${days}`)
+}

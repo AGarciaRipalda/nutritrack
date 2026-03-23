@@ -19,8 +19,8 @@ import {
   ResponsiveContainer,
   Legend,
 } from "recharts"
-import type { ProgressData } from "@/lib/api"
-import { fetchProgress, logWeight } from "@/lib/api"
+import type { ProgressData, AdherenceMetrics } from "@/lib/api"
+import { fetchProgress, logWeight, getAdherenceMetrics } from "@/lib/api"
 
 const mockProgressData: ProgressData = {
   weightHistory: [
@@ -56,13 +56,20 @@ export default function ProgressPage() {
   const [loading, setLoading] = useState(true)
   const [weight, setWeight] = useState("")
   const [logging, setLogging] = useState(false)
+  const [metrics, setMetrics] = useState<AdherenceMetrics | null>(null)
+  const [metricsDays, setMetricsDays] = useState<7 | 30>(7)
 
   useEffect(() => {
     fetchProgress()
       .then(setData)
       .catch(() => setData(mockProgressData))
       .finally(() => setLoading(false))
+    getAdherenceMetrics(metricsDays).then(setMetrics).catch(() => null)
   }, [])
+
+  useEffect(() => {
+    getAdherenceMetrics(metricsDays).then(setMetrics).catch(() => null)
+  }, [metricsDays])
 
   const handleLogWeight = async () => {
     if (!weight) return
@@ -260,6 +267,62 @@ export default function ProgressPage() {
             </ResponsiveContainer>
           </div>
         </Card>
+
+        {metrics && (
+          <Card className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-white">Métricas de adherencia</h3>
+              <div className="flex gap-2">
+                {([7, 30] as const).map((d) => (
+                  <button
+                    key={d}
+                    onClick={() => setMetricsDays(d)}
+                    className={`px-3 py-1 text-xs rounded-lg border transition-colors ${
+                      metricsDays === d
+                        ? "bg-emerald-500/20 border-emerald-400/30 text-emerald-300"
+                        : "bg-white/5 border-white/10 text-white/50 hover:bg-white/10"
+                    }`}
+                  >
+                    {d} días
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Streak */}
+            <div className="mb-4 p-3 bg-white/5 rounded-xl border border-white/10">
+              <p className="text-white/50 text-xs">Racha actual (&gt;80% adherencia)</p>
+              <p className="text-2xl font-bold text-emerald-400">{metrics.current_streak} días</p>
+            </div>
+
+            {/* Daily trend sparkline */}
+            <p className="text-white/50 text-xs mb-2">Tendencia diaria</p>
+            <ResponsiveContainer width="100%" height={80}>
+              <LineChart data={metrics.daily_trend.filter(d => d.pct !== null)}>
+                <Line type="monotone" dataKey="pct" stroke="#34d399" strokeWidth={2} dot={false} />
+                <Tooltip
+                  formatter={(val: number) => [`${val}%`, "Adherencia"]}
+                  contentStyle={{ background: "rgba(0,0,0,0.8)", border: "none", borderRadius: 8 }}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+
+            {/* Most skipped */}
+            {metrics.most_skipped.length > 0 && (
+              <div className="mt-4">
+                <p className="text-white/50 text-xs mb-2">Comidas más saltadas</p>
+                <div className="space-y-1">
+                  {metrics.most_skipped.map(({ meal, skips }) => (
+                    <div key={meal} className="flex justify-between text-sm">
+                      <span className="text-white/70 capitalize">{meal.replace("_", " ")}</span>
+                      <span className="text-red-400">{skips} veces</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </Card>
+        )}
       </div>
     </AppLayout>
   )

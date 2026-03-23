@@ -46,7 +46,7 @@ from weight_tracker import (
     HISTORY_FILE as W_HISTORY_FILE, EXPECTED_WEEKLY_CHANGE, needs_weigh_in,
     _load as load_weight_history, _save as save_weight_history,
 )
-from adherence import ADHERENCE_FILE, weekly_adherence
+from adherence import ADHERENCE_FILE, weekly_adherence, get_metrics as get_adherence_metrics
 from data_dir import DATA_DIR
 from weekly_survey import (
     needs_survey, last_survey_scores,
@@ -1134,6 +1134,12 @@ def get_today_adherence():
         "consumed_kcal": entry.get("consumed_kcal", 0),
         "meals":         entry.get("meals", {}),
     }
+
+
+@app.get("/adherence/metrics", tags=["Adherencia"])
+def adherence_metrics(days: int = Query(7, ge=7, le=30, description="7 or 30 days")):
+    """Agrega métricas de adherencia: cumplimiento por comida, tendencia, racha, comidas problemáticas."""
+    return get_adherence_metrics(days)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
