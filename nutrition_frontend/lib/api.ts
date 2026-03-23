@@ -929,3 +929,18 @@ export interface AdherenceMetrics {
 export async function getAdherenceMetrics(days: 7 | 30 = 7): Promise<AdherenceMetrics> {
   return get<AdherenceMetrics>(`/adherence/metrics?days=${days}`)
 }
+
+// ── Data Export ───────────────────────────────────────────────────────────
+
+export function getExportUrl(params: {
+  format: "csv" | "xlsx"
+  from: string
+  to: string
+}): string {
+  const q = new URLSearchParams({
+    format: params.format,
+    from:   params.from,
+    to:     params.to,
+  })
+  return `${API_BASE}/export?${q}`
+}

@@ -134,6 +134,20 @@ def test_get_reports_after_download(tmp_path):
         assert reports[0]["filename"].endswith(".pdf")
         assert "url" in reports[0]
 
+def test_export_csv():
+    """GET /export?format=csv returns a CSV file download."""
+    r = client.get("/export?format=csv&from=2026-01-01&to=2026-03-23")
+    assert r.status_code == 200
+    assert "text/csv" in r.headers.get("content-type", "")
+    assert "attachment" in r.headers.get("content-disposition", "")
+
+def test_export_xlsx():
+    """GET /export?format=xlsx returns an XLSX file download."""
+    r = client.get("/export?format=xlsx&from=2026-01-01&to=2026-03-23")
+    assert r.status_code == 200
+    assert "spreadsheetml" in r.headers.get("content-type", "") or \
+           "octet-stream" in r.headers.get("content-type", "")
+
 def test_adherence_metrics_7days():
     """GET /adherence/metrics?days=7 returns expected keys."""
     from unittest.mock import patch

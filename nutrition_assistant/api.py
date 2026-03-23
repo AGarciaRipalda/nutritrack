@@ -4,6 +4,8 @@ Ejecutar con: uvicorn api:app --reload
 Documentación automática en: http://localhost:8000/docs
 """
 
+import csv
+import io
 import os, json
 from datetime import date, timedelta
 from typing import Optional, List
@@ -20,7 +22,7 @@ import urllib.request
 import urllib.parse
 
 from fastapi import FastAPI, HTTPException, Request, Header, Query
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, model_validator
 
@@ -1694,3 +1696,149 @@ def save_cheat_day(record: CheatDayRecordModel):
 def get_cheat_days():
     """Devuelve el historial de comodines."""
     return {"records": _load_cheatdays()}
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# DATA EXPORT (CSV / XLSX)
+# ══════════════════════════════════════════════════════════════════════════════
+
+@app.get("/export", tags=["Exportación"])
+def export_data(
+    format: str = Query("csv", pattern="^(csv|xlsx)$"),
+    from_date: str = Query(..., alias="from", description="YYYY-MM-DD"),
+    to_date:   str = Query(..., alias="to",   description="YYYY-MM-DD"),
+):
+    """Exporta datos del usuario en CSV o XLSX."""
+    try:
+        d_from = date.fromisoformat(from_date)
+        d_to   = date.fromisoformat(to_date)
+    except ValueError:
+        raise HTTPException(400, "Fechas inválidas. Usa formato YYYY-MM-DD.")
+
+    if d_to < d_from:
+        raise HTTPException(400, "La fecha 'to' debe ser posterior a 'from'.")
+
+    # ── Weight history ────────────────────────────────────────────────────────
+    weight_data = []
+    if os.path.exists(W_HISTORY_FILE):
+        with open(W_HISTORY_FILE) as f:
+            wh = json.load(f)
+        for entry in wh.get("history", []):
+            d = date.fromisoformat(entry["date"])
+            if d_from <= d <= d_to:
+                weight_data.append({"date": entry["date"], "weight_kg": entry["weight_kg"]})
+
+    # ── Adherence ─────────────────────────────────────────────────────────────
+    adh_data = []
+    if os.path.exists(ADHERENCE_FILE):
+        with open(ADHERENCE_FILE) as f:
+            adh_log = json.load(f)
+        for iso, entry in adh_log.items():
+            d = date.fromisoformat(iso)
+            if d_from <= d <= d_to:
+                adh_data.append({
+                    "date": iso,
+                    "pct":  entry.get("pct", 0),
+                    "meals_done": sum(1 for v in entry.get("meals", {}).values() if v),
+                    "meals_total": len(entry.get("meals", {})),
+                })
+
+    # ── Exercise ──────────────────────────────────────────────────────────────
+    ex_data = []
+    if os.path.exists(EX_HISTORY_FILE):
+        with open(EX_HISTORY_FILE) as f:
+            ex_log = json.load(f)
+        for iso, entry in ex_log.items():
+            d = date.fromisoformat(iso)
+            if d_from <= d <= d_to and entry.get("trained"):
+                ex_data.append({
+                    "date":         iso,
+                    "burned_kcal":  entry.get("burned_kcal", 0),
+                    "session_type": entry.get("session_type", ""),
+                    "duration_min": entry.get("health_data", {}).get("duration_min", ""),
+                })
+
+    # ── Surveys ───────────────────────────────────────────────────────────────
+    survey_data = []
+    survey_file = DATA_DIR / "survey_history.json"
+    if os.path.exists(survey_file):
+        with open(survey_file) as f:
+            surveys = json.load(f)
+        for entry in surveys:
+            d = date.fromisoformat(entry.get("date", "2000-01-01"))
+            if d_from <= d <= d_to:
+                survey_data.append({
+                    "date":       entry.get("date", ""),
+                    "energia":    entry.get("energia", ""),
+                    "sueno":      entry.get("sueno", ""),
+                    "adherencia": entry.get("adherencia", ""),
+                    "hambre":     entry.get("hambre", ""),
+                })
+
+    filename_base = f"nutritrack_{from_date}_{to_date}"
+
+    if format == "csv":
+        output = io.StringIO()
+        writer = csv.writer(output)
+
+        writer.writerow(["## Peso"])
+        writer.writerow(["fecha", "peso_kg"])
+        for row in sorted(weight_data, key=lambda x: x["date"]):
+            writer.writerow([row["date"], row["weight_kg"]])
+
+        writer.writerow([])
+        writer.writerow(["## Adherencia"])
+        writer.writerow(["fecha", "pct", "comidas_hechas", "comidas_total"])
+        for row in sorted(adh_data, key=lambda x: x["date"]):
+            writer.writerow([row["date"], row["pct"], row["meals_done"], row["meals_total"]])
+
+        writer.writerow([])
+        writer.writerow(["## Ejercicio"])
+        writer.writerow(["fecha", "kcal_quemadas", "tipo", "duracion_min"])
+        for row in sorted(ex_data, key=lambda x: x["date"]):
+            writer.writerow([row["date"], row["burned_kcal"], row["session_type"], row["duration_min"]])
+
+        writer.writerow([])
+        writer.writerow(["## Encuestas"])
+        writer.writerow(["fecha", "energia", "sueno", "adherencia", "hambre"])
+        for row in sorted(survey_data, key=lambda x: x["date"]):
+            writer.writerow([row["date"], row["energia"], row["sueno"], row["adherencia"], row["hambre"]])
+
+        output.seek(0)
+        return StreamingResponse(
+            iter([output.getvalue()]),
+            media_type="text/csv",
+            headers={"Content-Disposition": f'attachment; filename="{filename_base}.csv"'},
+        )
+
+    else:  # xlsx
+        import openpyxl
+        wb = openpyxl.Workbook()
+
+        sheets_data = [
+            ("Peso",       ["fecha", "peso_kg"],
+             [[r["date"], r["weight_kg"]] for r in sorted(weight_data, key=lambda x: x["date"])]),
+            ("Adherencia", ["fecha", "pct", "comidas_hechas", "comidas_total"],
+             [[r["date"], r["pct"], r["meals_done"], r["meals_total"]] for r in sorted(adh_data, key=lambda x: x["date"])]),
+            ("Ejercicio",  ["fecha", "kcal_quemadas", "tipo", "duracion_min"],
+             [[r["date"], r["burned_kcal"], r["session_type"], r["duration_min"]] for r in sorted(ex_data, key=lambda x: x["date"])]),
+            ("Encuestas",  ["fecha", "energia", "sueno", "adherencia", "hambre"],
+             [[r["date"], r["energia"], r["sueno"], r["adherencia"], r["hambre"]] for r in sorted(survey_data, key=lambda x: x["date"])]),
+        ]
+
+        for i, (title, headers, rows) in enumerate(sheets_data):
+            ws = wb.active if i == 0 else wb.create_sheet(title=title)
+            if i == 0:
+                ws.title = title
+            ws.append(headers)
+            for row in rows:
+                ws.append(row)
+
+        buf = io.BytesIO()
+        wb.save(buf)
+        buf.seek(0)
+        return StreamingResponse(
+            iter([buf.read()]),
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={"Content-Disposition": f'attachment; filename="{filename_base}.xlsx"'},
+        )

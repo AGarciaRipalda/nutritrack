@@ -20,9 +20,10 @@ import {
   Trash2,
   CheckCircle2,
   AlertCircle,
+  Download,
 } from "lucide-react"
 import type { SettingsData, UserProfile, FoodPreferences, UpcomingEvent } from "@/lib/api"
-import { fetchSettings, updateProfile, updateFoodPreferences, saveEvent, deleteEvent } from "@/lib/api"
+import { fetchSettings, updateProfile, updateFoodPreferences, saveEvent, deleteEvent, getExportUrl } from "@/lib/api"
 
 const mockSettingsData: SettingsData = {
   profile: {
@@ -52,6 +53,13 @@ export default function SettingsPage() {
   const [preferences, setPreferences] = useState<FoodPreferences | null>(null)
   const [newTag, setNewTag] = useState({ excluded: "", favorites: "", disliked: "" })
   const [newEvent, setNewEvent] = useState({ name: "", date: "" })
+  const [exportFrom, setExportFrom] = useState(() => {
+    const d = new Date()
+    d.setMonth(d.getMonth() - 1)
+    return d.toISOString().slice(0, 10)
+  })
+  const [exportTo, setExportTo] = useState(new Date().toISOString().slice(0, 10))
+  const [exportFormat, setExportFormat] = useState<"csv" | "xlsx">("csv")
 
   useEffect(() => {
     fetchSettings()
@@ -541,6 +549,62 @@ export default function SettingsPage() {
             </div>
           </TabsContent>
         </Tabs>
+
+        {/* Export section */}
+        <Card className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <Download className="h-5 w-5 text-white/70" />
+            <h3 className="text-lg font-semibold text-white">Exportar mis datos</h3>
+          </div>
+          <p className="text-white/50 text-sm mb-4">
+            Descarga todos tus datos en CSV o Excel para análisis externo.
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+            <div className="space-y-1">
+              <Label className="text-white/70 text-xs">Desde</Label>
+              <Input
+                type="date"
+                value={exportFrom}
+                onChange={(e) => setExportFrom(e.target.value)}
+                className="bg-white/5 border-white/20 text-white"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-white/70 text-xs">Hasta</Label>
+              <Input
+                type="date"
+                value={exportTo}
+                onChange={(e) => setExportTo(e.target.value)}
+                className="bg-white/5 border-white/20 text-white"
+              />
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="flex gap-2">
+              {(["csv", "xlsx"] as const).map((fmt) => (
+                <button
+                  key={fmt}
+                  onClick={() => setExportFormat(fmt)}
+                  className={`px-3 py-1.5 text-xs rounded-lg border transition-colors ${
+                    exportFormat === fmt
+                      ? "bg-emerald-500/20 border-emerald-400/30 text-emerald-300"
+                      : "bg-white/5 border-white/10 text-white/50 hover:bg-white/10"
+                  }`}
+                >
+                  {fmt.toUpperCase()}
+                </button>
+              ))}
+            </div>
+            <a
+              href={getExportUrl({ format: exportFormat, from: exportFrom, to: exportTo })}
+              download
+              className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-xl transition-colors"
+            >
+              <Download className="h-4 w-4" />
+              Descargar
+            </a>
+          </div>
+        </Card>
       </div>
     </AppLayout>
   )
