@@ -406,7 +406,7 @@ export default function DietPage() {
                     { key: "vitamin_b12_mcg", label: "Vitamina B12", unit: "mcg" },
                   ] as { key: keyof MicronutrientTotals; label: string; unit: string }[]).map(({ key, label, unit }) => {
                     const current = micronutrients.totals[key]
-                    const goal = (micronutrients.goals as Record<string, number>)[key]
+                    const goal = (micronutrients.goals as Record<string, number | undefined>)[key] ?? null
                     if (current === null) {
                       return (
                         <div key={key} className="flex justify-between text-xs">
@@ -415,13 +415,13 @@ export default function DietPage() {
                         </div>
                       )
                     }
-                    const pct = goal > 0 ? Math.min(Math.round((current / goal) * 100), 100) : 0
+                    const pct = goal !== null && goal > 0 ? Math.min(Math.round((current / goal) * 100), 100) : 0
                     const barColor = pct >= 90 ? "bg-emerald-400" : pct >= 70 ? "bg-amber-400" : "bg-red-400"
                     return (
                       <div key={key} className="space-y-0.5">
                         <div className="flex justify-between text-xs">
                           <span className="text-white/60">{label}</span>
-                          <span className="text-white/70">{current}{unit} / {goal}{unit}</span>
+                          <span className="text-white/70">{current}{unit}{goal !== null ? ` / ${goal}${unit}` : ""}</span>
                         </div>
                         <div className="w-full bg-white/10 rounded-full h-1">
                           <div className={`${barColor} h-1 rounded-full`} style={{ width: `${pct}%` }} />

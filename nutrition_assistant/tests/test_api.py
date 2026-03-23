@@ -243,3 +243,21 @@ def test_put_micronutrient_goals(tmp_path):
         r = client.put("/profile/micronutrient-goals", json=goals)
         assert r.status_code == 200
         assert r.json()["ok"] is True
+
+def test_micronutrients_today_returns_structure():
+    """GET /micronutrients/today returns the expected keys."""
+    r = client.get("/micronutrients/today", headers={"X-User-Timezone": "Europe/Madrid"})
+    assert r.status_code == 200
+    body = r.json()
+    assert "totals" in body
+    assert "goals" in body
+    assert isinstance(body["totals"], dict)
+    # All 11 MICRO_KEYS present
+    micro_keys = ["fiber_g", "sodium_mg", "potassium_mg", "vitamin_a_mcg",
+                  "vitamin_c_mg", "vitamin_d_mcg", "vitamin_b12_mcg",
+                  "calcium_mg", "iron_mg", "magnesium_mg", "zinc_mg"]
+    for key in micro_keys:
+        assert key in body["totals"]
+    # Values default to None (not 0) when no data
+    for val in body["totals"].values():
+        assert val is None or isinstance(val, (int, float))
