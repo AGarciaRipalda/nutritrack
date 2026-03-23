@@ -34,6 +34,7 @@ const mockSettingsData: SettingsData = {
     activityLevel: 3,
     goal: "lose",
     weekStartDay: 0,
+    trainingMode: "gym" as const,
   },
   foodPreferences: {
     excluded: ["shellfish", "peanuts"],
@@ -289,6 +290,33 @@ export default function SettingsPage() {
                     </SelectContent>
                   </Select>
                   <p className="text-white/40 text-xs">El menú semanal se renovará cada semana a partir de este día.</p>
+                </div>
+                <div>
+                  <label className="block text-white/70 text-sm mb-2">Modo de entrenamiento</label>
+                  <div className="flex gap-3">
+                    {(["home", "gym"] as const).map((mode) => {
+                      const isActive = profile.trainingMode === mode
+                      const label = mode === "home" ? "🏠 Casa" : "🏋️ Gimnasio"
+                      return (
+                        <button
+                          key={mode}
+                          type="button"
+                          onClick={() => {
+                            const next = { ...profile, trainingMode: mode }
+                            setProfile(next)
+                            updateProfile(next).then(() => showStatus(true)).catch(() => showStatus(false))
+                          }}
+                          className={`flex-1 py-3 rounded-2xl text-sm font-medium transition-all ${
+                            isActive
+                              ? "bg-white text-black"
+                              : "bg-white/10 text-white/70 hover:bg-white/20"
+                          }`}
+                        >
+                          {label}
+                        </button>
+                      )
+                    })}
+                  </div>
                 </div>
               </div>
               <div className="mt-6 flex items-center gap-4">

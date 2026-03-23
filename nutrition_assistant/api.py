@@ -145,6 +145,7 @@ class ProfileModel(BaseModel):
     activity_level: int   # 1-4
     goal: str             # "lose" | "maintain" | "gain"
     week_start_day: int = 0  # 0=Monday … 6=Sunday
+    training_mode: str = "gym"  # "home" | "gym"
 
 
 class ExerciseEntryModel(BaseModel):
@@ -1236,7 +1237,10 @@ def get_dashboard():
             adh_log = json.load(f)
     consumed_kcal = adh_log.get(today_iso, {}).get("consumed_kcal", 0)
     today_tr = session.get("today_training") or {}
-    ex_adj   = ex_data.get("adjustment_kcal", 0) + today_tr.get("bonus_kcal", 0)
+    _raw_bonus = today_tr.get("bonus_kcal", 0)
+    _training_mode = profile.get("training_mode", "gym")
+    _bonus_kcal = round(_raw_bonus * 0.85) if _training_mode == "home" else _raw_bonus
+    ex_adj   = ex_data.get("adjustment_kcal", 0) + _bonus_kcal
 
     bmr     = calculate_bmr(profile["gender"], profile["age"],
                             profile["height_cm"], profile["weight_kg"])
