@@ -1652,6 +1652,19 @@ def search_food(q: str = Query(..., min_length=2, description="Nombre del alimen
         raise HTTPException(502, "No se pudo consultar OpenFoodFacts")
 
     results = []
+
+    def _mg(n: dict, key: str):
+        v = n.get(key)
+        return round(v * 1000, 1) if v is not None else None
+
+    def _g(n: dict, key: str):
+        v = n.get(key)
+        return round(v, 2) if v is not None else None
+
+    def _mcg(n: dict, key: str):
+        v = n.get(key)
+        return round(v * 1_000_000, 1) if v is not None else None
+
     for product in data.get("products", []):
         name = product.get("product_name", "").strip()
         kcal = product.get("nutriments", {}).get("energy-kcal_100g")
@@ -1660,34 +1673,22 @@ def search_food(q: str = Query(..., min_length=2, description="Nombre del alimen
 
         n = product.get("nutriments", {})
 
-        def _mg(key: str):
-            v = n.get(key)
-            return round(v * 1000, 1) if v is not None else None
-
-        def _g(key: str):
-            v = n.get(key)
-            return round(v, 2) if v is not None else None
-
-        def _mcg(key: str):
-            v = n.get(key)
-            return round(v * 1_000_000, 1) if v is not None else None
-
         results.append({
             "name":            name,
             "kcal_100g":       round(kcal),
             "image":           product.get("image_small_url"),
             # Micronutrients per 100g
-            "fiber_g":         _g("fiber_100g"),
-            "sodium_mg":       _mg("sodium_100g"),
-            "potassium_mg":    _mg("potassium_100g"),
-            "vitamin_a_mcg":   _mcg("vitamin-a_100g"),
-            "vitamin_c_mg":    _mg("vitamin-c_100g"),
-            "vitamin_d_mcg":   _mcg("vitamin-d_100g"),
-            "vitamin_b12_mcg": _mcg("vitamin-b12_100g"),
-            "calcium_mg":      _mg("calcium_100g"),
-            "iron_mg":         _mg("iron_100g"),
-            "magnesium_mg":    _mg("magnesium_100g"),
-            "zinc_mg":         _mg("zinc_100g"),
+            "fiber_g":         _g(n, "fiber_100g"),
+            "sodium_mg":       _mg(n, "sodium_100g"),
+            "potassium_mg":    _mg(n, "potassium_100g"),
+            "vitamin_a_mcg":   _mcg(n, "vitamin-a_100g"),
+            "vitamin_c_mg":    _mg(n, "vitamin-c_100g"),
+            "vitamin_d_mcg":   _mcg(n, "vitamin-d_100g"),
+            "vitamin_b12_mcg": _mcg(n, "vitamin-b12_100g"),
+            "calcium_mg":      _mg(n, "calcium_100g"),
+            "iron_mg":         _mg(n, "iron_100g"),
+            "magnesium_mg":    _mg(n, "magnesium_100g"),
+            "zinc_mg":         _mg(n, "zinc_100g"),
         })
 
     return {"results": results}
