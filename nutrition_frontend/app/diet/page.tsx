@@ -11,7 +11,7 @@ import {
   Lightbulb, CheckCircle2, Wheat, Scale, Star, X, Ban, Plus,
 } from "lucide-react"
 import type { PlanDay, FoodSearchResult } from "@/lib/api"
-import { fetchTodaysPlan, swapMeal, updateAdherence, fetchFavoriteCarbs, searchFood } from "@/lib/api"
+import { fetchTodaysPlan, swapMeal, updateAdherence, fetchFavoriteCarbs, searchFood, fetchTodayBonusKcal } from "@/lib/api"
 import { useDietDay } from "@/context/DietDayContext"
 import { useCheatDay } from "@/context/CheatDayContext"
 
@@ -48,6 +48,7 @@ export default function DietPage() {
 
   const [planDay, setPlanDay]         = useState<(PlanDay & { stale?: boolean }) | null>(null)
   const [stale, setStale]             = useState(false)
+  const [bonusKcal, setBonusKcal]     = useState(0)
   const [loading, setLoading]         = useState(true)
   const [swapping, setSwapping]       = useState<string | null>(null)
   const [checkedMeals, setCheckedMeals] = useState<Record<string, boolean>>({})
@@ -77,8 +78,9 @@ export default function DietPage() {
   }, [])
 
   useEffect(() => {
-    Promise.all([fetchTodaysPlan(), fetchFavoriteCarbs()])
-      .then(([d, carbs]) => {
+    Promise.all([fetchTodaysPlan(), fetchFavoriteCarbs(), fetchTodayBonusKcal()])
+      .then(([d, carbs, bonus]) => {
+        setBonusKcal(bonus)
         setStale(d.stale ?? false)
         setPlanDay(d)
         const target = d.exerciseAdj?.adjustedTotal ?? d.totalKcal
@@ -227,6 +229,11 @@ export default function DietPage() {
                 <p className="text-yellow-300 text-sm mt-1">
                   ⚡ +{day.exerciseAdj.extraKcal} kcal · porciones ampliadas
                   <span className="text-white/40 ml-1">({day.exerciseAdj.source})</span>
+                </p>
+              )}
+              {bonusKcal > 0 && (
+                <p className="text-emerald-300 text-sm mt-1">
+                  ＋{bonusKcal} kcal por entrenamiento de hoy
                 </p>
               )}
             </div>

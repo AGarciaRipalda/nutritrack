@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge"
 import {
   Flame, Dumbbell, Bell, Scale, ClipboardList,
   Calendar, TrendingUp, Beef, Wheat, Droplet, Star, X,
-  Footprints, Heart, Target, ArrowDown, ArrowUp, Minus,
+  Footprints, Heart, Target, ArrowDown, ArrowUp, Minus, Zap,
 } from "lucide-react"
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts"
 import type { DashboardData, GamificationStatus } from "@/lib/api"
@@ -347,6 +347,14 @@ export default function DashboardPage() {
               </div>
               <p className="text-right text-sm text-white/60">{calorieProgress}%</p>
             </div>
+            {dashboard.bonusKcal > 0 && (
+              <div className="flex items-center gap-1.5 mt-2">
+                <Zap className="h-3.5 w-3.5 text-emerald-400" />
+                <span className="text-emerald-300 text-xs font-medium">
+                  +{dashboard.bonusKcal} kcal por entrenamiento
+                </span>
+              </div>
+            )}
           </Card>
 
           {/* Macros Donut Chart */}

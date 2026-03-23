@@ -69,6 +69,7 @@ export interface DashboardData {
   steps: number | null
   heartRateAvg: number | null
   activeCalories: number | null
+  bonusKcal: number   // today's training bonus (0 if none)
   goalBalance: GoalBalance
   macros: {
     protein: { current: number; target: number }
@@ -362,6 +363,7 @@ export async function fetchDashboard(): Promise<DashboardData> {
           heartRateAvg:   exHealth?.heart_rate_avg ?? null,
         }
       : null,
+    bonusKcal: d.today_training?.bonus_kcal ?? 0,
     goalBalance: {
       goal:             d.goal_balance?.goal ?? d.profile?.goal ?? "maintain",
       targetAdjustment: d.goal_balance?.target_adjustment ?? 0,
@@ -890,4 +892,9 @@ export async function saveCheatDay(record: CheatDayRecordAPI): Promise<void> {
 export async function getCheatDays(): Promise<CheatDayRecordAPI[]> {
   const d = await get<{ records: CheatDayRecordAPI[] }>("/cheatday")
   return d.records
+}
+
+export async function fetchTodayBonusKcal(): Promise<number> {
+  const d = await get<{ bonus_kcal: number; training_type: string | null }>("/exercise/today-training")
+  return d.bonus_kcal ?? 0
 }
