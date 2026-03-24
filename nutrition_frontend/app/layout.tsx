@@ -11,7 +11,7 @@ const figtree = Figtree({
 })
 
 export const metadata: Metadata = {
-  title: "NutriTrack - Nutrition & Training Assistant",
+  title: "METABOLIC - Nutrition & Training Assistant",
   description: "Track your nutrition, plan meals, log workouts, and monitor your fitness progress",
 }
 

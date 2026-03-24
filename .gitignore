@@ -33,3 +33,7 @@ nutrition_assistant/food_preferences.json
 .claude/
 .env.local
 .env*.local
+.worktrees/
+
+#zip
+nutritrack_frio.tar.gz

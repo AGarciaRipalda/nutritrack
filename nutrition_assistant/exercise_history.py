@@ -1,6 +1,6 @@
 """
 Historial de ejercicio diario.
-Guarda el registro de cada día en exercise_history.json.
+Guarda el registro de cada día en exercise_history.json o PostgreSQL.
 Permite ver resumen semanal: días entrenados, kcal totales, racha.
 """
 
@@ -12,7 +12,59 @@ from data_dir import DATA_DIR
 HISTORY_FILE = DATA_DIR / "exercise_history.json"
 
 
+def _use_db():
+    try:
+        from database import is_db_available
+        return is_db_available()
+    except ImportError:
+        return False
+
+
 def _load() -> dict:
+    if _use_db():
+        from database import fetchall
+        rows = fetchall("""
+            SELECT eh.date, eh.burned_kcal, eh.adjustment_kcal, eh.duration_min,
+                   eh.session_type, eh.sources, eh.health_data, eh.gym_detail
+            FROM exercise_history eh
+            ORDER BY eh.date
+        """)
+        result = {}
+        for row in rows:
+            d = str(row["date"])
+            # Cargar ejercicios individuales
+            from database import fetchall as fa
+            entries = fa(
+                "SELECT exercise_key, name, minutes, burned_kcal FROM exercise_entries WHERE history_id = %s",
+                (row.get("id") if "id" in row else None,)
+            ) if "id" in row else []
+
+            # Construir entrada compatible con el formato JSON original
+            entry = {
+                "burned_kcal": row["burned_kcal"],
+                "adjustment_kcal": row["adjustment_kcal"],
+            }
+            if row.get("duration_min"):
+                entry["duration_min"] = row["duration_min"]
+            if row.get("session_type"):
+                entry["session_type"] = row["session_type"]
+            if row.get("sources"):
+                entry["sources"] = list(row["sources"])
+            if row.get("health_data"):
+                entry["health_data"] = row["health_data"]
+            if row.get("gym_detail"):
+                entry["gym_detail"] = row["gym_detail"]
+            if entries:
+                entry["exercises"] = [
+                    {"key": e["exercise_key"], "name": e["name"],
+                     "minutes": e["minutes"], "burned": e["burned_kcal"],
+                     "kcal": e["burned_kcal"]}
+                    for e in entries
+                ]
+            result[d] = entry
+        return result
+
+    # Fallback: JSON
     if not os.path.exists(HISTORY_FILE):
         return {}
     with open(HISTORY_FILE, "r", encoding="utf-8") as f:
@@ -20,14 +72,61 @@ def _load() -> dict:
 
 
 def _save(history: dict) -> None:
+    if _use_db():
+        # En modo DB, cada operación de escritura se hace directamente,
+        # no se usa _save() global. Ver record_today().
+        return
+
     with open(HISTORY_FILE, "w", encoding="utf-8") as f:
         json.dump(history, f, indent=2, ensure_ascii=False)
 
 
 def record_today(exercise_data: dict) -> None:
     """Guarda el ejercicio del día actual en el historial."""
+    today_iso = date.today().isoformat()
+
+    if _use_db():
+        from database import fetchone, execute, get_cursor
+        from psycopg2.extras import Json
+
+        burned = exercise_data.get("burned_kcal", 0)
+        adj = exercise_data.get("adjustment_kcal", 0)
+        sources = exercise_data.get("sources", [])
+        health_data = exercise_data.get("health_data")
+        gym_detail = exercise_data.get("gym_detail")
+
+        with get_cursor() as cur:
+            cur.execute("""
+                INSERT INTO exercise_history (date, burned_kcal, adjustment_kcal,
+                                              sources, health_data, gym_detail)
+                VALUES (%s, %s, %s, %s, %s, %s)
+                ON CONFLICT (date) DO UPDATE SET
+                    burned_kcal = EXCLUDED.burned_kcal,
+                    adjustment_kcal = EXCLUDED.adjustment_kcal,
+                    sources = EXCLUDED.sources,
+                    health_data = EXCLUDED.health_data,
+                    gym_detail = EXCLUDED.gym_detail
+                RETURNING id
+            """, (today_iso, burned, adj,
+                  sources if sources else [],
+                  Json(health_data) if health_data else None,
+                  Json(gym_detail) if gym_detail else None))
+
+            history_id = cur.fetchone()[0]
+
+            exercises = exercise_data.get("exercises", [])
+            cur.execute("DELETE FROM exercise_entries WHERE history_id = %s", (history_id,))
+            for ex in exercises:
+                cur.execute("""
+                    INSERT INTO exercise_entries (history_id, exercise_key, name, minutes, burned_kcal)
+                    VALUES (%s, %s, %s, %s, %s)
+                """, (history_id, ex.get("key"), ex.get("name", ""),
+                      ex.get("minutes", 0), ex.get("burned", ex.get("kcal", 0))))
+        return
+
+    # Fallback: JSON
     history = _load()
-    history[date.today().isoformat()] = exercise_data
+    history[today_iso] = exercise_data
     _save(history)
 
 
@@ -57,7 +156,7 @@ def print_weekly_summary() -> None:
     total_kcal    = 0
     days_trained  = 0
 
-    for i in range(6, -1, -1):   # de hace 6 días a hoy
+    for i in range(6, -1, -1):
         day     = today - timedelta(days=i)
         iso     = day.isoformat()
         label   = day.strftime("%a %d/%m")

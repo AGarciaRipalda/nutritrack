@@ -19,7 +19,31 @@ QUESTIONS = [
 ]
 
 
+def _use_db():
+    try:
+        from database import is_db_available
+        return is_db_available()
+    except ImportError:
+        return False
+
+
 def _load() -> list:
+    if _use_db():
+        from database import fetchall
+        rows = fetchall("SELECT * FROM survey_history ORDER BY date")
+        return [
+            {
+                "date": str(r["date"]),
+                "week": r["week"],
+                "energia": r["energia"],
+                "hambre": r["hambre"],
+                "adherencia": r["adherencia"],
+                "sueno": r["sueno"],
+                "score": float(r["score"]),
+            }
+            for r in rows
+        ]
+
     if not os.path.exists(SURVEY_FILE):
         return []
     with open(SURVEY_FILE, "r", encoding="utf-8") as f:
@@ -27,12 +51,23 @@ def _load() -> list:
 
 
 def _save(history: list) -> None:
+    if _use_db():
+        return  # Las escrituras van directas a la DB
+
     with open(SURVEY_FILE, "w", encoding="utf-8") as f:
         json.dump(history, f, indent=2, ensure_ascii=False)
 
 
 def needs_survey() -> bool:
     """True si no hay encuesta de esta semana."""
+    if _use_db():
+        from database import fetchone
+        row = fetchone(
+            "SELECT week FROM survey_history WHERE week = %s",
+            (date.today().strftime("%G-W%V"),)
+        )
+        return row is None
+
     history = _load()
     if not history:
         return True
@@ -65,9 +100,25 @@ def run_survey() -> dict:
         **answers,
         "score": score,
     }
-    history = _load()
-    history.append(entry)
-    _save(history)
+
+    if _use_db():
+        from database import execute
+        execute("""
+            INSERT INTO survey_history (date, week, energia, hambre, adherencia, sueno, score)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            ON CONFLICT (week) DO UPDATE SET
+                date = EXCLUDED.date, energia = EXCLUDED.energia,
+                hambre = EXCLUDED.hambre, adherencia = EXCLUDED.adherencia,
+                sueno = EXCLUDED.sueno, score = EXCLUDED.score
+        """, (entry["date"], entry["week"],
+              entry["energia"], entry["hambre"],
+              entry["adherencia"], entry["sueno"],
+              entry["score"]))
+    else:
+        history = _load()
+        history.append(entry)
+        _save(history)
+
     return entry
 
 
@@ -96,5 +147,20 @@ def print_survey_history(n_weeks: int = 4) -> None:
 
 def last_survey_scores() -> dict:
     """Devuelve las puntuaciones de la última encuesta o dict vacío."""
+    if _use_db():
+        from database import fetchone
+        row = fetchone("SELECT * FROM survey_history ORDER BY date DESC LIMIT 1")
+        if row:
+            return {
+                "date": str(row["date"]),
+                "week": row["week"],
+                "energia": row["energia"],
+                "hambre": row["hambre"],
+                "adherencia": row["adherencia"],
+                "sueno": row["sueno"],
+                "score": float(row["score"]),
+            }
+        return {}
+
     history = _load()
     return history[-1] if history else {}

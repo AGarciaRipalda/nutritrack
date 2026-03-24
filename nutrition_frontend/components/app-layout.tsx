@@ -10,21 +10,26 @@ export function AppLayout({ children }: { children: ReactNode }) {
   const [collapsed, setCollapsed] = useState(false)
 
   return (
-    <div className="min-h-screen relative overflow-hidden">
-      {/* Background */}
-      <div className="fixed inset-0 bg-black print:hidden" />
+    <div className="min-h-screen relative overflow-hidden font-sans">
+      {/* Background - Sporty Light Theme */}
+      <div className="fixed inset-0 bg-[#f8fafc] print:hidden" />
+      <div className="fixed inset-0 bg-gradient-to-br from-emerald-50/50 via-white to-blue-50/50 print:hidden" />
+
+      {/* Decorative patterns */}
+      <div className="fixed inset-0 opacity-[0.03] pointer-events-none print:hidden"
+           style={{ backgroundImage: 'radial-gradient(#10b981 0.5px, transparent 0.5px)', backgroundSize: '24px 24px' }} />
 
       {/* Mobile backdrop */}
       {mobileOpen && (
         <div
-          className="fixed inset-0 z-20 bg-black/60 md:hidden print:hidden"
+          className="fixed inset-0 z-20 bg-black/20 backdrop-blur-sm md:hidden print:hidden"
           onClick={() => setMobileOpen(false)}
         />
       )}
 
       {/* Mobile hamburger button */}
       <button
-        className="fixed top-4 left-4 z-30 md:hidden p-2 bg-white/10 border border-white/20 rounded-xl text-white backdrop-blur-sm print:hidden"
+        className="fixed top-3 left-4 z-30 md:hidden p-2 bg-white/80 border border-emerald-100 rounded-xl text-emerald-700 shadow-sm backdrop-blur-md print:hidden"
         onClick={() => setMobileOpen(true)}
         aria-label="Abrir menú"
       >
@@ -32,7 +37,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
       </button>
 
       {/* Layout */}
-      <div className="relative flex gap-6 p-4 md:p-6 min-h-screen print:block print:p-0">
+      <div className="relative flex gap-4 p-3 md:p-6 min-h-screen print:block print:p-0">
         <div className="print:hidden">
           <AppSidebar
             mobileOpen={mobileOpen}
@@ -41,8 +46,10 @@ export function AppLayout({ children }: { children: ReactNode }) {
             onToggleCollapse={() => setCollapsed(!collapsed)}
           />
         </div>
-        <main className="flex-1 overflow-y-auto pt-12 md:pt-0 min-w-0 print:pt-0">
-          {children}
+        <main className="flex-1 pt-10 md:pt-0 min-w-0 print:pt-0">
+          <div className="max-w-7xl mx-auto h-full">
+            {children}
+          </div>
         </main>
       </div>
     </div>

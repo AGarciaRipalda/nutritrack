@@ -41,12 +41,12 @@ from exercise_log import (
     EXERCISES, RECOVERY_FACTOR, TODAY_BONUS_KCAL, TODAY_TIMING,
     calculate_exercise_kcal,
 )
-from exercise_history import record_today, HISTORY_FILE as EX_HISTORY_FILE
+from exercise_history import record_today, HISTORY_FILE as EX_HISTORY_FILE, _load as _load_ex_history
 from weight_tracker import (
     HISTORY_FILE as W_HISTORY_FILE, EXPECTED_WEEKLY_CHANGE, needs_weigh_in,
     _load as load_weight_history, _save as save_weight_history,
 )
-from adherence import ADHERENCE_FILE, weekly_adherence
+from adherence import ADHERENCE_FILE, weekly_adherence, _load as _load_adh_log
 from weekly_survey import (
     needs_survey, last_survey_scores,
     _load as load_surveys, _save as save_surveys, QUESTIONS,
@@ -85,8 +85,18 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ── Estado en memoria (evita leer JSON en cada request) ──────────────────────
+# ── Helpers para acceso a datos (delegan a módulos DB-aware) ─────────────────
 _cache: dict = {}
+
+
+def _load_exercise_history_data() -> dict:
+    """Carga historial de ejercicio usando el módulo DB-aware."""
+    return _load_ex_history()
+
+
+def _load_adherence_data() -> dict:
+    """Carga log de adherencia usando el módulo DB-aware."""
+    return _load_adh_log()
 
 
 def _get_session():
@@ -1546,7 +1556,7 @@ def download_report_pdf():
     story.append(Spacer(1, 0.6*cm))
     story.append(HRFlowable(width="100%", thickness=0.5, color=GREY_MID))
     story.append(Spacer(1, 0.2*cm))
-    story.append(Paragraph("NutriTrack  ·  Informe generado automáticamente", s_foot))
+    story.append(Paragraph("METABOLIC  ·  Informe generado automáticamente", s_foot))
 
     doc.build(story)
 
@@ -1578,7 +1588,7 @@ def search_food(q: str = Query(..., min_length=2, description="Nombre del alimen
     url = f"https://world.openfoodfacts.org/cgi/search.pl?{params}"
 
     try:
-        req = urllib.request.Request(url, headers={"User-Agent": "NutriTrack/1.0"})
+        req = urllib.request.Request(url, headers={"User-Agent": "METABOLIC/1.0"})
         with urllib.request.urlopen(req, timeout=8) as resp:
             data = json.loads(resp.read().decode())
     except Exception:
