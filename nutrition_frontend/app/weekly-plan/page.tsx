@@ -722,7 +722,7 @@ export default function WeeklyPlanPage() {
           >
             <div>
               <h1 style={{ margin: 0, fontSize: "18pt", fontWeight: 800, color: "#064e3b" }}>
-                🥗 Plan Semanal — NutriTrack
+                🥗 Plan Semanal — METABOLIC
               </h1>
               <p style={{ margin: "3pt 0 0", fontSize: "9pt", color: "#6b7280", textTransform: "capitalize" }}>
                 {dateStr}

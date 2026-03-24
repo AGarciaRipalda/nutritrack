@@ -65,7 +65,7 @@ function SidebarContent({ collapsed, onToggleCollapse, onClose, showClose }: Sid
           <div className="flex items-center gap-2 min-w-0">
             <Apple className="h-7 w-7 text-emerald-400 shrink-0" />
             <div className="min-w-0">
-              <h1 className="text-xl font-bold text-white leading-tight">NutriTrack</h1>
+              <h1 className="text-xl font-bold text-white leading-tight">METABOLIC</h1>
               <p className="text-white/60 text-xs truncate">Nutrición y Entrenamiento</p>
             </div>
           </div>

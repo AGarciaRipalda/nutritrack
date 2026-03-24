@@ -1556,7 +1556,7 @@ def download_report_pdf():
     story.append(Spacer(1, 0.6*cm))
     story.append(HRFlowable(width="100%", thickness=0.5, color=GREY_MID))
     story.append(Spacer(1, 0.2*cm))
-    story.append(Paragraph("NutriTrack  ·  Informe generado automáticamente", s_foot))
+    story.append(Paragraph("METABOLIC  ·  Informe generado automáticamente", s_foot))
 
     doc.build(story)
 
@@ -1588,7 +1588,7 @@ def search_food(q: str = Query(..., min_length=2, description="Nombre del alimen
     url = f"https://world.openfoodfacts.org/cgi/search.pl?{params}"
 
     try:
-        req = urllib.request.Request(url, headers={"User-Agent": "NutriTrack/1.0"})
+        req = urllib.request.Request(url, headers={"User-Agent": "METABOLIC/1.0"})
         with urllib.request.urlopen(req, timeout=8) as resp:
             data = json.loads(resp.read().decode())
     except Exception:
