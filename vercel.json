@@ -1,6 +1,0 @@
-Set-Content -Path vercel.json -Value '{
-  "framework": "nextjs",
-  "rootDirectory": "nutrition_frontend",
-  "installCommand": "npm install",
-  "buildCommand": "npm run build"
-}' -Encoding UTF8
