@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
 import {
   Shuffle, Coffee, Sun, Utensils, Cookie, Moon,
-  Lightbulb, CheckCircle2, Wheat, Scale, Star, X, Ban, Plus,
+  Lightbulb, CheckCircle2, Wheat, Scale, Star, X, Ban, Plus, Search,
 } from "lucide-react"
 import type { PlanDay, FoodSearchResult } from "@/lib/api"
 import { fetchTodaysPlan, swapMeal, updateAdherence, fetchFavoriteCarbs, searchFood } from "@/lib/api"
@@ -40,6 +40,15 @@ const mealIdLabels: Record<string, string> = {
 }
 const mealIdIcons: Record<string, typeof Coffee> = {
   desayuno: Coffee, media_manana: Sun, almuerzo: Utensils, merienda: Cookie, cena: Moon,
+}
+
+// Colors for each meal type
+const mealColors: Record<string, { bg: string, border: string, text: string, iconBg: string, iconText: string }> = {
+  desayuno:     { bg: "bg-amber-50/40",    border: "border-amber-100",    text: "text-amber-900",    iconBg: "bg-amber-100",    iconText: "text-amber-600" },
+  media_manana: { bg: "bg-orange-50/40",   border: "border-orange-100",   text: "text-orange-900",   iconBg: "bg-orange-100",   iconText: "text-orange-600" },
+  almuerzo:     { bg: "bg-emerald-50/40",  border: "border-emerald-100",  text: "text-emerald-900",  iconBg: "bg-emerald-100",  iconText: "text-emerald-600" },
+  merienda:     { bg: "bg-rose-50/40",     border: "border-rose-100",     text: "text-rose-900",     iconBg: "bg-rose-100",     iconText: "text-rose-600" },
+  cena:         { bg: "bg-indigo-50/40",   border: "border-indigo-100",   text: "text-indigo-900",   iconBg: "bg-indigo-100",   iconText: "text-indigo-600" },
 }
 
 export default function DietPage() {
@@ -83,7 +92,6 @@ export default function DietPage() {
         setPlanDay(d)
         const target = d.exerciseAdj?.adjustedTotal ?? d.totalKcal
         init(d.date, target, d.meals, carbs)
-        // Restore persisted adherence state (skipped meals + checked meals)
         if (d.adherence) {
           if (Object.keys(d.adherence.meals).length > 0) {
             setCheckedMeals(d.adherence.meals)
@@ -103,7 +111,6 @@ export default function DietPage() {
     try {
       const updated = await swapMeal(mealId)
       setPlanDay((prev) => prev ? { ...updated, stale: prev.stale } : updated)
-      // Re-init context with new meals
       const carbs = state.favoriteCarbs
       const target = updated.exerciseAdj?.adjustedTotal ?? updated.totalKcal
       init(updated.date, target, updated.meals, carbs)
@@ -151,7 +158,7 @@ export default function DietPage() {
     if (!input?.name?.trim() || !input?.grams) return
     const grams = parseInt(input.grams)
     if (isNaN(grams) || grams <= 0) return
-    const kcalPer100g = input.kcalPer100g ?? 100  // fallback: 100 kcal/100g
+    const kcalPer100g = input.kcalPer100g ?? 100
     const kcal = Math.round((kcalPer100g * grams) / 100)
     const newSkipped = {
       ...skippedMeals,
@@ -173,8 +180,8 @@ export default function DietPage() {
   if (loading) {
     return (
       <AppLayout>
-        <div className="flex items-center justify-center h-full">
-          <div className="text-white/60">Cargando...</div>
+        <div className="flex items-center justify-center h-screen -mt-20">
+          <div className="text-emerald-600/60 font-medium">Cargando dieta...</div>
         </div>
       </AppLayout>
     )
@@ -185,7 +192,6 @@ export default function DietPage() {
   const { totalEffective, remaining, exceeded, overLimit, rebalancedTargets, effectiveKcalPerMeal } = derived
   const dailyTarget   = state.dailyTarget || day.totalKcal
 
-  // Kcal realmente consumidas = comidas marcadas (no saltadas) + alimentos de reemplazo
   const replacementKcal = Object.values(skippedMeals)
     .flatMap((s) => s.foods)
     .reduce((sum, f) => sum + f.kcal, 0)
@@ -193,487 +199,289 @@ export default function DietPage() {
     .filter((m) => checkedMeals[m.id] && !skippedMeals[m.id])
     .reduce((sum, m) => sum + (effectiveKcalPerMeal[m.id] ?? m.kcal), 0)
     + replacementKcal
-  const consumedPct     = dailyTarget > 0 ? Math.min((consumedKcal / dailyTarget) * 100, cheatActive ? 130 : 110) : 0
+  const consumedPct     = dailyTarget > 0 ? Math.min((consumedKcal / dailyTarget) * 100, 100) : 0
   const consumedExceeded  = consumedKcal > dailyTarget
   const consumedOverLimit = consumedKcal > dailyTarget * 1.1
   const consumedRemaining = dailyTarget - consumedKcal
 
-  // When comodín is active, suppress the over-limit red warning
   const showOverLimit = consumedOverLimit && !cheatActive
   const excessKcal = Math.max(consumedKcal - dailyTarget, 0)
 
   return (
     <AppLayout>
-      <div className="space-y-4">
+      <div className="space-y-3 pb-6">
 
         {/* Stale banner */}
         {stale && (
-          <div className="bg-amber-500/20 border border-amber-400/30 rounded-2xl p-4 flex items-center justify-between">
-            <span className="text-amber-300 text-sm">Tu plan es de la semana pasada. ¿Regenerar ahora?</span>
-            <a href="/weekly-plan" className="text-amber-400 text-sm font-semibold hover:underline ml-4">Ver plan →</a>
+          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3 flex items-center justify-between shadow-sm">
+            <span className="text-amber-800 text-xs font-medium">Plan desactualizado</span>
+            <a href="/weekly-plan" className="text-amber-600 text-xs font-bold hover:underline">Regenerar →</a>
           </div>
         )}
 
-        {/* Header */}
-        <Card className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-6">
-          <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
+        {/* Header - Compact */}
+        <Card className="bg-white border-emerald-100 rounded-2xl p-4 shadow-sm">
+          <div className="flex items-center justify-between gap-3 mb-3">
             <div>
-              <h2 className="text-3xl font-bold text-white">Dieta de hoy</h2>
-              <p className="text-white/60 text-sm">
-                {day.dayName}, semana del{" "}
-                {new Date(day.date + "T00:00:00").toLocaleDateString("es-ES", { day: "numeric", month: "short" })}
+              <h2 className="text-xl font-bold text-slate-800">Dieta de hoy</h2>
+              <p className="text-slate-500 text-[10px] font-bold uppercase tracking-wider">
+                {day.dayName} · {new Date(day.date + "T00:00:00").toLocaleDateString("es-ES", { day: "numeric", month: "short" })}
               </p>
-              {day.exerciseAdj && day.exerciseAdj.extraKcal > 0 && (
-                <p className="text-yellow-300 text-sm mt-1">
-                  ⚡ +{day.exerciseAdj.extraKcal} kcal · porciones ampliadas
-                  <span className="text-white/40 ml-1">({day.exerciseAdj.source})</span>
-                </p>
-              )}
             </div>
-            <a href="/weekly-plan" className="text-emerald-400 text-sm font-semibold hover:underline">
-              Ver plan completo →
-            </a>
+            {day.exerciseAdj && day.exerciseAdj.extraKcal > 0 && (
+              <Badge className="bg-emerald-50 text-emerald-600 border-emerald-100 text-[10px] font-bold">
+                ⚡ +{day.exerciseAdj.extraKcal} kcal
+              </Badge>
+            )}
           </div>
 
-          {/* Daily budget bar */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-white/60">Consumido</span>
-              <span className={`font-semibold ${
-                showOverLimit ? "text-red-400"
-                : cheatActive && consumedExceeded ? "text-amber-300"
-                : consumedExceeded ? "text-amber-400"
-                : "text-emerald-400"
-              }`}>
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between text-[11px]">
+              <span className="text-slate-500 font-medium">Presupuesto calórico</span>
+              <span className={`font-bold ${showOverLimit ? "text-rose-600" : "text-emerald-600"}`}>
                 {consumedKcal} / {dailyTarget} kcal
               </span>
             </div>
-            <div className="h-2 bg-white/10 rounded-full overflow-hidden">
+            <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
               <div
                 className={`h-full rounded-full transition-all duration-300 ${
-                  showOverLimit ? "bg-red-400"
-                  : cheatActive && consumedExceeded ? "bg-amber-400"
-                  : consumedExceeded ? "bg-amber-400"
-                  : "bg-emerald-400"
+                  showOverLimit ? "bg-rose-500" : consumedExceeded ? "bg-amber-500" : "bg-emerald-500"
                 }`}
                 style={{ width: `${consumedPct}%` }}
               />
             </div>
-            <div className="flex justify-between text-xs text-white/40">
-              <span>
-                {consumedRemaining >= 0
-                  ? `Restante: ${consumedRemaining} kcal`
-                  : `Exceso: +${Math.abs(consumedRemaining)} kcal`}
+            <div className="flex justify-between text-[10px] font-medium">
+              <span className="text-slate-400">
+                {consumedRemaining >= 0 ? `Quedan ${consumedRemaining} kcal` : `Exceso +${excessKcal} kcal`}
               </span>
-              {showOverLimit && (
-                <span className="text-red-400 font-medium">⚠ Límite diario excedido</span>
-              )}
-              {cheatActive && consumedExceeded && (
-                <span className="text-amber-300 font-medium">⭐ Comodín activo</span>
-              )}
+              {cheatActive && <span className="text-amber-600 flex items-center gap-1"><Star className="h-2.5 w-2.5 fill-amber-500" /> Comodín</span>}
             </div>
           </div>
         </Card>
 
-        {/* Cheat day active banner */}
-        {cheatActive && (
-          <div className="bg-amber-500/10 border border-amber-400/20 rounded-2xl px-4 py-3 flex items-center justify-between gap-3">
+        {/* Compensation/Cheat Banners - Compact */}
+        {cheatActive && excessKcal > 0 && !cheatRecord?.compensating && (
+          <button
+            onClick={() => { finalizeExcess(excessKcal); setShowCompModal(true) }}
+            className="w-full bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 flex items-center justify-between gap-2 shadow-sm animate-pulse"
+          >
             <div className="flex items-center gap-2">
-              <Star className="h-4 w-4 text-amber-400 fill-amber-400 shrink-0" />
-              <span className="text-amber-300 text-sm">
-                {excessKcal > 0
-                  ? `Comodín activo · ${excessKcal} kcal de exceso registradas`
-                  : "Comodín activo · sin límite estricto hoy"}
-              </span>
+              <Star className="h-3.5 w-3.5 text-amber-500 fill-amber-500" />
+              <span className="text-amber-800 text-[11px] font-bold">¿Compensar exceso de hoy?</span>
             </div>
-            {excessKcal > 0 && !cheatRecord?.compensating && (
-              <button
-                onClick={() => { finalizeExcess(excessKcal); setShowCompModal(true) }}
-                className="text-amber-400 text-xs font-semibold hover:underline shrink-0"
-              >
-                Compensar →
-              </button>
-            )}
-            {cheatRecord?.compensating && (
-              <span className="text-emerald-400 text-xs font-medium shrink-0">✓ Compensando</span>
-            )}
-          </div>
+            <span className="text-amber-600 text-[10px] font-black uppercase">Click aquí</span>
+          </button>
         )}
 
-        {/* Compensation banner */}
-        {Object.keys(rebalancedTargets).length > 0 && (
-          <div className="bg-blue-500/10 border border-blue-400/20 rounded-2xl px-4 py-3 flex items-start gap-2">
-            <Scale className="h-4 w-4 text-blue-400 shrink-0 mt-0.5" />
-            <div className="text-sm text-blue-300">
-              <span className="font-medium">Compensación sugerida · </span>
-              {Object.entries(rebalancedTargets).map(([id, kcal], i) => (
-                <span key={id}>
-                  {i > 0 && " · "}
-                  <span className="text-white">{mealIdLabels[id]}</span>
-                  {" → "}
-                  <span className="font-semibold">{kcal} kcal</span>
-                </span>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Meal Cards */}
+        {/* Meal Cards - Tighter spacing, color-coded, background icons */}
         <div className="grid grid-cols-1 gap-3">
           {day.meals.map((meal) => {
-            const MealIcon  = mealIdIcons[meal.id] ?? mealIcons[meal.type] ?? Utensils
-            const label     = mealLabels[meal.type] ?? mealIdLabels[meal.id]
-            const override  = state.overrides[meal.id]
-            const selCarb   = override?.selectedCarb ?? null
-            const customG   = override?.customGrams ?? null
-            const effKcal   = state.initialized
-              ? effectiveKcalPerMeal[meal.id] ?? (meal.adjustedKcal ?? meal.kcal)
-              : (meal.adjustedKcal ?? meal.kcal)
+            const colors      = mealColors[meal.id] || mealColors.cena
+            const MealIcon    = mealIdIcons[meal.id] ?? mealIcons[meal.type] ?? Utensils
+            const label       = mealLabels[meal.type] ?? mealIdLabels[meal.id]
+            const override    = state.overrides[meal.id]
+            const selCarb     = override?.selectedCarb ?? null
+            const customG     = override?.customGrams ?? null
+            const effKcal     = state.initialized ? effectiveKcalPerMeal[meal.id] ?? (meal.adjustedKcal ?? meal.kcal) : (meal.adjustedKcal ?? meal.kcal)
+            const isSkipped   = !!skippedMeals[meal.id]
+            const isChecked   = checkedMeals[meal.id]
 
-            // Suggested grams when carb is selected but no custom input yet
             const suggestedGrams = selCarb && meal.fixedKcal != null && meal.targetKcal != null
               ? Math.round(Math.max(meal.targetKcal - meal.fixedKcal, 0) / (selCarb.kcal / 100))
               : null
 
-            const isMealOverLimit = state.initialized && showOverLimit
-
-            // Rebalance hint for this meal
-            const rebalHint = rebalancedTargets[meal.id]
-
-            const isSkipped = !!skippedMeals[meal.id]
-
             return (
               <Card
                 key={meal.id}
-                className={`backdrop-blur-xl border rounded-2xl p-4 transition-all duration-300 ${
-                  isSkipped
-                    ? "bg-amber-500/5 border-amber-400/20"
-                    : isMealOverLimit
-                    ? "bg-red-500/10 border-red-400/30"
-                    : "bg-white/10 border-white/20 hover:bg-white/15"
-                }`}
+                className={`relative overflow-hidden border transition-all duration-300 rounded-2xl ${
+                  isSkipped ? "bg-slate-50 border-slate-200 opacity-80" : `${colors.bg} ${colors.border}`
+                } shadow-sm`}
               >
-                {/* Header: icon + label + kcal */}
-                <div className="flex items-center gap-2 border-b border-white/10 pb-3 mb-3">
-                  <div className={`p-2 rounded-lg border shrink-0 ${isSkipped ? "bg-amber-500/10 border-amber-400/20" : "bg-emerald-500/20 border-emerald-400/30"}`}>
-                    <MealIcon className={`h-4 w-4 ${isSkipped ? "text-amber-400/60" : "text-emerald-400"}`} />
-                  </div>
-                  <span className={`text-sm font-medium flex-1 ${isSkipped ? "text-white/40 line-through" : "text-white/60"}`}>{label}</span>
-                  {isSkipped && (
-                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-400/30 leading-none mr-1">Saltada</span>
-                  )}
-                  <div className="flex flex-col items-end shrink-0 gap-0.5">
-                    <Badge
-                      className={`text-sm px-2 py-0.5 border ${
-                        override
-                          ? "bg-blue-500/20 text-blue-300 border-blue-400/30"
-                          : "bg-emerald-500/20 text-emerald-400 border-emerald-400/30"
-                      }`}
-                    >
-                      {effKcal} kcal
-                    </Badge>
-                    {meal.portionScale && meal.portionScale > 1 && (
-                      <span className="text-yellow-300 text-xs">×{meal.portionScale.toFixed(2)}</span>
-                    )}
-                  </div>
-                </div>
+                {/* Visual context icon */}
+                <MealIcon className={`absolute -right-2 -bottom-2 h-16 w-16 opacity-[0.05] ${isSkipped ? 'text-slate-400' : colors.iconText}`} />
 
-                {/* Dish description */}
-                <p className="text-white text-sm leading-snug mb-3">{meal.description}</p>
+                <div className="p-4 relative z-10">
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className={`p-2 rounded-xl shrink-0 ${isSkipped ? 'bg-slate-200 text-slate-500' : `${colors.iconBg} ${colors.iconText}`}`}>
+                      <MealIcon className="h-4 w-4" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className={`text-sm font-bold ${isSkipped ? 'text-slate-500 line-through' : colors.text}`}>{label}</h3>
+                      <p className={`text-[10px] font-bold ${isSkipped ? 'text-slate-400' : 'text-slate-500'}`}>{effKcal} kcal</p>
+                    </div>
+                    <Checkbox
+                      checked={isChecked && !isSkipped}
+                      disabled={isSkipped}
+                      onCheckedChange={(checked) => handleAdherenceChange(meal.id, checked as boolean)}
+                      className={`h-5 w-5 rounded-lg border-2 ${isSkipped ? 'opacity-0' : 'border-slate-300'}`}
+                    />
+                  </div>
 
-                {/* Rebalance hint */}
-                {rebalHint != null && (
-                  <p className="text-blue-300/70 text-xs mb-2">
-                    💡 Objetivo sugerido: {rebalHint} kcal
+                  <p className={`text-xs leading-relaxed mb-3 font-medium ${isSkipped ? 'text-slate-400 italic' : 'text-slate-700'}`}>
+                    {meal.description}
                   </p>
-                )}
 
-                {/* Carb selector + gram input */}
-                {state.favoriteCarbs.length > 0 && meal.fixedKcal != null && (
-                  <div className="space-y-2 mb-3">
-                    <div className="flex items-center gap-2">
-                      <Wheat className="h-3.5 w-3.5 text-white/40 shrink-0" />
-                      <select
-                        value={selCarb?.key ?? ""}
-                        onChange={(e) => {
-                          const found = state.favoriteCarbs.find((c) => c.key === e.target.value) ?? null
-                          setMealCarb(meal.id, found)
-                        }}
-                        className="flex-1 bg-white/5 border border-white/10 rounded-lg text-white/60 text-xs px-2 py-1.5 focus:outline-none focus:border-emerald-400/40"
-                      >
-                        <option value="">Carbohidrato original</option>
-                        {state.favoriteCarbs.map((c) => (
-                          <option key={c.key} value={c.key}>{c.name} · {c.kcal} kcal/100g</option>
-                        ))}
-                      </select>
-                    </div>
-
-                    {/* Gram input — only when carb is selected */}
-                    {selCarb && (
-                      <div className="flex items-center gap-2 pl-5">
-                        <input
-                          type="number"
-                          min="0"
-                          max="999"
-                          placeholder={suggestedGrams != null ? String(suggestedGrams) : "g"}
-                          value={customG ?? ""}
-                          onChange={(e) => {
-                            const val = parseInt(e.target.value)
-                            setMealGrams(meal.id, isNaN(val) ? null : val)
-                          }}
-                          className={`w-20 bg-white/5 border rounded-lg text-xs px-2 py-1.5 text-center focus:outline-none transition-colors ${
-                            overLimit
-                              ? "border-red-400/60 text-red-400 focus:border-red-400"
-                              : "border-white/10 text-white/70 focus:border-emerald-400/40"
-                          }`}
-                        />
-                        <span className="text-white/40 text-xs">g de {selCarb.name}</span>
-                        {customG != null && (
-                          <button
-                            onClick={() => setMealGrams(meal.id, null)}
-                            className="text-white/30 hover:text-white/60 text-xs"
-                          >
-                            ✕
-                          </button>
-                        )}
-                        {overLimit && (
-                          <span className="text-red-400 text-xs font-medium whitespace-nowrap">
-                            Límite diario excedido
-                          </span>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Tip */}
-                {meal.note && (
-                  <div className="flex items-start gap-2 text-amber-400 text-sm mb-3">
-                    <Lightbulb className="h-4 w-4 shrink-0 mt-0.5" />
-                    <span className="leading-snug">{meal.note}</span>
-                  </div>
-                )}
-
-                {/* Replacement food form — only when skipped */}
-                {isSkipped && (
-                  <div className="mb-3 space-y-2">
-                    <p className="text-amber-300/60 text-xs">¿Qué comiste en su lugar?</p>
-                    {/* Listed replacement foods */}
-                    {(skippedMeals[meal.id]?.foods ?? []).map((food, i) => (
-                      <div key={i} className="flex items-center justify-between bg-white/5 rounded-lg px-3 py-1.5">
-                        <span className="text-white/70 text-sm">{food.name}</span>
-                        <div className="flex items-center gap-2">
-                          <span className="text-orange-400 text-xs font-medium">{food.kcal} kcal</span>
-                          <button
-                            onClick={() => handleRemoveFood(meal.id, i)}
-                            className="text-white/30 hover:text-white/60 leading-none"
-                          >
-                            <X className="h-3 w-3" />
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                    {/* Add food input with autocomplete */}
-                    <div className="space-y-1">
-                      <div className="flex gap-2">
-                        <div className="flex-1 relative">
-                          <input
-                            type="text"
-                            placeholder="Buscar alimento..."
-                            value={foodInput[meal.id]?.name ?? ""}
-                            onChange={(e) => {
-                              const val = e.target.value
-                              setFoodInput((prev) => ({ ...prev, [meal.id]: { ...prev[meal.id], name: val, kcalPer100g: prev[meal.id]?.kcalPer100g ?? null } }))
-                              debouncedFoodSearch(meal.id, val)
-                            }}
-                            onKeyDown={(e) => e.key === "Enter" && handleAddFood(meal.id)}
-                            className="w-full bg-white/5 border border-white/10 rounded-lg text-xs px-2 py-1.5 text-white/70 placeholder:text-white/30 focus:outline-none focus:border-amber-400/40"
-                          />
-                          {/* Autocomplete dropdown */}
-                          {(foodSuggestions[meal.id]?.length ?? 0) > 0 && (
-                            <div className="absolute z-20 left-0 right-0 top-full mt-1 bg-zinc-900/95 border border-white/20 rounded-lg shadow-xl max-h-40 overflow-y-auto">
-                              {foodSuggestions[meal.id].map((item, idx) => (
-                                <button
-                                  key={idx}
-                                  onClick={() => {
-                                    setFoodInput((prev) => ({
-                                      ...prev,
-                                      [meal.id]: { name: item.name, grams: prev[meal.id]?.grams ?? "", kcalPer100g: item.kcal_100g },
-                                    }))
-                                    setFoodSuggestions((prev) => ({ ...prev, [meal.id]: [] }))
-                                  }}
-                                  className="w-full text-left px-3 py-2 text-xs hover:bg-white/10 flex justify-between items-center gap-2 border-b border-white/5 last:border-0"
-                                >
-                                  <span className="text-white/80 truncate">{item.name}</span>
-                                  <span className="text-amber-400 font-medium shrink-0">{item.kcal_100g} kcal/100g</span>
-                                </button>
-                              ))}
-                            </div>
-                          )}
-                          {searchingFood[meal.id] && (
-                            <div className="absolute right-2 top-1/2 -translate-y-1/2">
-                              <div className="h-3 w-3 border border-amber-400/60 border-t-transparent rounded-full animate-spin" />
-                            </div>
-                          )}
-                        </div>
-                        <input
-                          type="number"
-                          placeholder="g"
-                          min="1"
-                          value={foodInput[meal.id]?.grams ?? ""}
-                          onChange={(e) => setFoodInput((prev) => ({ ...prev, [meal.id]: { ...prev[meal.id], grams: e.target.value, kcalPer100g: prev[meal.id]?.kcalPer100g ?? null } }))}
-                          onKeyDown={(e) => e.key === "Enter" && handleAddFood(meal.id)}
-                          className="w-14 bg-white/5 border border-white/10 rounded-lg text-xs px-2 py-1.5 text-white/70 text-center placeholder:text-white/30 focus:outline-none focus:border-amber-400/40"
-                        />
-                        <Button
-                          size="sm"
-                          onClick={() => handleAddFood(meal.id)}
-                          disabled={!foodInput[meal.id]?.name || !foodInput[meal.id]?.grams}
-                          className="h-7 w-7 p-0 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-400/30"
-                        >
-                          <Plus className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
-                      {/* Show calculated kcal preview */}
-                      {foodInput[meal.id]?.kcalPer100g != null && foodInput[meal.id]?.grams && (
-                        <p className="text-amber-400/60 text-[10px] pl-1">
-                          ≈ {Math.round((foodInput[meal.id].kcalPer100g! * parseInt(foodInput[meal.id].grams || "0")) / 100)} kcal
-                          ({foodInput[meal.id].kcalPer100g} kcal/100g)
-                        </p>
-                      )}
-                      {!foodInput[meal.id]?.kcalPer100g && (
-                        <p className="text-white/25 text-[10px] pl-1">Busca un alimento para autocompletar kcal</p>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {/* Swap + Skip buttons */}
-                <div className="flex gap-2">
+                  {/* Dynamic Controls - Compact */}
                   {!isSkipped && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleSwap(meal.id)}
-                      disabled={swapping === meal.id}
-                      className="flex-1 bg-white/5 border-white/20 text-white hover:bg-white/10 hover:border-white/30"
-                    >
-                      <Shuffle className={`mr-2 h-4 w-4 ${swapping === meal.id ? "animate-spin" : ""}`} />
-                      Cambiar plato
-                    </Button>
+                    <div className="space-y-3">
+                      {/* Carb selector */}
+                      {state.favoriteCarbs.length > 0 && meal.fixedKcal != null && (
+                        <div className="flex flex-wrap items-center gap-2">
+                          <div className="relative flex-1 min-w-[120px]">
+                            <Wheat className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-slate-400" />
+                            <select
+                              value={selCarb?.key ?? ""}
+                              onChange={(e) => {
+                                const found = state.favoriteCarbs.find((c) => c.key === e.target.value) ?? null
+                                setMealCarb(meal.id, found)
+                              }}
+                              className="w-full bg-white/60 border border-slate-200 rounded-lg pl-7 pr-2 py-1.5 text-[11px] font-bold text-slate-700 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                            >
+                              <option value="">Ajustar carbohidratos...</option>
+                              {state.favoriteCarbs.map((c) => (
+                                <option key={c.key} value={c.key}>{c.name} ({c.kcal}k/100g)</option>
+                              ))}
+                            </select>
+                          </div>
+                          {selCarb && (
+                             <div className="flex items-center gap-1.5">
+                               <input
+                                 type="number"
+                                 placeholder={suggestedGrams ? String(suggestedGrams) : "g"}
+                                 value={customG ?? ""}
+                                 onChange={(e) => {
+                                   const val = parseInt(e.target.value)
+                                   setMealGrams(meal.id, isNaN(val) ? null : val)
+                                 }}
+                                 className="w-14 bg-white border border-slate-200 rounded-lg py-1.5 text-center text-[11px] font-black text-emerald-600 focus:outline-none"
+                               />
+                               <span className="text-[10px] font-bold text-slate-400 uppercase">Grams</span>
+                             </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Bottom actions */}
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handleSwap(meal.id)}
+                          className="flex-1 bg-white/50 hover:bg-white border border-slate-200 rounded-xl py-1.5 text-[10px] font-bold text-slate-600 transition-colors flex items-center justify-center gap-1"
+                        >
+                          <Shuffle className={`h-3 w-3 ${swapping === meal.id ? 'animate-spin' : ''}`} /> Cambiar
+                        </button>
+                        <button
+                          onClick={() => handleSkipMeal(meal.id)}
+                          className="px-3 bg-white/50 hover:bg-rose-50 border border-slate-200 hover:border-rose-100 rounded-xl py-1.5 text-[10px] font-bold text-slate-500 hover:text-rose-600 transition-colors"
+                        >
+                          <Ban className="h-3 w-3" />
+                        </button>
+                      </div>
+                    </div>
                   )}
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleSkipMeal(meal.id)}
-                    className={`${isSkipped ? "flex-1" : ""} border text-xs h-9 ${
-                      isSkipped
-                        ? "bg-white/5 border-white/20 text-white/60 hover:bg-white/10"
-                        : "bg-amber-500/10 border-amber-400/20 text-amber-300/70 hover:bg-amber-500/20"
-                    }`}
-                  >
-                    {isSkipped ? (
-                      <><Shuffle className="mr-1.5 h-3.5 w-3.5" />Restaurar comida</>
-                    ) : (
-                      <><Ban className="mr-1.5 h-3.5 w-3.5" />Saltar</>
-                    )}
-                  </Button>
+
+                  {/* Skipped Meal UI */}
+                  {isSkipped && (
+                    <div className="space-y-2">
+                       <div className="flex gap-1.5">
+                         <div className="relative flex-1">
+                           <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-slate-400" />
+                           <input
+                             type="text"
+                             placeholder="¿Qué has comido?"
+                             value={foodInput[meal.id]?.name ?? ""}
+                             onChange={(e) => {
+                               const val = e.target.value
+                               setFoodInput(prev => ({ ...prev, [meal.id]: { ...prev[meal.id], name: val, kcalPer100g: prev[meal.id]?.kcalPer100g ?? null } }))
+                               debouncedFoodSearch(meal.id, val)
+                             }}
+                             className="w-full bg-white border border-slate-200 rounded-lg pl-7 pr-2 py-1.5 text-[11px] text-slate-700"
+                           />
+                           {foodSuggestions[meal.id]?.length > 0 && (
+                              <div className="absolute z-20 left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg overflow-hidden">
+                                {foodSuggestions[meal.id].map((item, idx) => (
+                                  <button
+                                    key={idx}
+                                    onClick={() => {
+                                      setFoodInput(prev => ({ ...prev, [meal.id]: { name: item.name, grams: prev[meal.id]?.grams ?? "", kcalPer100g: item.kcal_100g } }))
+                                      setFoodSuggestions(prev => ({ ...prev, [meal.id]: [] }))
+                                    }}
+                                    className="w-full text-left px-3 py-2 text-[10px] hover:bg-slate-50 border-b border-slate-100 last:border-0"
+                                  >
+                                    <span className="font-bold text-slate-700">{item.name}</span>
+                                    <span className="ml-2 text-slate-400">{item.kcal_100g}k/100g</span>
+                                  </button>
+                                ))}
+                              </div>
+                           )}
+                         </div>
+                         <input
+                           type="number"
+                           placeholder="g"
+                           value={foodInput[meal.id]?.grams ?? ""}
+                           onChange={(e) => setFoodInput(prev => ({ ...prev, [meal.id]: { ...prev[meal.id], grams: e.target.value, kcalPer100g: prev[meal.id]?.kcalPer100g ?? null } }))}
+                           className="w-12 bg-white border border-slate-200 rounded-lg py-1.5 text-center text-[11px]"
+                         />
+                         <button
+                           onClick={() => handleAddFood(meal.id)}
+                           className="bg-emerald-500 text-white rounded-lg px-2"
+                         >
+                           <Plus className="h-3 w-3" />
+                         </button>
+                       </div>
+
+                       <div className="flex flex-wrap gap-1">
+                         {(skippedMeals[meal.id]?.foods ?? []).map((food, i) => (
+                           <div key={i} className="bg-emerald-50 border border-emerald-100 rounded-lg px-2 py-1 flex items-center gap-1.5">
+                             <span className="text-[10px] font-bold text-emerald-800">{food.name} ({food.kcal}k)</span>
+                             <button onClick={() => handleRemoveFood(meal.id, i)}><X className="h-2.5 w-2.5 text-emerald-400" /></button>
+                           </div>
+                         ))}
+                       </div>
+
+                       <button
+                         onClick={() => handleSkipMeal(meal.id)}
+                         className="w-full py-1 text-[10px] font-bold text-emerald-600 hover:underline"
+                       >
+                         Restaurar comida original
+                       </button>
+                    </div>
+                  )}
                 </div>
               </Card>
             )
           })}
         </div>
-
-        {/* Adherence Checklist */}
-        <Card className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-6">
-          <div className="flex items-center gap-2 mb-4">
-            <CheckCircle2 className="h-5 w-5 text-emerald-400" />
-            <h3 className="text-xl font-semibold text-white">Seguimiento de adherencia</h3>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {adherenceItems.map((item) => {
-              const isItemSkipped = !!skippedMeals[item.id]
-              const replacementFoods = skippedMeals[item.id]?.foods ?? []
-              const replacementTotal = replacementFoods.reduce((s, f) => s + f.kcal, 0)
-              return (
-                <label
-                  key={item.id}
-                  className={`flex items-center gap-3 p-4 rounded-xl border transition-all ${
-                    isItemSkipped
-                      ? "bg-amber-500/5 border-amber-400/15 cursor-default"
-                      : "bg-white/5 border-white/10 hover:bg-white/10 cursor-pointer"
-                  }`}
-                >
-                  {isItemSkipped ? (
-                    <Ban className="h-4 w-4 text-amber-400/50 shrink-0" />
-                  ) : (
-                    <Checkbox
-                      checked={item.checked}
-                      onCheckedChange={(checked) => handleAdherenceChange(item.id, checked as boolean)}
-                      className="border-white/30 data-[state=checked]:bg-emerald-500 data-[state=checked]:border-emerald-500"
-                    />
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <span className={`text-sm ${isItemSkipped ? "text-white/30 line-through" : item.checked ? "text-white line-through opacity-60" : "text-white"}`}>
-                      {item.label}
-                    </span>
-                    {isItemSkipped && replacementTotal > 0 && (
-                      <p className="text-amber-300/50 text-xs mt-0.5">{replacementFoods.map(f => f.name).join(", ")} · {replacementTotal} kcal</p>
-                    )}
-                    {isItemSkipped && replacementTotal === 0 && (
-                      <p className="text-white/25 text-xs mt-0.5">Sin reemplazo registrado</p>
-                    )}
-                  </div>
-                </label>
-              )
-            })}
-          </div>
-        </Card>
-
       </div>
 
-      {/* Compensation modal */}
+      {/* Compensation Modal - Light Theme */}
       {showCompModal && cheatRecord && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-6 w-full max-w-sm">
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white border border-emerald-100 rounded-3xl p-6 w-full max-w-sm shadow-xl">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
-                <Star className="h-5 w-5 text-amber-400 fill-amber-400" />
-                <h3 className="text-white font-bold text-lg">Comodín detectado</h3>
+                <Star className="h-5 w-5 text-amber-500 fill-amber-500" />
+                <h3 className="text-slate-800 font-bold text-lg">Compensar Exceso</h3>
               </div>
-              <button onClick={() => setShowCompModal(false)} className="text-white/50 hover:text-white">
+              <button onClick={() => setShowCompModal(false)} className="text-slate-400 hover:text-slate-600">
                 <X className="w-5 h-5" />
               </button>
             </div>
-
-            <div className="bg-amber-500/10 border border-amber-400/20 rounded-xl p-4 mb-4">
-              <p className="text-amber-300 text-sm font-medium mb-1">
-                Exceso de {cheatRecord.excess} kcal registrado
-              </p>
-              <p className="text-white/60 text-xs">
-                Distribuido en los próximos 3 días:
-                <span className="text-white font-semibold ml-1">
-                  -{Math.round(cheatRecord.excess / 3)} kcal/día
-                </span>
-              </p>
-            </div>
-
-            <p className="text-white/60 text-sm mb-5">
-              ¿Quieres compensar este exceso en los próximos 3 días para mantener tu meta semanal intacta?
+            <p className="text-slate-600 text-sm mb-4">
+              Has consumido <span className="font-bold text-amber-600">{cheatRecord.excess} kcal</span> extra.
+              Podemos repartirlas en los próximos 3 días (-{Math.round(cheatRecord.excess / 3)} kcal/día) para no afectar tu progreso semanal.
             </p>
-
             <div className="flex gap-3">
               <button
                 onClick={() => { declineCompensation(); setShowCompModal(false) }}
-                className="flex-1 px-4 py-2 border border-white/20 rounded-xl text-white/60 text-sm hover:bg-white/5"
+                className="flex-1 px-4 py-2.5 border border-slate-200 rounded-xl text-slate-500 text-sm font-semibold"
               >
-                No, gracias
+                No
               </button>
               <button
                 onClick={() => { setupCompensation(day.date); setShowCompModal(false) }}
-                className="flex-1 px-4 py-2 bg-amber-500 hover:bg-amber-600 rounded-xl text-white text-sm font-medium"
+                className="flex-1 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 rounded-xl text-white text-sm font-bold shadow-md shadow-emerald-100"
               >
-                Compensar
+                Sí, compensar
               </button>
             </div>
           </div>
