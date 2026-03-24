@@ -1,0 +1,2634 @@
+"""
+FastAPI backend para el Asistente de Nutrición y Entrenamiento.
+Ejecutar con: uvicorn api:app --reload
+Documentación automática en: http://localhost:8000/docs
+"""
+
+import os, json
+from datetime import date, timedelta
+from typing import Optional, List
+import zoneinfo
+
+# Fijar el directorio de trabajo al directorio del script
+# (necesario para que los módulos Python locales se importen correctamente)
+import sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+os.chdir(os.path.dirname(os.path.abspath(__file__)))
+
+from fastapi import FastAPI, HTTPException, Request, Header
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel, model_validator
+
+# ── Módulos del proyecto ──────────────────────────────────────────────────────
+from storage import (
+    load_profile, save_profile, load_session, save_session,
+    load_weekly_history, save_weekly_history,
+)
+from calculator import (
+    calculate_bmr, calculate_tdee, calculate_daily_target,
+    calculate_macros, ACTIVITY_LEVELS, GOAL_ADJUSTMENTS,
+)
+from diet import (
+    generate_week_plan, get_day_from_plan,
+    regenerate_meal, FAVORITE_CARBS,
+)
+from exercise_log import (
+    EXERCISES, RECOVERY_FACTOR, TODAY_BONUS_KCAL, TODAY_TIMING,
+    calculate_exercise_kcal,
+)
+from exercise_history import record_today, HISTORY_FILE as EX_HISTORY_FILE
+from weight_tracker import (
+    HISTORY_FILE as W_HISTORY_FILE, EXPECTED_WEEKLY_CHANGE, needs_weigh_in,
+    _load as load_weight_history, _save as save_weight_history,
+)
+from adherence import ADHERENCE_FILE, weekly_adherence
+from weekly_survey import (
+    needs_survey, last_survey_scores,
+    _load as load_surveys, _save as save_surveys, QUESTIONS,
+)
+from weekly_report import (
+    _last_week_exercise, _weight_change, _recommendation,
+    needs_weekly_report, mark_report_shown,
+)
+from competition_planner import (
+    get_event, days_to_event, COMPETITION_FILE, event_calorie_adjustment,
+)
+from preferences import (
+    _load as load_prefs, _save as save_prefs,
+    load_excluded, load_favorites,
+)
+from shopping_list import build_shopping_list
+from training import (
+    FULL_BODY_ROUTINE, PPL_ROUTINE, CALISTENIA, CALISTENIA_PLANS,
+    _build_ppl_plan, _filter_exercises,
+)
+from gamification import gamification_status
+
+# ── App ───────────────────────────────────────────────────────────────────────
+app = FastAPI(
+    title="Nutrition Assistant API",
+    description="Backend para el asistente de nutrición y entrenamiento",
+    version="1.0.0",
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],          # En producción limita a tu dominio
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# ── Estado en memoria (evita leer JSON en cada request) ──────────────────────
+_cache: dict = {}
+
+
+def _get_session():
+    return load_session()
+
+
+def _get_today_for_tz(tz_header: str | None) -> str:
+    """Return today's ISO date string in the user's timezone. Falls back to UTC."""
+    # Empty or unrecognized timezone → fall back to UTC, log warning
+    try:
+        tz = zoneinfo.ZoneInfo(tz_header) if tz_header else zoneinfo.ZoneInfo("UTC")
+    except Exception:
+        import warnings
+        warnings.warn(f"Unrecognized timezone '{tz_header}', falling back to UTC")
+        tz = zoneinfo.ZoneInfo("UTC")
+    from datetime import datetime
+    return datetime.now(tz=tz).date().isoformat()
+
+
+def _get_week_start_for_tz(tz_header: str | None) -> str:
+    """Return the most recent week-start day in the user's timezone.
+
+    week_start_day comes from the profile (0=Monday … 6=Sunday).
+    Example: if week_start_day=3 (Thursday) and today is Wednesday the 19th,
+    the current week started on Thursday the 13th.
+    """
+    from datetime import datetime, timedelta
+    try:
+        tz = zoneinfo.ZoneInfo(tz_header) if tz_header else zoneinfo.ZoneInfo("UTC")
+    except Exception:
+        tz = zoneinfo.ZoneInfo("UTC")
+    today = datetime.now(tz=tz).date()
+    week_start_day = load_profile().get("week_start_day", 0)
+    days_since_start = (today.weekday() - week_start_day) % 7
+    return (today - timedelta(days=days_since_start)).isoformat()
+
+
+def _is_stale(plan: dict, tz_header: str | None) -> bool:
+    """True when plan.generated_at is from a previous week cycle."""
+    current_week_start = _get_week_start_for_tz(tz_header)
+    # Empty or missing generated_at ("") < any date string is True —
+    # treats missing plan as stale, which is intentional.
+    return plan.get("generated_at", "") < current_week_start
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# MODELOS PYDANTIC
+# ══════════════════════════════════════════════════════════════════════════════
+
+class ProfileModel(BaseModel):
+    name: str
+    gender: str           # "male" | "female"
+    age: int
+    height_cm: int
+    weight_kg: float
+    activity_level: int   # 1-4
+    goal: str             # "lose" | "maintain" | "gain"
+    week_start_day: int = 0  # 0=Monday … 6=Sunday
+
+
+class ExerciseEntryModel(BaseModel):
+    exercise_key: str     # "1"-"7"
+    minutes: int
+
+
+class YesterdayExerciseModel(BaseModel):
+    rested: bool
+    entries: Optional[List[ExerciseEntryModel]] = []
+
+
+class ExerciseLogByDateModel(BaseModel):
+    date: str                                      # ISO format YYYY-MM-DD
+    rested: bool
+    entries: Optional[List[ExerciseEntryModel]] = []
+
+
+class HealthSyncModel(BaseModel):
+    date: str                                   # ISO YYYY-MM-DD
+    active_calories: Optional[float] = None     # nombre preferido
+    burned_kcal: Optional[float] = None         # alias que envía el Shortcut
+    workout_type: Optional[str] = None          # "Strength Training", "Running", etc.
+    duration_min: Optional[int] = None
+    steps: Optional[int] = None
+    heart_rate_avg: Optional[int] = None
+    heart_rate_max: Optional[int] = None
+
+    @model_validator(mode="after")
+    def resolve_calories(self):
+        # Acepta burned_kcal como sinónimo de active_calories
+        if self.active_calories is None and self.burned_kcal is not None:
+            self.active_calories = self.burned_kcal
+        if self.active_calories is None:
+            raise ValueError("Se requiere 'active_calories' o 'burned_kcal'")
+        return self
+
+
+class TodayTrainingModel(BaseModel):
+    trains: bool
+    exercise_key: Optional[str] = None   # "1"-"7"
+
+
+class WeightModel(BaseModel):
+    weight_kg: float
+
+
+class SurveyModel(BaseModel):
+    energia: int     # 1-5
+    hambre: int      # 1-5
+    adherencia: int  # 1-5
+    sueno: int       # 1-5
+
+
+class AdherenceModel(BaseModel):
+    meals: dict                    # {meal_key: bool}
+    kcal_map: dict = {}            # {meal_key: kcal}
+    skipped_meals: dict = {}       # {meal_key: {foods: [{name, kcal}]}}
+
+
+class PreferencesModel(BaseModel):
+    excluded: List[str]
+    favorites: List[str]
+    disliked: List[str]
+
+
+class EventModel(BaseModel):
+    name: str
+    date: str    # ISO format YYYY-MM-DD
+
+
+class RegenerateWeeklyModel(BaseModel):
+    apply_from: str = "tomorrow"   # "today" | "tomorrow"
+
+
+class SwapMealModel(BaseModel):
+    meal_id: str
+
+
+class SwapWeeklyMealModel(BaseModel):
+    date:    str   # ISO YYYY-MM-DD
+    meal_id: str
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# PERFIL
+# ══════════════════════════════════════════════════════════════════════════════
+
+@app.get("/profile", tags=["Perfil"])
+def get_profile():
+    return load_profile()
+
+
+@app.put("/profile", tags=["Perfil"])
+def update_profile(data: ProfileModel):
+    profile = data.model_dump()
+    save_profile(profile)
+    return {"ok": True, "profile": profile}
+
+
+@app.get("/profile/nutrition", tags=["Perfil"])
+def get_nutrition(exercise_adj: int = 0):
+    """Calcula BMR, TDEE y macros con ajuste de ejercicio opcional."""
+    profile = load_profile()
+    bmr     = calculate_bmr(profile["gender"], profile["age"],
+                            profile["height_cm"], profile["weight_kg"])
+    tdee    = calculate_tdee(bmr, profile["activity_level"])
+    target  = calculate_daily_target(bmr, profile["goal"], exercise_adj,
+                                     activity_level=profile.get("activity_level", 1))
+    macros  = calculate_macros(profile["weight_kg"], target, profile["goal"])
+    return {
+        "bmr":          round(bmr),
+        "tdee_ref":     round(tdee),
+        "base_sedentary": round(bmr * 1.2),
+        "daily_target": target,
+        "goal_adjustment": GOAL_ADJUSTMENTS.get(profile["goal"], 0),
+        "macros":       macros,
+        "activity_level_name": ACTIVITY_LEVELS[profile["activity_level"]][0],
+    }
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# DIETA DEL DÍA
+# ══════════════════════════════════════════════════════════════════════════════
+
+@app.get("/diet/today", tags=["Dieta"])
+def get_today_diet(x_user_timezone: Optional[str] = Header(None)):
+    """Returns today's PlanDay from the weekly plan. Auto-generates plan if needed."""
+    session  = _get_session()
+    tz       = x_user_timezone
+    today    = _get_today_for_tz(tz)
+
+    plan = session.get("week_plan")
+
+    # Auto-generate if no plan exists
+    if not plan:
+        excluded  = load_excluded()
+        favorites = load_favorites()
+        history   = session.get("weekly_history", []) or load_weekly_history()
+        plan = generate_week_plan(excluded, favorites, _get_daily_target(), history=history or None)
+        save_session(week_plan=plan)
+
+    stale         = _is_stale(plan, tz)
+    exercise_adj  = dict(session.get("exercise_adj", {}))
+    today_training = session.get("today_training") or {}
+    bonus_kcal     = today_training.get("bonus_kcal", 0)
+    if bonus_kcal:
+        existing_extra = exercise_adj.get(today, {}).get("extra_kcal", 0)
+        exercise_adj[today] = {
+            "extra_kcal": existing_extra + bonus_kcal,
+            "source":     "today_training",
+        }
+    day          = get_day_from_plan(today, plan, exercise_adj)
+
+    if day is None:
+        raise HTTPException(
+            404,
+            {"error": "date_not_in_plan",
+             "detail": f"Date {today} is not in the current plan. Regenerate the plan."}
+        )
+
+    return {**day, "stale": stale}
+
+
+@app.post("/diet/today/regenerate", tags=["Dieta"])
+def regenerate_today_diet(x_user_timezone: Optional[str] = Header(None)):
+    """Regenerates the full weekly plan and returns today's PlanDay."""
+    session   = _get_session()
+    excluded  = load_excluded()
+    favorites = load_favorites()
+    history   = load_weekly_history()
+    plan = generate_week_plan(excluded, favorites, _get_daily_target(), history=history or None)
+    save_session(week_plan=plan)
+    today        = _get_today_for_tz(x_user_timezone)
+    exercise_adj = session.get("exercise_adj", {})
+    day          = get_day_from_plan(today, plan, exercise_adj)
+    if day is None:
+        raise HTTPException(404, {"error": "date_not_in_plan", "detail": "Regenerated plan does not cover today."})
+    return {**day, "stale": False}
+
+
+@app.post("/diet/today/swap", tags=["Dieta"])
+def swap_meal_new(data: SwapMealModel, x_user_timezone: Optional[str] = Header(None)):
+    """Swaps a meal in today's plan slot. Returns updated PlanDay."""
+    meal_type = data.meal_id
+    session   = _get_session()
+    plan      = session.get("week_plan")
+    if not plan:
+        raise HTTPException(404, {"error": "no_plan", "detail": "No weekly plan. Call GET /diet/today first."})
+
+    today = _get_today_for_tz(x_user_timezone)
+    days  = plan.get("days", [])
+    day_idx = next((i for i, d in enumerate(days) if d["date"] == today), None)
+    if day_idx is None:
+        raise HTTPException(404, {"error": "date_not_in_plan", "detail": f"No plan for {today}."})
+
+    excluded  = load_excluded()
+    favorites = load_favorites()
+
+    # Regenerate that meal slot in the plan day
+    today_day = days[day_idx]
+    daily_target = plan.get("weekly_target_kcal", 1800)
+    updated_day_meals = dict({m["id"]: m for m in today_day["meals"]})
+
+    # Use existing regenerate_meal logic
+    flat_day = {"daily_target": daily_target, "meals": updated_day_meals}
+    flat_day = regenerate_meal(flat_day, meal_type, excluded, favorites)
+    new_meals_dict = flat_day["meals"]
+
+    # Rebuild meals list preserving order
+    new_meals_list = [
+        {**new_meals_dict[m["id"]], "id": m["id"]}
+        if m["id"] in new_meals_dict else m
+        for m in today_day["meals"]
+    ]
+    plan["days"][day_idx] = {
+        **today_day,
+        "meals":     new_meals_list,
+        "totalKcal": sum(m["kcal"] for m in new_meals_list),
+    }
+    save_session(week_plan=plan)
+
+    # Return the updated PlanDay with exercise_adj applied
+    exercise_adj = session.get("exercise_adj", {})
+    updated_plan_day = get_day_from_plan(today, plan, exercise_adj)
+    return updated_plan_day
+
+
+@app.post("/diet/today/{meal_type}/swap", tags=["Dieta"], deprecated=True)
+def swap_meal_legacy(meal_type: str, x_user_timezone: Optional[str] = Header(None)):
+    """Legacy endpoint — use POST /diet/today/swap with JSON body instead."""
+    from pydantic import BaseModel as BM
+    class _Body(BM):
+        meal_id: str = meal_type
+    return swap_meal_new(_Body(meal_id=meal_type), x_user_timezone)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# PLAN SEMANAL
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _get_daily_target() -> int:
+    profile  = load_profile()
+    bmr      = calculate_bmr(profile["gender"], profile["age"],
+                              profile["height_cm"], profile["weight_kg"])
+    return calculate_daily_target(bmr, profile["goal"],
+                                  activity_level=profile.get("activity_level", 1))
+
+
+@app.get("/diet/carbs", tags=["Dieta"])
+def get_favorite_carbs():
+    """Returns the list of swappable carb sources for the UI selector."""
+    return {"carbs": FAVORITE_CARBS}
+
+
+@app.get("/diet/weekly", tags=["Dieta"])
+def get_weekly_plan(x_user_timezone: Optional[str] = Header(None)):
+    """Returns full weekly plan as { days: PlanDay[], summary, stale }."""
+    session = _get_session()
+    plan    = session.get("week_plan")
+    if not plan:
+        excluded  = load_excluded()
+        favorites = load_favorites()
+        history   = load_weekly_history()
+        plan = generate_week_plan(excluded, favorites, _get_daily_target(), history=history or None)
+        save_session(week_plan=plan)
+
+    stale        = _is_stale(plan, x_user_timezone)
+    exercise_adj = session.get("exercise_adj", {})
+
+    # Apply exercise adjustments to each day
+    days_with_adj = []
+    for day in plan.get("days", []):
+        enriched = get_day_from_plan(day["date"], plan, exercise_adj)
+        if enriched:
+            days_with_adj.append(enriched)
+
+    return {
+        "days":    days_with_adj,
+        "summary": plan.get("weekly_summary"),
+        "stale":   stale,
+    }
+
+
+@app.post("/diet/weekly/swap", tags=["Dieta"])
+def swap_weekly_meal(data: SwapWeeklyMealModel, x_user_timezone: Optional[str] = Header(None)):
+    """Cambia una sola comida de cualquier día del plan semanal. Devuelve el PlanDay actualizado."""
+    session = _get_session()
+    plan    = session.get("week_plan")
+    if not plan:
+        raise HTTPException(404, {"error": "no_plan", "detail": "No hay plan semanal. Regenera el plan primero."})
+
+    days    = plan.get("days", [])
+    day_idx = next((i for i, d in enumerate(days) if d["date"] == data.date), None)
+    if day_idx is None:
+        raise HTTPException(404, {"error": "date_not_in_plan", "detail": f"No hay plan para {data.date}."})
+
+    excluded  = load_excluded()
+    favorites = load_favorites()
+
+    today_day    = days[day_idx]
+    daily_target = plan.get("weekly_target_kcal", 1800)
+
+    # Reutiliza la lógica ya existente de regenerate_meal
+    flat_day  = {"daily_target": daily_target, "meals": {m["id"]: m for m in today_day["meals"]}}
+    flat_day  = regenerate_meal(flat_day, data.meal_id, excluded, favorites)
+    new_meals = flat_day["meals"]
+
+    new_meals_list = [
+        {**new_meals[m["id"]], "id": m["id"]} if m["id"] in new_meals else m
+        for m in today_day["meals"]
+    ]
+    plan["days"][day_idx] = {
+        **today_day,
+        "meals":     new_meals_list,
+        "totalKcal": sum(m["kcal"] for m in new_meals_list),
+    }
+    save_session(week_plan=plan)
+
+    exercise_adj  = session.get("exercise_adj", {})
+    updated_day   = get_day_from_plan(data.date, plan, exercise_adj)
+    return updated_day
+
+
+@app.post("/diet/weekly/regenerate", tags=["Dieta"])
+def regenerate_weekly_plan(
+    data: RegenerateWeeklyModel = RegenerateWeeklyModel(),
+    x_user_timezone: Optional[str] = Header(None),
+):
+    """Regenerates part or all of the weekly plan. Returns { days: PlanDay[] }."""
+    session   = _get_session()
+    excluded  = load_excluded()
+    favorites = load_favorites()
+    history   = load_weekly_history()
+
+    new_plan = generate_week_plan(excluded, favorites, _get_daily_target(), history=history or None)
+
+    today = _get_today_for_tz(x_user_timezone)
+    apply_from = data.apply_from  # "today" or "tomorrow"
+
+    existing_plan = session.get("week_plan")
+    if existing_plan and apply_from in ("today", "tomorrow"):
+        from datetime import date as _date, timedelta
+        cutoff = _date.fromisoformat(today)
+        if apply_from == "tomorrow":
+            cutoff = cutoff + timedelta(days=1)
+
+        # Keep days BEFORE cutoff from existing plan, take days from cutoff onward from new plan
+        old_days_by_date = {d["date"]: d for d in existing_plan.get("days", [])}
+
+        merged_days = []
+        for d in new_plan["days"]:
+            day_date = _date.fromisoformat(d["date"])
+            if day_date < cutoff and d["date"] in old_days_by_date:
+                merged_days.append(old_days_by_date[d["date"]])
+            else:
+                merged_days.append(d)
+
+        # Discard FUTURE exercise_adj if apply_from == "today".
+        # Use `k <= today` (not `k < today`) so that today's adjustment is preserved
+        # per the spec: "exercise_adj[today] is preserved when apply_from == 'today'".
+        exercise_adj = session.get("exercise_adj", {})
+        if apply_from == "today":
+            exercise_adj = {k: v for k, v in exercise_adj.items() if k <= today}
+            save_session(exercise_adj=exercise_adj)
+
+        new_plan["days"] = merged_days
+
+    save_session(week_plan=new_plan)
+
+    exercise_adj = _get_session().get("exercise_adj", {})
+    days_with_adj = [
+        get_day_from_plan(d["date"], new_plan, exercise_adj)
+        for d in new_plan["days"]
+        if get_day_from_plan(d["date"], new_plan, exercise_adj) is not None
+    ]
+
+    return {"days": days_with_adj}
+
+
+@app.get("/diet/shopping-list", tags=["Dieta"])
+def get_shopping_list():
+    """Lista de la compra a partir del plan semanal actual."""
+    session = _get_session()
+    plan    = session.get("week_plan")
+    if not plan:
+        excluded  = load_excluded()
+        favorites = load_favorites()
+        plan = generate_week_plan(excluded, favorites)
+        save_session(week_plan=plan)
+    shopping = build_shopping_list(plan)
+    # Convertir sets a listas para JSON
+    return {cat: sorted(items) for cat, items in shopping.items()}
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# EJERCICIO
+# ══════════════════════════════════════════════════════════════════════════════
+
+@app.get("/exercise/types", tags=["Ejercicio"])
+def get_exercise_types():
+    """Lista de tipos de ejercicio disponibles."""
+    return {k: {"name": v["name"], "met": v["met"]} for k, v in EXERCISES.items()}
+
+
+@app.get("/exercise/yesterday", tags=["Ejercicio"])
+def get_yesterday_exercise():
+    session = _get_session()
+    return session.get("exercise_data") or {"burned_kcal": 0, "adjustment_kcal": 0, "exercises": []}
+
+
+@app.post("/exercise/yesterday", tags=["Ejercicio"])
+def log_yesterday_exercise(data: YesterdayExerciseModel):
+    """Registra el ejercicio de ayer y calcula el ajuste calórico."""
+    profile = load_profile()
+    goal    = profile["goal"]
+
+    if data.rested or not data.entries:
+        ex_data = {"burned_kcal": 0, "adjustment_kcal": 0, "exercises": []}
+    else:
+        total_burned = 0.0
+        log = []
+        for entry in data.entries:
+            ex = EXERCISES.get(entry.exercise_key)
+            if not ex:
+                raise HTTPException(400, f"Ejercicio '{entry.exercise_key}' no válido")
+            kcal = calculate_exercise_kcal(ex["met"], profile["weight_kg"], entry.minutes)
+            total_burned += kcal
+            log.append({"key": entry.exercise_key, "name": ex["name"],
+                         "minutes": entry.minutes, "burned": round(kcal), "kcal": round(kcal)})
+
+        factor = RECOVERY_FACTOR.get(goal, 0.60)
+        adj    = round(total_burned * factor)
+        ex_data = {
+            "burned_kcal":     round(total_burned),
+            "adjustment_kcal": adj,
+            "exercises":       log,
+        }
+
+    save_session(exercise_data=ex_data, adaptive_day=None)
+    record_today(ex_data)
+    return ex_data
+
+
+@app.get("/exercise/today-training", tags=["Ejercicio"])
+def get_today_training():
+    session = _get_session()
+    return session.get("today_training") or {"bonus_kcal": 0, "training_type": None}
+
+
+@app.post("/exercise/today-training", tags=["Ejercicio"])
+def log_today_training(data: TodayTrainingModel):
+    """Registra si el usuario entrena hoy y qué tipo."""
+    if not data.trains or not data.exercise_key:
+        today_data = {"bonus_kcal": 0, "training_type": None, "exercise_key": None}
+    else:
+        bonus = TODAY_BONUS_KCAL.get(data.exercise_key, 250)
+        ttype = TODAY_TIMING.get(data.exercise_key, "fuerza")
+        today_data = {"bonus_kcal": bonus, "training_type": ttype, "exercise_key": data.exercise_key}
+
+    save_session(today_training=today_data, adaptive_day=None)
+    return today_data
+
+
+@app.get("/exercise/gym-history", tags=["Ejercicio"])
+def get_gym_history(days: int = 7):
+    """
+    Historial de sesiones de gym de los últimos N días leído desde Google Sheets
+    (o Excel local como fallback). Incluye ejercicios y kcal estimadas.
+    """
+    from sheets_parser import get_recent_sessions
+    from calorie_estimator import estimate_session_calories
+
+    sessions, source = get_recent_sessions(days=days)
+
+    result = []
+    for s in sessions:
+        kcal = estimate_session_calories(s)
+        result.append({
+            "date":      s["date"].isoformat() if s["date"] else None,
+            "type":      s["type"],
+            "kcal":      round(kcal),
+            "exercises": [
+                {
+                    "name":     ex["name"],
+                    "volume":   ex["volume"],
+                    "kg_s1":    ex["kg_s1"],
+                    "reps_s1":  ex["reps_s1"],
+                    "kg_s2":    ex["kg_s2"],
+                    "reps_s2":  ex["reps_s2"],
+                    "compound": ex["compound"],
+                }
+                for ex in s["exercises"]
+            ],
+        })
+
+    # Sincronizar sesiones del gym al exercise_history.json (sin sobreescribir registros manuales)
+    if sessions:
+        history = {}
+        if os.path.exists(EX_HISTORY_FILE):
+            with open(EX_HISTORY_FILE) as f:
+                history = json.load(f)
+
+        changed = False
+        goal = load_profile()["goal"]
+        for s in sessions:
+            if s["date"] is None:
+                continue
+            date_str = s["date"].isoformat() if hasattr(s["date"], "isoformat") else str(s["date"])
+            existing  = history.get(date_str, {})
+            has_health = "apple_health" in existing.get("sources", [])
+
+            # Siempre actualizar el detalle de gym (Sheets), pero respetar kcal de Apple Health
+            gym_detail = [{"name": ex["name"], "volume": ex.get("volume"), "compound": ex.get("compound")}
+                          for ex in s["exercises"]]
+            sheets_kcal = round(estimate_session_calories(s))
+
+            if has_health:
+                # Apple Health ya tiene las kcal → solo actualizamos gym_detail y tipo
+                history[date_str]["gym_detail"]    = gym_detail
+                history[date_str]["session_type"]  = s["type"]
+                sources = existing.get("sources", [])
+                if source not in sources:
+                    sources.append(source)
+                history[date_str]["sources"] = sources
+            else:
+                # Sin Apple Health → usamos estimación de Sheets como hasta ahora
+                sources = existing.get("sources", [source])
+                if source not in sources:
+                    sources.append(source)
+                history[date_str] = {
+                    **existing,
+                    "burned_kcal":     sheets_kcal,
+                    "adjustment_kcal": round(sheets_kcal * RECOVERY_FACTOR.get(goal, 0.85)),
+                    "gym_detail":      gym_detail,
+                    "session_type":    s["type"],
+                    "sources":         sources,
+                }
+            changed = True
+
+        if changed:
+            with open(EX_HISTORY_FILE, "w") as f:
+                json.dump(history, f, indent=2, ensure_ascii=False)
+
+    return {
+        "source":   source,
+        "sessions": result,
+        "credentials_configured": (
+            __import__("pathlib").Path("google_credentials.json").exists()
+        ),
+    }
+
+
+@app.get("/exercise/history", tags=["Ejercicio"])
+def get_exercise_history(days: int = 7):
+    """Historial de ejercicio de los últimos N días."""
+    history = {}
+    if os.path.exists(EX_HISTORY_FILE):
+        with open(EX_HISTORY_FILE) as f:
+            history = json.load(f)
+
+    today = date.today()
+    result = []
+    streak = 0
+    for i in range(days - 1, -1, -1):
+        d      = today - timedelta(days=i)
+        iso    = d.isoformat()
+        entry  = history.get(iso, {})
+        burned = int(entry.get("burned_kcal", 0))
+        result.append({
+            "date":        iso,
+            "day_label":   d.strftime("%a %d/%m"),
+            "burned_kcal": burned,
+            "trained":     burned > 0,
+            "exercises":   entry.get("exercises", []),
+            "sources":      entry.get("sources", [entry["source"]] if "source" in entry else []),
+            "health_data":  entry.get("health_data"),
+            "gym_detail":   entry.get("gym_detail"),
+            "session_type": entry.get("session_type"),
+        })
+        if burned > 0 and i > 0:
+            streak += 1
+        elif burned == 0 and i > 0:
+            streak = 0
+
+    return {"history": result, "streak": streak,
+            "total_kcal": sum(r["burned_kcal"] for r in result),
+            "trained_days": sum(1 for r in result if r["trained"])}
+
+
+@app.post("/exercise/log", tags=["Ejercicio"])
+def log_exercise_by_date(data: ExerciseLogByDateModel):
+    """Registra ejercicio para cualquier fecha y evalúa su impacto en el plan semanal."""
+    try:
+        target_date = date.fromisoformat(data.date)
+    except ValueError:
+        raise HTTPException(400, "Formato de fecha inválido. Usa YYYY-MM-DD.")
+
+    today = date.today()
+    # Determinar el inicio de la semana según la preferencia del usuario
+    profile_tmp   = load_profile()
+    wsd           = profile_tmp.get("week_start_day", 0)
+    monday        = today - timedelta(days=(today.weekday() - wsd) % 7)
+    sunday        = monday + timedelta(days=6)
+
+    if data.rested or not data.entries:
+        ex_data = {"burned_kcal": 0, "adjustment_kcal": 0, "exercises": []}
+    else:
+        profile = load_profile()
+        total_burned = 0.0
+        log = []
+        for entry in data.entries:
+            ex = EXERCISES.get(entry.exercise_key)
+            if not ex:
+                raise HTTPException(400, f"Ejercicio '{entry.exercise_key}' no válido")
+            kcal = calculate_exercise_kcal(ex["met"], profile["weight_kg"], entry.minutes)
+            total_burned += kcal
+            log.append({"key": entry.exercise_key, "name": ex["name"],
+                         "minutes": entry.minutes, "burned": round(kcal), "kcal": round(kcal)})
+
+        factor = RECOVERY_FACTOR.get(profile["goal"], 0.60)
+        adj    = round(total_burned * factor)
+        ex_data = {
+            "burned_kcal":     round(total_burned),
+            "adjustment_kcal": adj,
+            "exercises":       log,
+        }
+
+    # Guardar en historial para la fecha indicada
+    history = {}
+    if os.path.exists(EX_HISTORY_FILE):
+        with open(EX_HISTORY_FILE) as f:
+            history = json.load(f)
+    history[data.date] = ex_data
+    with open(EX_HISTORY_FILE, "w") as f:
+        json.dump(history, f, indent=2, ensure_ascii=False)
+
+    # Evaluación de impacto en el plan semanal
+    in_current_week = monday <= target_date <= sunday
+    is_today        = target_date == today
+    is_yesterday    = target_date == today - timedelta(days=1)
+    is_future       = target_date > today
+
+    if is_future:
+        impact_type = "scheduled"
+        impact_msg  = f"Actividad programada para el {target_date.strftime('%d/%m')}. Se registrará en el historial pero no afecta el plan actual."
+    elif is_today:
+        impact_type = "today"
+        impact_msg  = "Actividad registrada para hoy. Afecta tu objetivo calórico del día actual."
+    elif is_yesterday:
+        impact_type = "yesterday"
+        impact_msg  = "Actividad de ayer registrada. Se aplica ajuste de recuperación a las calorías de hoy."
+    elif in_current_week:
+        impact_type = "this_week"
+        # Contar días entrenados esta semana
+        days_trained = sum(
+            1 for i in range(7)
+            if history.get((monday + timedelta(days=i)).isoformat(), {}).get("burned_kcal", 0) > 0
+        )
+        impact_msg = (
+            f"Actividad dentro de la semana actual. Llevas {days_trained} día{'s' if days_trained != 1 else ''} "
+            f"de entrenamiento esta semana ({monday.strftime('%d/%m')} – {sunday.strftime('%d/%m')})."
+        )
+    else:
+        impact_type = "past_week"
+        impact_msg  = f"Actividad de una semana anterior ({target_date.strftime('%d/%m/%Y')}). No afecta el plan semanal actual."
+
+    return {
+        "ok":           True,
+        "date":         data.date,
+        "exercise_data": ex_data,
+        "impact": {
+            "type":           impact_type,
+            "message":        impact_msg,
+            "in_current_week": in_current_week,
+            "is_today":       is_today,
+            "is_yesterday":   is_yesterday,
+            "is_future":      is_future,
+        },
+    }
+
+
+@app.delete("/exercise/log/{target_date}", tags=["Ejercicio"])
+def delete_exercise_by_date(target_date: str):
+    """Elimina el registro de ejercicio de una fecha concreta."""
+    try:
+        date.fromisoformat(target_date)
+    except ValueError:
+        raise HTTPException(400, "Formato de fecha inválido. Usa YYYY-MM-DD.")
+
+    history = {}
+    if os.path.exists(EX_HISTORY_FILE):
+        with open(EX_HISTORY_FILE) as f:
+            history = json.load(f)
+
+    if target_date not in history:
+        raise HTTPException(404, f"No hay registro de ejercicio para {target_date}.")
+
+    del history[target_date]
+    with open(EX_HISTORY_FILE, "w") as f:
+        json.dump(history, f, indent=2, ensure_ascii=False)
+
+    return {"ok": True, "deleted_date": target_date}
+
+
+@app.post("/health/sync", tags=["Apple Health"])
+def sync_health_data(data: HealthSyncModel):
+    """
+    Recibe datos de Apple Health (vía iOS Shortcuts) y los fusiona con el historial
+    de ejercicio. Apple Health tiene prioridad sobre la estimación por fórmula para
+    burned_kcal, pero preserva el detalle de ejercicios de Google Sheets si existe.
+
+    Reglas de merge:
+    - Si ya hay un registro para esa fecha con datos de Sheets → mantiene gym_detail,
+      reemplaza burned_kcal con el valor de Apple Health (más preciso).
+    - Si no hay registro previo → crea uno nuevo con los datos de Health.
+    - Siempre recalcula adjustment_kcal sobre el burned_kcal final.
+    """
+    try:
+        date.fromisoformat(data.date)
+    except ValueError:
+        raise HTTPException(400, "Formato de fecha inválido. Usa YYYY-MM-DD.")
+
+    if data.active_calories < 0:
+        raise HTTPException(400, "active_calories debe ser >= 0.")
+
+    # Cargar historial existente
+    history: dict = {}
+    if os.path.exists(EX_HISTORY_FILE):
+        with open(EX_HISTORY_FILE) as f:
+            history = json.load(f)
+
+    existing = history.get(data.date, {})
+    profile  = load_profile()
+    factor   = RECOVERY_FACTOR.get(profile["goal"], 0.85)
+
+    # Apple Health es la fuente de verdad para kcal cuando está disponible
+    burned_kcal     = round(data.active_calories)
+    adjustment_kcal = round(burned_kcal * factor)
+
+    # Construir sources — preservar fuentes previas
+    sources = list(existing.get("sources", []))
+    if existing.get("source") and existing["source"] not in sources:
+        sources.append(existing["source"])
+    if "apple_health" not in sources:
+        sources.append("apple_health")
+
+    # Preservar detalle de gym (Sheets) si existe
+    gym_detail = existing.get("gym_detail") or existing.get("exercises")
+
+    merged = {
+        **existing,
+        "burned_kcal":     burned_kcal,
+        "adjustment_kcal": adjustment_kcal,
+        "sources":         sources,
+        "health_data": {
+            "active_calories": data.active_calories,
+            "workout_type":    data.workout_type,
+            "duration_min":    data.duration_min,
+            "steps":           data.steps,
+            "heart_rate_avg":  data.heart_rate_avg,
+            "heart_rate_max":  data.heart_rate_max,
+        },
+    }
+    if gym_detail:
+        merged["gym_detail"] = gym_detail
+
+    history[data.date] = merged
+    with open(EX_HISTORY_FILE, "w") as f:
+        json.dump(history, f, indent=2, ensure_ascii=False)
+
+    return {
+        "ok":              True,
+        "date":            data.date,
+        "burned_kcal":     burned_kcal,
+        "adjustment_kcal": adjustment_kcal,
+        "sources":         sources,
+        "had_gym_detail":  bool(gym_detail),
+    }
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# PESO
+# ══════════════════════════════════════════════════════════════════════════════
+
+@app.get("/weight/history", tags=["Peso"])
+def get_weight_history():
+    """Historial completo de peso con análisis de progreso."""
+    history = load_weight_history()
+    profile = load_profile()
+    goal    = profile["goal"]
+    expected = EXPECTED_WEEKLY_CHANGE.get(goal, 0)
+
+    analysis = None
+    if len(history) >= 2:
+        first = history[0]
+        last  = history[-1]
+        weeks = max(
+            (date.fromisoformat(last["date"]) - date.fromisoformat(first["date"])).days / 7, 1
+        )
+        total_change = last["weight_kg"] - first["weight_kg"]
+        real_weekly  = total_change / weeks
+        diff_plan    = real_weekly - expected
+
+        if abs(diff_plan) < 0.1:
+            status = "on_track"
+            message = "Vas exactamente según el plan."
+        elif goal == "lose" and diff_plan > 0.1:
+            status = "warning"
+            message = "Pierdes menos de lo esperado. Revisa las porciones."
+        elif goal == "lose" and diff_plan < -0.2:
+            status = "warning"
+            message = "Pierdes más rápido de lo ideal. Asegúrate de comer suficiente."
+        elif goal == "gain" and diff_plan < -0.1:
+            status = "warning"
+            message = "Ganas menos masa de lo esperado. Considera aumentar calorías."
+        else:
+            status = "ok"
+            message = "Progreso dentro del rango esperado."
+
+        analysis = {
+            "total_change":   round(total_change, 1),
+            "real_weekly":    round(real_weekly, 2),
+            "expected_weekly": expected,
+            "weeks_elapsed":  round(weeks, 1),
+            "status":         status,
+            "message":        message,
+        }
+
+    return {
+        "history":        history,
+        "needs_weigh_in": needs_weigh_in(),
+        "expected_weekly": expected,
+        "analysis":       analysis,
+        "current_weight": history[-1]["weight_kg"] if history else None,
+    }
+
+
+@app.post("/weight", tags=["Peso"])
+def add_weight(data: WeightModel):
+    """Registra el peso actual."""
+    if not (30 <= data.weight_kg <= 300):
+        raise HTTPException(400, "Peso fuera de rango (30-300 kg)")
+
+    history = load_weight_history()
+    today   = date.today()
+    entry   = {
+        "date":      today.isoformat(),
+        "week":      today.strftime("%G-W%V"),
+        "weight_kg": data.weight_kg,
+    }
+    # Reemplazar si ya hay registro de hoy
+    history = [e for e in history if e.get("date") != entry["date"]]
+    history.append(entry)
+    save_weight_history(history)
+
+    # Actualizar perfil
+    profile = load_profile()
+    profile["weight_kg"] = data.weight_kg
+    save_profile(profile)
+    save_session(adaptive_day=None)
+
+    return {"ok": True, "entry": entry}
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ADHERENCIA
+# ══════════════════════════════════════════════════════════════════════════════
+
+@app.get("/adherence", tags=["Adherencia"])
+def get_adherence(days: int = 7):
+    """Historial de adherencia de los últimos N días."""
+    adh_log = {}
+    if os.path.exists(ADHERENCE_FILE):
+        with open(ADHERENCE_FILE) as f:
+            raw = json.load(f)
+        # Normalizar: puede ser dict {date: {pct}} o lista [{date, pct}]
+        if isinstance(raw, list):
+            adh_log = {e["date"]: e for e in raw if "date" in e}
+        elif isinstance(raw, dict):
+            adh_log = raw
+
+    today = date.today()
+    result = []
+    for i in range(days - 1, -1, -1):
+        d   = today - timedelta(days=i)
+        iso = d.isoformat()
+        entry = adh_log.get(iso)
+        result.append({
+            "date":      iso,
+            "day_label": d.strftime("%a %d/%m"),
+            "pct":       entry["pct"] if entry else None,
+            "has_data":  entry is not None,
+        })
+
+    weekly_avg = weekly_adherence()
+    return {"history": result, "weekly_average": weekly_avg}
+
+
+@app.post("/adherence", tags=["Adherencia"])
+def log_adherence_endpoint(data: AdherenceModel):
+    """Registra la adherencia del día (qué comidas se han cumplido)."""
+    meals     = data.meals        # {meal_key: bool}
+    kcal_map  = data.kcal_map     # {meal_key: kcal}
+    followed  = sum(1 for v in meals.values() if v)
+    total     = len(meals)
+    pct       = round(followed / total * 100) if total else 0
+    today_iso = date.today().isoformat()
+
+    # Kcal de comidas seguidas del plan
+    plan_kcal = sum(
+        kcal_map.get(k, 0) for k, v in meals.items()
+        if v and k not in data.skipped_meals
+    ) if kcal_map else 0
+
+    # Kcal de alimentos alternativos en comidas saltadas
+    replacement_kcal = sum(
+        sum(f.get("kcal", 0) for f in v.get("foods", []))
+        for v in data.skipped_meals.values()
+    )
+
+    consumed_kcal = round(plan_kcal + replacement_kcal) if (kcal_map or data.skipped_meals) else None
+
+    adh_log = {}
+    if os.path.exists(ADHERENCE_FILE):
+        with open(ADHERENCE_FILE) as f:
+            adh_log = json.load(f)
+
+    entry = {"meals": meals, "pct": pct}
+    if data.skipped_meals:
+        entry["skipped_meals"] = data.skipped_meals
+    if consumed_kcal is not None:
+        entry["consumed_kcal"] = consumed_kcal
+
+    adh_log[today_iso] = entry
+    with open(ADHERENCE_FILE, "w") as f:
+        json.dump(adh_log, f, indent=2)
+
+    return {"ok": True, "pct": pct, "followed": followed, "total": total,
+            "consumed_kcal": entry.get("consumed_kcal", 0)}
+
+
+@app.get("/adherence/today", tags=["Adherencia"])
+def get_today_adherence():
+    """Devuelve las kcal consumidas y adherencia del día de hoy."""
+    today_iso = date.today().isoformat()
+    adh_log   = {}
+    if os.path.exists(ADHERENCE_FILE):
+        with open(ADHERENCE_FILE) as f:
+            adh_log = json.load(f)
+    entry = adh_log.get(today_iso, {})
+    return {
+        "pct":           entry.get("pct", 0),
+        "consumed_kcal": entry.get("consumed_kcal", 0),
+        "meals":         entry.get("meals", {}),
+    }
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ENCUESTA SEMANAL
+# ══════════════════════════════════════════════════════════════════════════════
+
+@app.get("/survey", tags=["Encuesta"])
+def get_survey():
+    """Última encuesta y si hace falta rellenar una nueva."""
+    return {
+        "needs_survey": needs_survey(),
+        "last_scores":  last_survey_scores(),
+        "history":      load_surveys()[-4:],   # últimas 4 semanas
+        "questions":    [{"key": k, "label": q} for k, q in QUESTIONS],
+    }
+
+
+@app.post("/survey", tags=["Encuesta"])
+def submit_survey(data: SurveyModel):
+    vals   = data.model_dump()
+    score  = round(sum(vals.values()) / len(vals), 1)
+    today  = date.today()
+    entry  = {
+        "date":  today.isoformat(),
+        "week":  today.strftime("%G-W%V"),
+        **vals,
+        "score": score,
+    }
+    history = load_surveys()
+    history.append(entry)
+    save_surveys(history)
+    return {"ok": True, "score": score, "entry": entry}
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# INFORME SEMANAL
+# ══════════════════════════════════════════════════════════════════════════════
+
+@app.get("/report/weekly", tags=["Informe"])
+def get_weekly_report():
+    profile       = load_profile()
+    goal          = profile["goal"]
+    ex_days, ex_kcal = _last_week_exercise()
+    prev_w, curr_w   = _weight_change()
+    adherence        = weekly_adherence()
+    survey           = last_survey_scores()
+    weight_change    = round(curr_w - prev_w, 1) if prev_w and curr_w else None
+    rec_raw          = _recommendation(goal, adherence, ex_days, weight_change, survey)
+    recommendations  = [line.strip().lstrip("•").strip()
+                        for line in rec_raw.strip().split("\n") if line.strip()]
+
+    if needs_weekly_report():
+        mark_report_shown()
+
+    return {
+        "exercise": {"days_trained": ex_days, "kcal_burned": ex_kcal},
+        "weight":   {"current": curr_w, "previous": prev_w, "change": weight_change},
+        "adherence": adherence,
+        "survey":    survey,
+        "recommendations": recommendations,
+        "needs_report": False,   # ya lo marcamos como visto
+    }
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ALERTAS / DASHBOARD
+# ══════════════════════════════════════════════════════════════════════════════
+
+@app.get("/dashboard", tags=["Dashboard"])
+def get_dashboard():
+    """Todo lo necesario para el dashboard en un solo request."""
+    profile  = load_profile()
+    session  = _get_session()
+    ex_data  = session.get("exercise_data") or {"burned_kcal": 0, "adjustment_kcal": 0, "exercises": []}
+
+    # Kcal consumidas hoy (desde adherencia)
+    today_iso = date.today().isoformat()
+    adh_log   = {}
+    if os.path.exists(ADHERENCE_FILE):
+        with open(ADHERENCE_FILE) as f:
+            adh_log = json.load(f)
+    consumed_kcal = adh_log.get(today_iso, {}).get("consumed_kcal", 0)
+    today_tr = session.get("today_training") or {}
+    ex_adj   = ex_data.get("adjustment_kcal", 0) + today_tr.get("bonus_kcal", 0)
+
+    bmr     = calculate_bmr(profile["gender"], profile["age"],
+                            profile["height_cm"], profile["weight_kg"])
+    tdee    = calculate_tdee(bmr, profile["activity_level"])
+    target  = calculate_daily_target(bmr, profile["goal"], ex_adj,
+                                     activity_level=profile.get("activity_level", 1))
+    macros  = calculate_macros(profile["weight_kg"], target, profile["goal"])
+
+    d_event = days_to_event()
+    event   = get_event()
+
+    alerts = []
+    if needs_weigh_in():
+        alerts.append({"type": "weigh_in", "message": "Toca registrar tu peso esta semana"})
+    if needs_survey():
+        alerts.append({"type": "survey", "message": "Encuesta semanal pendiente"})
+    if needs_weekly_report():
+        alerts.append({"type": "weekly_report", "message": "Informe semanal disponible"})
+    if d_event is not None and d_event <= 7:
+        alerts.append({"type": "event", "message": f"Evento '{event['name']}' en {d_event} días",
+                       "days": d_event})
+
+    return {
+        "profile":      profile,
+        "nutrition":    {"bmr": round(bmr), "tdee_ref": round(tdee),
+                         "daily_target": target, "macros": macros,
+                         "consumed_kcal": consumed_kcal},
+        "exercise_data": ex_data,
+        "today_training": today_tr,
+        "alerts":        alerts,
+        "session_has_exercise": session.get("exercise_data") is not None,
+    }
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# PREFERENCIAS
+# ══════════════════════════════════════════════════════════════════════════════
+
+@app.get("/preferences", tags=["Preferencias"])
+def get_preferences():
+    return load_prefs()
+
+
+@app.put("/preferences", tags=["Preferencias"])
+def update_preferences(data: PreferencesModel):
+    prefs = {"excluded": data.excluded, "favorites": data.favorites, "disliked": data.disliked}
+    save_prefs(prefs)
+    save_session(week_plan=None, adaptive_day=None)
+    return {"ok": True, "preferences": prefs}
+
+
+@app.post("/preferences/excluded", tags=["Preferencias"])
+def add_excluded(keyword: str):
+    prefs = load_prefs()
+    if keyword not in prefs["excluded"]:
+        prefs["excluded"].append(keyword.lower().strip())
+        save_prefs(prefs)
+        save_session(week_plan=None, adaptive_day=None)
+    return prefs
+
+
+@app.delete("/preferences/excluded/{keyword}", tags=["Preferencias"])
+def remove_excluded(keyword: str):
+    prefs = load_prefs()
+    prefs["excluded"] = [k for k in prefs["excluded"] if k != keyword]
+    save_prefs(prefs)
+    save_session(week_plan=None, adaptive_day=None)
+    return prefs
+
+
+@app.post("/preferences/favorites", tags=["Preferencias"])
+def add_favorite(keyword: str):
+    prefs = load_prefs()
+    if keyword not in prefs["favorites"]:
+        prefs["favorites"].append(keyword.lower().strip())
+        save_prefs(prefs)
+        save_session(week_plan=None, adaptive_day=None)
+    return prefs
+
+
+@app.delete("/preferences/favorites/{keyword}", tags=["Preferencias"])
+def remove_favorite(keyword: str):
+    prefs = load_prefs()
+    prefs["favorites"] = [k for k in prefs["favorites"] if k != keyword]
+    save_prefs(prefs)
+    save_session(week_plan=None, adaptive_day=None)
+    return prefs
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# EVENTOS / COMPETICIÓN
+# ══════════════════════════════════════════════════════════════════════════════
+
+@app.get("/event", tags=["Evento"])
+def get_event_status():
+    event = get_event()
+    d     = days_to_event()
+    if not event:
+        return {"has_event": False}
+
+    _, msg = event_calorie_adjustment(2000)  # mensaje con base ficticia
+    return {
+        "has_event":   True,
+        "name":        event["name"],
+        "date":        event["date"],
+        "days_to_event": d,
+        "message":     msg.strip(),
+    }
+
+
+@app.post("/event", tags=["Evento"])
+def create_event(data: EventModel):
+    event_date = date.fromisoformat(data.date)
+    if event_date <= date.today():
+        raise HTTPException(400, "La fecha debe ser futura")
+    event = {"name": data.name, "date": data.date}
+    with open(COMPETITION_FILE, "w") as f:
+        json.dump(event, f, indent=2)
+    save_session(adaptive_day=None)
+    return {"ok": True, "event": event}
+
+
+@app.delete("/event", tags=["Evento"])
+def delete_event():
+    if os.path.exists(COMPETITION_FILE):
+        os.remove(COMPETITION_FILE)
+    save_session(adaptive_day=None)
+    return {"ok": True}
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ENTRENAMIENTO (rutinas)
+# ══════════════════════════════════════════════════════════════════════════════
+
+@app.get("/training/routine", tags=["Entrenamiento"])
+def get_routine(days: int = 3, type: str = "gym"):
+    """
+    Genera una rutina de entrenamiento.
+    type: "gym" | "calistenia"
+    """
+    profile = load_profile()
+    weight  = profile["weight_kg"]
+
+    if type == "gym":
+        if days <= 3:
+            return {
+                "type":       "full_body",
+                "days":       days,
+                "day_plan":   [{"day": i + 1, "label": "Full Body", "exercises": FULL_BODY_ROUTINE}
+                               for i in range(days)],
+                "protein_post": round(weight * 0.3),
+            }
+        else:
+            day_plan_keys = _build_ppl_plan(days)
+            return {
+                "type":       "ppl",
+                "days":       days,
+                "day_plan":   [{"day": i + 1, "label": key, "exercises": PPL_ROUTINE[key]}
+                               for i, key in enumerate(day_plan_keys)],
+                "protein_post": round(weight * 0.3),
+            }
+    else:
+        return {
+            "type":       "calistenia",
+            "days":       days,
+            "levels":     ["principiante", "intermedio", "avanzado"],
+            "blocks":     {block: list(levels.keys())
+                           for block, levels in CALISTENIA.items()},
+        }
+
+
+@app.get("/training/calistenia", tags=["Entrenamiento"])
+def get_calistenia_routine(
+    days: int = 3,
+    level: str = "intermedio",
+    has_barra: bool = True,
+    has_paralelas: bool = True,
+):
+    profile  = load_profile()
+    capped   = min(max(days, 2), 5)
+    plan     = CALISTENIA_PLANS.get(capped, CALISTENIA_PLANS[3])
+    day_list = []
+    for day_num, blocks in enumerate(plan, 1):
+        block_list = []
+        for block in blocks:
+            exercises = CALISTENIA[block].get(level, [])
+            exercises = _filter_exercises(exercises, has_barra, has_paralelas)
+            block_list.append({"block": block, "exercises": exercises})
+        day_list.append({"day": day_num, "label": " + ".join(blocks), "blocks": block_list})
+
+    return {
+        "type":             "calistenia",
+        "level":            level,
+        "days":             capped,
+        "has_barra":        has_barra,
+        "has_paralelas":    has_paralelas,
+        "day_plan":         day_list,
+        "protein_post":     round(profile["weight_kg"] * 0.3),
+    }
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# GAMIFICACIÓN
+# ══════════════════════════════════════════════════════════════════════════════
+
+@app.get("/gamification/status", tags=["Gamificación"])
+def get_gamification_status():
+    """Devuelve el nivel, XP total, progreso al siguiente nivel y desglose de puntos."""
+    return gamification_status()
+
+"use client"
+
+import { useEffect, useState } from "react"
+import { AppLayout } from "@/components/app-layout"
+import { Card } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import {
+  Flame, Dumbbell, Bell, Scale, ClipboardList,
+  Calendar, TrendingUp, Beef, Wheat, Droplet, Star, X,
+} from "lucide-react"
+import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts"
+import type { DashboardData, GamificationStatus } from "@/lib/api"
+import { fetchDashboard, fetchGamification } from "@/lib/api"
+import { LevelBadge } from "@/components/level-badge"
+import { useCheatDay } from "@/context/CheatDayContext"
+
+// Mock data for development when API is unavailable
+const mockDashboardData: DashboardData = {
+  dailyCalorieTarget: 2200,
+  caloriesConsumed: 1650,
+  macros: {
+    protein: { current: 95, target: 150 },
+    carbs: { current: 180, target: 250 },
+    fat: { current: 55, target: 70 },
+  },
+  exerciseYesterday: {
+    type: "Running",
+    minutes: 45,
+    caloriesBurned: 420,
+  },
+  alerts: [
+    { id: "1", type: "weigh-in", message: "Time for your weekly weigh-in!" },
+    { id: "2", type: "survey", message: "Complete your weekly sensations survey" },
+    { id: "3", type: "event", message: "Beach vacation in 3 weeks", dueDate: "2024-02-15" },
+  ],
+}
+
+const todayISO = new Date().toISOString().slice(0, 10)
+
+export default function DashboardPage() {
+  const [data, setData]         = useState<DashboardData | null>(null)
+  const [loading, setLoading]   = useState(true)
+  const [showConfirm, setShowConfirm] = useState(false)
+  const [gamification, setGamification] = useState<GamificationStatus | null>(null)
+
+  const { record, isCheatDay, isWeeklyLimitReached, activateCheatDay } = useCheatDay()
+
+  const cheatActive  = isCheatDay(todayISO)
+  const weeklyUsed   = isWeeklyLimitReached(todayISO) && !cheatActive
+
+  useEffect(() => {
+    fetchDashboard()
+      .then(setData)
+      .catch(() => setData(mockDashboardData))
+      .finally(() => setLoading(false))
+    fetchGamification().then(setGamification).catch(() => null)
+  }, [])
+
+  if (loading) {
+    return (
+      <AppLayout>
+        <div className="flex items-center justify-center h-full">
+          <div className="text-white/60">Cargando...</div>
+        </div>
+      </AppLayout>
+    )
+  }
+
+  const dashboard = data || mockDashboardData
+  const calorieProgress = Math.round((dashboard.caloriesConsumed / dashboard.dailyCalorieTarget) * 100)
+
+  const macroData = [
+    { name: "Proteínas", value: dashboard.macros.protein.current, color: "#f87171" },
+    { name: "Carbohidratos", value: dashboard.macros.carbs.current, color: "#fbbf24" },
+    { name: "Grasas", value: dashboard.macros.fat.current, color: "#60a5fa" },
+  ]
+
+  const getAlertIcon = (type: string) => {
+    switch (type) {
+      case "weigh-in":
+        return Scale
+      case "survey":
+        return ClipboardList
+      case "event":
+        return Calendar
+      default:
+        return Bell
+    }
+  }
+
+  const getAlertColor = (type: string) => {
+    switch (type) {
+      case "weigh-in":
+        return "bg-blue-500/20 text-blue-400 border-blue-400/30"
+      case "survey":
+        return "bg-amber-500/20 text-amber-400 border-amber-400/30"
+      case "event":
+        return "bg-emerald-500/20 text-emerald-400 border-emerald-400/30"
+      default:
+        return "bg-white/20 text-white border-white/30"
+    }
+  }
+
+  return (
+    <AppLayout>
+      <div className="space-y-6">
+        {/* Header */}
+        <Card className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-6">
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <div>
+              <h2 className="text-3xl font-bold text-white">Panel</h2>
+              <p className="text-white/60">Sigue tu nutrición y objetivos de fitness</p>
+            </div>
+            <div className="flex items-center gap-3 flex-wrap">
+              {/* Comodín button */}
+              {cheatActive ? (
+                <div className="flex items-center gap-2 px-4 py-2 bg-amber-500/20 border border-amber-400/30 rounded-xl">
+                  <Star className="h-4 w-4 text-amber-400 fill-amber-400" />
+                  <span className="text-amber-300 text-sm font-medium">Comodín activo hoy</span>
+                </div>
+              ) : weeklyUsed ? (
+                <div
+                  title="Tu metabolismo necesita estabilidad. ¡Reserva tu próximo comodín para la semana que viene!"
+                  className="flex items-center gap-2 px-4 py-2 bg-white/5 border border-white/10 rounded-xl cursor-not-allowed opacity-60"
+                >
+                  <Star className="h-4 w-4 text-white/40" />
+                  <span className="text-white/40 text-sm">Comodín usado</span>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setShowConfirm(true)}
+                  className="flex items-center gap-2 px-4 py-2 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-400/20 hover:border-amber-400/40 rounded-xl text-amber-300 text-sm font-medium transition-colors"
+                >
+                  <Star className="h-4 w-4" />
+                  Activar Comodín
+                </button>
+              )}
+              <div className="text-right">
+                <p className="text-white/60 text-sm">Hoy</p>
+                <p className="text-white font-medium">
+                  {new Date().toLocaleDateString("es-ES", { weekday: "long", month: "short", day: "numeric" })}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Weekly limit tooltip shown inline when hovered */}
+          {weeklyUsed && (
+            <p className="mt-3 text-white/40 text-xs">
+              ⚠ Tu metabolismo necesita estabilidad. ¡Reserva tu próximo comodín para la semana que viene!
+            </p>
+          )}
+        </Card>
+
+        {/* Comodín confirmation modal */}
+        {showConfirm && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-6 w-full max-w-sm">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <Star className="h-5 w-5 text-amber-400 fill-amber-400" />
+                  <h3 className="text-white font-bold text-lg">Activar Comodín</h3>
+                </div>
+                <button onClick={() => setShowConfirm(false)} className="text-white/50 hover:text-white">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <p className="text-white/70 text-sm mb-2">
+                El límite calórico de hoy se vuelve <span className="text-amber-300 font-medium">flexible</span>.
+                Los avisos en rojo desaparecen.
+              </p>
+              <p className="text-white/50 text-xs mb-5">
+                Al final del día podrás repartir el exceso en los próximos 3 días para mantener tu meta semanal intacta.
+                Solo puedes usar un comodín por semana.
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowConfirm(false)}
+                  className="flex-1 px-4 py-2 border border-white/20 rounded-xl text-white/60 text-sm hover:bg-white/5"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={() => { activateCheatDay(todayISO); setShowConfirm(false) }}
+                  className="flex-1 px-4 py-2 bg-amber-500 hover:bg-amber-600 rounded-xl text-white text-sm font-medium"
+                >
+                  Activar
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Gamification card */}
+        {gamification && (
+          <Card className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-5">
+            <div className="flex items-center justify-between gap-4 flex-wrap">
+              <div className="flex-1 min-w-48">
+                <LevelBadge status={gamification} />
+              </div>
+              <div className="flex gap-3 text-center flex-wrap justify-end">
+                {[
+                  { label: "Entrenos",   value: gamification.breakdown.training,  color: "text-emerald-300" },
+                  { label: "Dieta",      value: gamification.breakdown.diet,      color: "text-amber-300"   },
+                  { label: "Combos",     value: gamification.breakdown.combo,     color: "text-violet-300"  },
+                  { label: "Rachas",     value: gamification.breakdown.streak,    color: "text-red-300"     },
+                ].map(({ label, value, color }) => (
+                  <div key={label} className="bg-white/5 rounded-xl px-3 py-2 min-w-16">
+                    <p className={`text-sm font-bold ${color}`}>+{value}</p>
+                    <p className="text-white/40 text-[10px]">{label}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </Card>
+        )}
+
+        {/* Calorie and Macro Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+          {/* Daily Calories */}
+          <Card className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-6 transition-all duration-300 hover:bg-white/15">
+            <div className="flex items-start justify-between mb-4">
+              <div>
+                <p className="text-white/60 text-sm">Calorías del día</p>
+                <p className="text-3xl font-bold text-white">
+                  {dashboard.caloriesConsumed.toLocaleString()}
+                </p>
+                <p className="text-white/60 text-sm">
+                  de {dashboard.dailyCalorieTarget.toLocaleString()} kcal
+                </p>
+              </div>
+              <Flame className="h-8 w-8 text-orange-400" />
+            </div>
+            <div className="space-y-2">
+              <div className="w-full bg-white/10 rounded-full h-3">
+                <div
+                  className="bg-gradient-to-r from-orange-400 to-red-500 h-3 rounded-full transition-all duration-500"
+                  style={{ width: `${Math.min(calorieProgress, 100)}%` }}
+                />
+              </div>
+              <p className="text-right text-sm text-white/60">{calorieProgress}%</p>
+            </div>
+          </Card>
+
+          {/* Macros Donut Chart */}
+          <Card className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-6 transition-all duration-300 hover:bg-white/15">
+            <p className="text-white/60 text-sm mb-2">Distribución de macros</p>
+            <div className="flex items-center gap-4">
+              <div className="w-32 h-32">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={macroData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={35}
+                      outerRadius={55}
+                      paddingAngle={3}
+                      dataKey="value"
+                    >
+                      {macroData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <Beef className="h-4 w-4 text-red-400" />
+                  <span className="text-white/80 text-sm">
+                    Proteínas: {dashboard.macros.protein.current}g / {dashboard.macros.protein.target}g
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Wheat className="h-4 w-4 text-amber-400" />
+                  <span className="text-white/80 text-sm">
+                    Carbohidratos: {dashboard.macros.carbs.current}g / {dashboard.macros.carbs.target}g
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Droplet className="h-4 w-4 text-blue-400" />
+                  <span className="text-white/80 text-sm">
+                    Grasas: {dashboard.macros.fat.current}g / {dashboard.macros.fat.target}g
+                  </span>
+                </div>
+              </div>
+            </div>
+          </Card>
+
+          {/* Yesterday's Exercise */}
+          <Card className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-6 transition-all duration-300 hover:bg-white/15">
+            <div className="flex items-start justify-between mb-4">
+              <div>
+                <p className="text-white/60 text-sm">Ejercicio de ayer</p>
+                {dashboard.exerciseYesterday ? (
+                  <>
+                    <p className="text-2xl font-bold text-white">
+                      {dashboard.exerciseYesterday.type}
+                    </p>
+                    <p className="text-emerald-400 font-medium">
+                      {dashboard.exerciseYesterday.minutes} min
+                    </p>
+                  </>
+                ) : (
+                  <p className="text-xl font-medium text-white/60">Sin ejercicio registrado</p>
+                )}
+              </div>
+              <Dumbbell className="h-8 w-8 text-emerald-400" />
+            </div>
+            {dashboard.exerciseYesterday && (
+              <div className="flex items-center gap-2 bg-white/5 rounded-xl p-3">
+                <TrendingUp className="h-5 w-5 text-orange-400" />
+                <span className="text-white/80">
+                  {dashboard.exerciseYesterday.caloriesBurned} kcal quemadas
+                </span>
+              </div>
+            )}
+          </Card>
+        </div>
+
+        {/* Alerts */}
+        <Card className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <Bell className="h-5 w-5 text-white" />
+            <h3 className="text-xl font-semibold text-white">Alertas y recordatorios</h3>
+          </div>
+          <div className="space-y-3">
+            {dashboard.alerts.map((alert) => {
+              const AlertIcon = getAlertIcon(alert.type)
+              return (
+                <div
+                  key={alert.id}
+                  className="flex items-center justify-between p-4 bg-white/5 rounded-xl border border-white/10 hover:bg-white/10 transition-all duration-300"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className={`p-2 rounded-lg ${getAlertColor(alert.type)}`}>
+                      <AlertIcon className="h-5 w-5" />
+                    </div>
+                    <span className="text-white">{alert.message}</span>
+                  </div>
+                  {alert.dueDate && (
+                    <Badge className="bg-white/10 text-white/80 border-white/20">
+                      {new Date(alert.dueDate).toLocaleDateString()}
+                    </Badge>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </Card>
+      </div>
+    </AppLayout>
+  )
+}
+"use client"
+
+import { useEffect, useState } from "react"
+import { AppLayout } from "@/components/app-layout"
+import { Card } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Slider } from "@/components/ui/slider"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Calendar } from "@/components/ui/calendar"
+import {
+  Dumbbell,
+  Clock,
+  Flame,
+  History,
+  Sparkles,
+  Plus,
+  CalendarDays,
+  Calendar as CalendarIcon,
+  AlertCircle,
+  CheckCircle2,
+  Info,
+  TrendingUp,
+  Zap,
+  Trash2,
+  X,
+  Sheet,
+  HardDrive,
+  ChevronDown,
+  ChevronRight,
+  Heart,
+  Activity,
+  Download,
+} from "lucide-react"
+import type { TrainingData, ExerciseRoutine, ExerciseImpact, GymHistoryData } from "@/lib/api"
+import { fetchTraining, logExerciseForDate, generateRoutine, deleteExerciseByDate, fetchGymHistory } from "@/lib/api"
+
+const mockTrainingData: TrainingData = {
+  exerciseTypes: ["Correr", "Ciclismo", "Natación", "Pesas", "HIIT", "Yoga", "Caminar", "Remo"],
+  history: [
+    { id: "1", date: "2024-01-14", type: "Correr", minutes: 45, caloriesBurned: 420 },
+    { id: "2", date: "2024-01-13", type: "Pesas", minutes: 60, caloriesBurned: 350 },
+    { id: "3", date: "2024-01-12", type: "HIIT", minutes: 30, caloriesBurned: 380 },
+    { id: "4", date: "2024-01-11", type: "Ciclismo", minutes: 50, caloriesBurned: 400 },
+    { id: "5", date: "2024-01-10", type: "Natación", minutes: 40, caloriesBurned: 360 },
+    { id: "6", date: "2024-01-09", type: "Yoga", minutes: 45, caloriesBurned: 150 },
+    { id: "7", date: "2024-01-08", type: "Correr", minutes: 35, caloriesBurned: 320 },
+  ],
+  streak: 0,
+  totalKcal: 0,
+  trainedDays: 0,
+  yesterdayExercise: null,
+  todayTraining: null,
+}
+
+const mockGymRoutine: ExerciseRoutine[] = [
+  { day: "Día 1 - Empuje", label: "Empuje", exercises: [{ name: "Press de banca", sets: "4x8-10", muscles: "Pecho, Hombros, Tríceps" }, { name: "Press militar", sets: "3x10-12", muscles: "Hombros, Tríceps" }, { name: "Fondos en paralelas", sets: "3x12-15", muscles: "Pecho, Tríceps" }, { name: "Elevaciones laterales", sets: "3x12-15", muscles: "Hombros" }] },
+  { day: "Día 2 - Tirón", label: "Tirón", exercises: [{ name: "Peso muerto", sets: "4x6-8", muscles: "Espalda, Isquios, Glúteos" }, { name: "Remo con barra", sets: "4x8-10", muscles: "Espalda, Bíceps" }, { name: "Jalón al pecho", sets: "3x10-12", muscles: "Espalda, Bíceps" }, { name: "Curl de bíceps", sets: "3x12-15", muscles: "Bíceps" }] },
+  { day: "Día 3 - Piernas", label: "Piernas", exercises: [{ name: "Sentadillas", sets: "4x8-10", muscles: "Cuádriceps, Glúteos" }, { name: "Prensa de piernas", sets: "3x10-12", muscles: "Cuádriceps" }, { name: "Peso muerto rumano", sets: "3x10-12", muscles: "Isquios, Glúteos" }, { name: "Elevaciones de gemelos", sets: "4x15-20", muscles: "Gemelos" }] },
+]
+
+const mockCalisthenicsRoutine: ExerciseRoutine[] = [
+  { day: "Día 1 - Tren superior", label: "Superior", exercises: [{ name: "Flexiones", sets: "4x15-20", muscles: "Pecho, Tríceps" }, { name: "Dominadas", sets: "4x8-12", muscles: "Espalda, Bíceps" }, { name: "Fondos", sets: "3x12-15", muscles: "Tríceps, Pecho" }, { name: "Flexiones en pica", sets: "3x10-12", muscles: "Hombros" }] },
+  { day: "Día 2 - Tren inferior", label: "Inferior", exercises: [{ name: "Sentadilla a una pierna", sets: "3x6-8", muscles: "Cuádriceps, Glúteos" }, { name: "Sentadillas con salto", sets: "4x15-20", muscles: "Piernas completo" }, { name: "Zancadas", sets: "3x12", muscles: "Cuádriceps, Glúteos" }, { name: "Elevaciones de gemelos", sets: "4x20-25", muscles: "Gemelos" }] },
+  { day: "Día 3 - Core", label: "Core", exercises: [{ name: "Plancha", sets: "3x60s", muscles: "Core completo" }, { name: "Elevaciones de piernas", sets: "4x15-20", muscles: "Abdomen" }, { name: "Giros rusos", sets: "3x20", muscles: "Oblicuos" }, { name: "Mountain climbers", sets: "3x30s", muscles: "Core, Cardio" }] },
+]
+
+// ── Constantes ───────────────────────────────────────────────────────────────
+// Pega aquí el enlace iCloud cuando compartas el Shortcut desde tu iPhone:
+// Shortcuts → ··· → Compartir → Copiar enlace iCloud
+const SHORTCUT_URL = "https://www.icloud.com/shortcuts/ce9f7daa9e0d4b50af2fe50cb9e63096"
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+function toLocalIso(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
+}
+
+function formatDateEs(iso: string): string {
+  const [y, m, day] = iso.split("-").map(Number)
+  const d = new Date(y, m - 1, day)
+  return d.toLocaleDateString("es-ES", { weekday: "short", day: "numeric", month: "short" })
+}
+
+function getMondayOfWeek(d: Date): Date {
+  const day = d.getDay()
+  const diff = (day === 0 ? -6 : 1 - day)
+  const monday = new Date(d)
+  monday.setDate(d.getDate() + diff)
+  return monday
+}
+
+function getImpactStyle(impact: ExerciseImpact) {
+  switch (impact.type) {
+    case "today":
+      return { bg: "bg-emerald-500/20 border-emerald-500/40", icon: <Zap className="h-4 w-4 text-emerald-400" />, color: "text-emerald-300" }
+    case "yesterday":
+      return { bg: "bg-blue-500/20 border-blue-500/40", icon: <TrendingUp className="h-4 w-4 text-blue-400" />, color: "text-blue-300" }
+    case "this_week":
+      return { bg: "bg-amber-500/20 border-amber-500/40", icon: <CheckCircle2 className="h-4 w-4 text-amber-400" />, color: "text-amber-300" }
+    case "scheduled":
+      return { bg: "bg-purple-500/20 border-purple-500/40", icon: <CalendarIcon className="h-4 w-4 text-purple-400" />, color: "text-purple-300" }
+    default:
+      return { bg: "bg-white/10 border-white/20", icon: <Info className="h-4 w-4 text-white/60" />, color: "text-white/60" }
+  }
+}
+
+// ── Component ─────────────────────────────────────────────────────────────────
+
+export default function TrainingPage() {
+  const [data, setData] = useState<TrainingData | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  // Log exercise state
+  const [selectedType, setSelectedType] = useState("")
+  const [minutes, setMinutes] = useState("")
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date())
+  const [calendarOpen, setCalendarOpen] = useState(false)
+  const [logging, setLogging] = useState(false)
+  const [lastImpact, setLastImpact] = useState<ExerciseImpact | null>(null)
+  const [savedKcal, setSavedKcal] = useState<number | null>(null)
+
+  // Gym history from Google Sheets / Excel
+  const [gymHistory, setGymHistory] = useState<GymHistoryData | null>(null)
+  const [gymLoading, setGymLoading] = useState(false)
+  const [gymError, setGymError] = useState<string | null>(null)
+  const [expandedSession, setExpandedSession] = useState<string | null>(null)
+
+  // Routine state
+  const [routineType, setRoutineType] = useState<"gym" | "calisthenics">("gym")
+  const [daysPerWeek, setDaysPerWeek] = useState([3])
+  const [generatedRoutine, setGeneratedRoutine] = useState<ExerciseRoutine[]>([])
+  const [generating, setGenerating] = useState(false)
+
+  useEffect(() => {
+    fetchTraining()
+      .then(setData)
+      .catch(() => setData(mockTrainingData))
+      .finally(() => setLoading(false))
+  }, [])
+
+  const loadGymHistory = () => {
+    setGymLoading(true)
+    setGymError(null)
+    fetchGymHistory(7)
+      .then(setGymHistory)
+      .catch(() => setGymError("No se pudo cargar el historial de gym. Verifica que el backend está activo y las credenciales configuradas."))
+      .finally(() => setGymLoading(false))
+  }
+
+  // Si las credenciales acaban de configurarse, recargar automáticamente
+  useEffect(() => {
+    if (gymHistory?.credentials_configured && gymHistory.sessions.length === 0) {
+      loadGymHistory()
+    }
+  }, [gymHistory?.credentials_configured])
+
+  // ── Computed date info ──────────────────────────────────────────────────────
+  const today = new Date()
+  const todayIso = toLocalIso(today)
+  const selectedIso = toLocalIso(selectedDate)
+  const monday = getMondayOfWeek(today)
+  const sunday = new Date(monday); sunday.setDate(monday.getDate() + 6)
+
+  const isToday = selectedIso === todayIso
+  const isYesterday = selectedIso === toLocalIso(new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1))
+  const isFuture = selectedDate > today
+  const selectedMs = selectedDate.getTime()
+  const mondayMs = monday.getTime(); const sundayMs = sunday.getTime()
+  const inCurrentWeek = selectedMs >= mondayMs && selectedMs <= sundayMs + 86_400_000
+
+  function getDateLabel() {
+    if (isToday) return "Hoy"
+    if (isYesterday) return "Ayer"
+    return formatDateEs(selectedIso)
+  }
+
+  function getPreviewImpact(): string {
+    if (isFuture) return "Se registrará como actividad programada"
+    if (isToday) return "Afecta el objetivo calórico de hoy"
+    if (isYesterday) return "Aplica ajuste de recuperación a hoy"
+    if (inCurrentWeek) return "Completa un día de la semana actual"
+    return "Semana anterior — no afecta el plan actual"
+  }
+
+  // ── Handlers ────────────────────────────────────────────────────────────────
+
+  const handleLogExercise = async () => {
+    if (!selectedType || !minutes) return
+    setLogging(true)
+    setLastImpact(null)
+    setSavedKcal(null)
+    try {
+      const result = await logExerciseForDate({
+        date:    selectedIso,
+        type:    selectedType,
+        minutes: parseInt(minutes),
+      })
+      setLastImpact(result.impact)
+      setSavedKcal(result.exercise_data.burned_kcal)
+
+      const newLog = {
+        id:            Date.now().toString(),
+        date:          selectedIso,
+        type:          selectedType.includes("|") ? selectedType.split("|")[1] : selectedType,
+        minutes:       parseInt(minutes),
+        caloriesBurned: result.exercise_data.burned_kcal || Math.round(parseInt(minutes) * 8),
+      }
+      setData((prev) => prev ? { ...prev, history: [newLog, ...prev.history] } : prev)
+    } catch {
+      // Mock fallback
+      const burned = Math.round(parseInt(minutes) * 8)
+      setSavedKcal(burned)
+
+      // Build a local mock impact
+      let impactType: ExerciseImpact["type"] = "past_week"
+      let impactMsg = "Actividad registrada en el historial."
+      if (isFuture) { impactType = "scheduled"; impactMsg = "Actividad programada registrada." }
+      else if (isToday) { impactType = "today"; impactMsg = "Actividad de hoy registrada. Afecta el objetivo calórico del día." }
+      else if (isYesterday) { impactType = "yesterday"; impactMsg = "Actividad de ayer registrada. Se aplica ajuste de recuperación a hoy." }
+      else if (inCurrentWeek) { impactType = "this_week"; impactMsg = "Actividad dentro de la semana actual." }
+
+      setLastImpact({
+        type:            impactType,
+        message:         impactMsg,
+        in_current_week: inCurrentWeek,
+        is_today:        isToday,
+        is_yesterday:    isYesterday,
+        is_future:       isFuture,
+      })
+
+      const newLog = {
+        id:            Date.now().toString(),
+        date:          selectedIso,
+        type:          selectedType.includes("|") ? selectedType.split("|")[1] : selectedType,
+        minutes:       parseInt(minutes),
+        caloriesBurned: burned,
+      }
+      setData((prev) => prev ? { ...prev, history: [newLog, ...prev.history] } : prev)
+    }
+    setSelectedType("")
+    setMinutes("")
+    setLogging(false)
+  }
+
+  // ── Delete exercise ─────────────────────────────────────────────────────────
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
+  const [deleting, setDeleting] = useState(false)
+
+  const handleDeleteExercise = async (logId: string, logDate: string) => {
+    if (confirmDeleteId !== logId) {
+      setConfirmDeleteId(logId)
+      return
+    }
+    setDeleting(true)
+    try {
+      await deleteExerciseByDate(logDate)
+    } catch {
+      // Si el backend falla (mock mode) igualmente eliminamos del estado local
+    }
+    setData((prev) =>
+      prev ? { ...prev, history: prev.history.filter((h) => h.id !== logId) } : prev
+    )
+    setConfirmDeleteId(null)
+    setDeleting(false)
+  }
+
+  const handleGenerateRoutine = async () => {
+    setGenerating(true)
+    try {
+      const routine = await generateRoutine({ type: routineType, daysPerWeek: daysPerWeek[0] })
+      setGeneratedRoutine(routine)
+    } catch {
+      const mockRoutine = routineType === "gym" ? mockGymRoutine : mockCalisthenicsRoutine
+      setGeneratedRoutine(mockRoutine.slice(0, daysPerWeek[0]))
+    }
+    setGenerating(false)
+  }
+
+  if (loading) {
+    return (
+      <AppLayout>
+        <div className="flex items-center justify-center h-full">
+          <div className="text-white/60">Cargando...</div>
+        </div>
+      </AppLayout>
+    )
+  }
+
+  const training = data || mockTrainingData
+  const maxKcal = Math.max(...training.history.map((h) => h.caloriesBurned), 1)
+
+  const lastHealthSync = training.history
+    .filter((h) => h.sources?.includes("apple_health"))
+    .sort((a, b) => b.date.localeCompare(a.date))[0] ?? null
+
+  return (
+    <AppLayout>
+      <div className="space-y-6">
+        {/* Header */}
+        <Card className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-6">
+          <div className="flex items-center gap-3">
+            <Dumbbell className="h-7 w-7 text-emerald-400" />
+            <div>
+              <h2 className="text-3xl font-bold text-white">Entrenamiento</h2>
+              <p className="text-white/60">Registra ejercicios, consulta el historial y genera rutinas</p>
+            </div>
+          </div>
+        </Card>
+
+        {/* Tabs */}
+        <Tabs defaultValue="log" className="space-y-6">
+          <TabsList className="bg-white/10 border border-white/20">
+            <TabsTrigger value="log" className="data-[state=active]:bg-white/20 data-[state=active]:text-white text-white/70">
+              Registrar ejercicio
+            </TabsTrigger>
+            <TabsTrigger value="history" className="data-[state=active]:bg-white/20 data-[state=active]:text-white text-white/70">
+              Historial 7 días
+            </TabsTrigger>
+            <TabsTrigger
+              value="gym"
+              className="data-[state=active]:bg-white/20 data-[state=active]:text-white text-white/70"
+              onClick={() => { if (!gymLoading) loadGymHistory() }}
+            >
+              <Sheet className="mr-1.5 h-3.5 w-3.5" />
+              Gym (Sheets)
+            </TabsTrigger>
+            <TabsTrigger value="routine" className="data-[state=active]:bg-white/20 data-[state=active]:text-white text-white/70">
+              Generador de rutinas
+            </TabsTrigger>
+          </TabsList>
+
+          {/* ── Log Exercise Tab ── */}
+          <TabsContent value="log">
+            <div className="space-y-4">
+              <Card className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-6">
+                <h3 className="text-xl font-semibold text-white mb-6">Registrar ejercicio</h3>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+                  {/* Date picker */}
+                  <div className="space-y-2">
+                    <Label className="text-white/80">Fecha</Label>
+                    <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className="w-full justify-start gap-2 bg-white/5 border-white/20 text-white hover:bg-white/10"
+                        >
+                          <CalendarIcon className="h-4 w-4 text-white/40" />
+                          {getDateLabel()}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0 bg-gray-900 border-white/20" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={selectedDate}
+                          onSelect={(d) => {
+                            if (d) { setSelectedDate(d); setLastImpact(null) }
+                            setCalendarOpen(false)
+                          }}
+                          disabled={{ after: new Date(today.getFullYear(), today.getMonth(), today.getDate() + 30) }}
+                          className="text-white [&_.rdp-day]:text-white [&_.rdp-day_button:hover]:bg-white/20 [&_.rdp-day_button.rdp-day_selected]:bg-emerald-500"
+                        />
+                      </PopoverContent>
+                    </Popover>
+                    {/* Preview impact badge */}
+                    <p className="text-xs text-white/50">{getPreviewImpact()}</p>
+                  </div>
+
+                  {/* Exercise type */}
+                  <div className="space-y-2">
+                    <Label className="text-white/80">Tipo de ejercicio</Label>
+                    <Select value={selectedType} onValueChange={setSelectedType}>
+                      <SelectTrigger className="bg-white/5 border-white/20 text-white">
+                        <SelectValue placeholder="Selecciona ejercicio" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {training.exerciseTypes.map((type) => (
+                          <SelectItem key={type} value={type}>{type}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Duration */}
+                  <div className="space-y-2">
+                    <Label className="text-white/80">Duración (minutos)</Label>
+                    <div className="relative">
+                      <Clock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/40" />
+                      <Input
+                        type="number"
+                        placeholder="45"
+                        value={minutes}
+                        onChange={(e) => setMinutes(e.target.value)}
+                        className="pl-10 bg-white/5 border-white/20 text-white placeholder:text-white/40"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Save button */}
+                  <div className="flex items-end">
+                    <Button
+                      onClick={handleLogExercise}
+                      disabled={!selectedType || !minutes || logging}
+                      className="w-full bg-emerald-500 hover:bg-emerald-600 text-white"
+                    >
+                      <Plus className="mr-2 h-4 w-4" />
+                      {logging ? "Guardando..." : "Guardar ejercicio"}
+                    </Button>
+                  </div>
+                </div>
+              </Card>
+
+              {/* Impact evaluation card */}
+              {lastImpact && (
+                <Card className={`backdrop-blur-xl border rounded-3xl p-5 ${getImpactStyle(lastImpact).bg}`}>
+                  <div className="flex items-start gap-3">
+                    {getImpactStyle(lastImpact).icon}
+                    <div className="flex-1">
+                      <p className={`font-semibold text-sm mb-1 ${getImpactStyle(lastImpact).color}`}>
+                        {lastImpact.type === "today" && "Actividad de hoy registrada"}
+                        {lastImpact.type === "yesterday" && "Actividad de ayer registrada"}
+                        {lastImpact.type === "this_week" && "Actividad de la semana actual"}
+                        {lastImpact.type === "scheduled" && "Actividad programada"}
+                        {lastImpact.type === "past_week" && "Semana anterior"}
+                      </p>
+                      <p className="text-white/80 text-sm">{lastImpact.message}</p>
+                      {savedKcal !== null && savedKcal > 0 && (
+                        <div className="flex items-center gap-1.5 mt-2">
+                          <Flame className="h-3.5 w-3.5 text-orange-400" />
+                          <span className="text-orange-400 text-sm font-medium">{savedKcal} kcal registradas</span>
+                        </div>
+                      )}
+                    </div>
+                    <CheckCircle2 className="h-5 w-5 text-white/40 shrink-0 mt-0.5" />
+                  </div>
+                </Card>
+              )}
+            </div>
+          </TabsContent>
+
+          {/* ── History Tab ── */}
+          <TabsContent value="history">
+            <div className="space-y-4">
+
+            {/* Apple Health last sync card */}
+            <Card className="backdrop-blur-xl bg-red-950/30 border border-red-500/20 rounded-3xl p-5">
+              <div className="flex items-center justify-between gap-3 flex-wrap mb-4">
+                <div className="flex items-center gap-2">
+                  <Heart className="h-5 w-5 text-red-400" />
+                  <h3 className="text-lg font-semibold text-white">Último sync Apple Health</h3>
+                </div>
+                <a
+                  href={SHORTCUT_URL || undefined}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-disabled={!SHORTCUT_URL}
+                  tabIndex={SHORTCUT_URL ? undefined : -1}
+                  className={!SHORTCUT_URL ? "pointer-events-none" : ""}
+                >
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={!SHORTCUT_URL}
+                    className="bg-white/5 border-white/20 text-white/80 hover:bg-white/10 text-xs h-8 gap-1.5 disabled:opacity-40"
+                  >
+                    <Download className="h-3.5 w-3.5" />
+                    Descargar Shortcut
+                  </Button>
+                </a>
+              </div>
+
+              {lastHealthSync ? (
+                <div>
+                  <p className="text-white/50 text-xs mb-3">
+                    {new Date(lastHealthSync.date + "T12:00:00").toLocaleDateString("es-ES", {
+                      weekday: "long", day: "numeric", month: "long",
+                    })}
+                    {lastHealthSync.healthData?.workout_type && (
+                      <> · <span className="text-white/70">{lastHealthSync.healthData.workout_type}</span></>
+                    )}
+                  </p>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <div className="bg-white/5 rounded-2xl p-3 text-center">
+                      <Flame className="h-4 w-4 text-orange-400 mx-auto mb-1" />
+                      <p className="text-white font-semibold">{lastHealthSync.caloriesBurned}</p>
+                      <p className="text-white/40 text-xs">kcal activas</p>
+                    </div>
+                    {lastHealthSync.minutes > 0 && (
+                      <div className="bg-white/5 rounded-2xl p-3 text-center">
+                        <Clock className="h-4 w-4 text-emerald-400 mx-auto mb-1" />
+                        <p className="text-white font-semibold">{lastHealthSync.minutes}</p>
+                        <p className="text-white/40 text-xs">minutos</p>
+                      </div>
+                    )}
+                    {lastHealthSync.healthData?.steps && (
+                      <div className="bg-white/5 rounded-2xl p-3 text-center">
+                        <Activity className="h-4 w-4 text-blue-400 mx-auto mb-1" />
+                        <p className="text-white font-semibold">{lastHealthSync.healthData.steps.toLocaleString()}</p>
+                        <p className="text-white/40 text-xs">pasos</p>
+                      </div>
+                    )}
+                    {lastHealthSync.healthData?.heart_rate_avg && (
+                      <div className="bg-white/5 rounded-2xl p-3 text-center">
+                        <Heart className="h-4 w-4 text-red-400 mx-auto mb-1" />
+                        <p className="text-white font-semibold">{lastHealthSync.healthData.heart_rate_avg}</p>
+                        <p className="text-white/40 text-xs">ppm prom</p>
+                      </div>
+                    )}
+                  </div>
+                  {lastHealthSync.healthData?.heart_rate_max && (
+                    <p className="text-white/30 text-xs mt-2 text-right">
+                      FC máx: {lastHealthSync.healthData.heart_rate_max} ppm
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <div className="text-center py-3">
+                  <p className="text-white/40 text-sm">No hay datos de Apple Health todavía.</p>
+                  <p className="text-white/25 text-xs mt-1">
+                    {SHORTCUT_URL
+                      ? "Descarga el Shortcut y actívalo desde iOS tras cada entreno."
+                      : "Configura y comparte el Shortcut desde tu iPhone para activar la integración."}
+                  </p>
+                </div>
+              )}
+            </Card>
+
+            <Card className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-6">
+              <div className="flex items-center gap-2 mb-6">
+                <History className="h-5 w-5 text-emerald-400" />
+                <h3 className="text-xl font-semibold text-white">Historial de ejercicio (7 días)</h3>
+              </div>
+              <Table>
+                <TableHeader>
+                  <TableRow className="border-white/10">
+                    <TableHead className="text-white/60">Fecha</TableHead>
+                    <TableHead className="text-white/60">Ejercicio</TableHead>
+                    <TableHead className="text-white/60">Duración</TableHead>
+                    <TableHead className="text-white/60">Calorías quemadas</TableHead>
+                    <TableHead className="text-white/60 w-10" />
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {training.history.slice(0, 7).map((log) => {
+                    const isPendingDelete = confirmDeleteId === log.id
+                    const hasAppleHealth  = log.sources?.includes("apple_health")
+                    const hasSheets       = log.sources?.some(s => s === "sheets" || s === "excel" || s === "google_sheets")
+                    return (
+                      <TableRow
+                        key={log.id}
+                        className={`border-white/10 transition-colors ${isPendingDelete ? "bg-red-500/10" : ""}`}
+                      >
+                        <TableCell className="text-white/80">
+                          <div>
+                            {new Date(log.date + "T12:00:00").toLocaleDateString("es-ES", {
+                              weekday: "short",
+                              month: "short",
+                              day: "numeric",
+                            })}
+                            <div className="flex gap-1 mt-1 flex-wrap">
+                              {hasAppleHealth && (
+                                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-red-500/20 text-red-300 border border-red-500/30 leading-none">
+                                  Apple Health
+                                </span>
+                              )}
+                              {hasSheets && (
+                                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 leading-none">
+                                  Sheets
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-white font-medium">
+                          <div>{log.type}</div>
+                          {log.healthData?.steps && (
+                            <div className="text-white/40 text-xs">{log.healthData.steps.toLocaleString()} pasos</div>
+                          )}
+                          {log.healthData?.heart_rate_avg && (
+                            <div className="text-white/40 text-xs">{log.healthData.heart_rate_avg} ppm avg</div>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-white/80">{log.minutes ? `${log.minutes} min` : "—"}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-3">
+                            <div className="flex-1 bg-white/10 rounded-full h-2 max-w-32">
+                              <div
+                                className="bg-gradient-to-r from-orange-400 to-red-500 h-2 rounded-full"
+                                style={{ width: `${(log.caloriesBurned / maxKcal) * 100}%` }}
+                              />
+                            </div>
+                            <span className="text-orange-400 font-medium">{log.caloriesBurned} kcal</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1 justify-end">
+                            {isPendingDelete ? (
+                              <>
+                                <Button
+                                  size="sm"
+                                  disabled={deleting}
+                                  onClick={() => handleDeleteExercise(log.id, log.date)}
+                                  className="h-7 px-2 text-xs bg-red-500 hover:bg-red-600 text-white"
+                                >
+                                  {deleting ? "..." : "Eliminar"}
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => setConfirmDeleteId(null)}
+                                  className="h-7 w-7 p-0 text-white/40 hover:text-white hover:bg-white/10"
+                                >
+                                  <X className="h-3.5 w-3.5" />
+                                </Button>
+                              </>
+                            ) : (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => handleDeleteExercise(log.id, log.date)}
+                                className="h-7 w-7 p-0 text-white/30 hover:text-red-400 hover:bg-red-500/10"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })}
+                </TableBody>
+              </Table>
+            </Card>
+            </div>
+          </TabsContent>
+
+          {/* ── Gym Sheets Tab ── */}
+          <TabsContent value="gym">
+            <div className="space-y-4">
+              {/* Source badge + refresh */}
+              <Card className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-5">
+                <div className="flex items-center justify-between gap-3 flex-wrap">
+                  <div className="flex items-center gap-2">
+                    <Dumbbell className="h-5 w-5 text-emerald-400" />
+                    <h3 className="text-xl font-semibold text-white">Historial de gym (últimos 7 días)</h3>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    {gymHistory && (
+                      <span className={`flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full border ${
+                        gymHistory.source === "sheets"
+                          ? "bg-emerald-500/15 border-emerald-500/30 text-emerald-300"
+                          : gymHistory.source === "excel"
+                          ? "bg-blue-500/15 border-blue-500/30 text-blue-300"
+                          : "bg-white/10 border-white/20 text-white/50"
+                      }`}>
+                        {gymHistory.source === "sheets"
+                          ? <><Sheet className="h-3 w-3" /> Google Sheets</>
+                          : gymHistory.source === "excel"
+                          ? <><HardDrive className="h-3 w-3" /> Excel local</>
+                          : "Sin datos"}
+                      </span>
+                    )}
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={loadGymHistory}
+                      disabled={gymLoading}
+                      className="bg-white/5 border-white/20 text-white/80 hover:bg-white/10 text-xs h-8"
+                    >
+                      {gymLoading ? "Cargando..." : "Actualizar"}
+                    </Button>
+                  </div>
+                </div>
+
+                {!gymHistory?.credentials_configured && gymHistory?.source !== "sheets" && (
+                  <div className="mt-4 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-sm">
+                    <p className="font-medium mb-1">Google Sheets no configurado</p>
+                    <p className="text-amber-300/80 text-xs">
+                      Crea un Service Account en Google Cloud, comparte el spreadsheet con su email y
+                      guarda el JSON como <code className="bg-white/10 px-1 rounded">nutrition_assistant/google_credentials.json</code>.
+                    </p>
+                  </div>
+                )}
+              </Card>
+
+              {/* Error */}
+              {gymError && (
+                <Card className="backdrop-blur-xl bg-red-500/10 border border-red-500/20 rounded-3xl p-5">
+                  <p className="text-red-300 text-sm">{gymError}</p>
+                </Card>
+              )}
+
+              {/* Loading */}
+              {gymLoading && (
+                <div className="text-center py-12 text-white/40">Cargando sesiones...</div>
+              )}
+
+              {/* No sessions */}
+              {!gymLoading && gymHistory && gymHistory.sessions.length === 0 && (
+                <Card className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-8 text-center">
+                  <p className="text-white/50">No hay sesiones de gym registradas en los últimos 7 días.</p>
+                </Card>
+              )}
+
+              {/* Sessions */}
+              {!gymLoading && gymHistory && gymHistory.sessions.map((session, idx) => {
+                const sessionKey = `${session.date}-${idx}`
+                const isExpanded = expandedSession === sessionKey
+                return (
+                  <Card
+                    key={sessionKey}
+                    className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl overflow-hidden"
+                  >
+                    {/* Session header */}
+                    <button
+                      className="w-full flex items-center justify-between p-5 hover:bg-white/5 transition-colors text-left"
+                      onClick={() => setExpandedSession(isExpanded ? null : sessionKey)}
+                    >
+                      <div className="flex items-center gap-3">
+                        <CalendarDays className="h-4 w-4 text-emerald-400 shrink-0" />
+                        <div>
+                          <p className="text-white font-semibold">{session.type}</p>
+                          <p className="text-white/50 text-sm">
+                            {new Date(session.date + "T12:00:00").toLocaleDateString("es-ES", {
+                              weekday: "long", day: "numeric", month: "long",
+                            })}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-1.5">
+                          <Flame className="h-4 w-4 text-orange-400" />
+                          <span className="text-orange-400 font-semibold">{session.kcal} kcal</span>
+                        </div>
+                        <span className="text-white/40 text-sm">{session.exercises.length} ejercicios</span>
+                        {isExpanded
+                          ? <ChevronDown className="h-4 w-4 text-white/40" />
+                          : <ChevronRight className="h-4 w-4 text-white/40" />
+                        }
+                      </div>
+                    </button>
+
+                    {/* Exercises detail */}
+                    {isExpanded && (
+                      <div className="border-t border-white/10 px-5 pb-5 pt-4">
+                        <Table>
+                          <TableHeader>
+                            <TableRow className="border-white/10">
+                              <TableHead className="text-white/50 text-xs">Ejercicio</TableHead>
+                              <TableHead className="text-white/50 text-xs text-right">Serie 1</TableHead>
+                              <TableHead className="text-white/50 text-xs text-right">Serie 2</TableHead>
+                              <TableHead className="text-white/50 text-xs text-right">Volumen</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {session.exercises.map((ex, i) => (
+                              <TableRow key={i} className="border-white/10">
+                                <TableCell className="text-white text-sm py-2">
+                                  <span className={ex.compound ? "font-medium" : ""}>{ex.name}</span>
+                                  {ex.compound && (
+                                    <span className="ml-1.5 text-[10px] text-emerald-400/70 border border-emerald-500/20 rounded px-1 py-0.5">C</span>
+                                  )}
+                                </TableCell>
+                                <TableCell className="text-white/70 text-sm text-right py-2">
+                                  {ex.reps_s1 > 0 ? `${ex.reps_s1}×${ex.kg_s1}kg` : "—"}
+                                </TableCell>
+                                <TableCell className="text-white/70 text-sm text-right py-2">
+                                  {ex.reps_s2 > 0 ? `${ex.reps_s2}×${ex.kg_s2}kg` : "—"}
+                                </TableCell>
+                                <TableCell className="text-white/50 text-sm text-right py-2">
+                                  {ex.volume > 0 ? `${ex.volume} kg·r` : "—"}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    )}
+                  </Card>
+                )
+              })}
+            </div>
+          </TabsContent>
+
+          {/* ── Routine Generator Tab ── */}
+          <TabsContent value="routine">
+            <div className="space-y-6">
+              <Card className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-6">
+                <div className="flex items-center gap-2 mb-6">
+                  <Sparkles className="h-5 w-5 text-emerald-400" />
+                  <h3 className="text-xl font-semibold text-white">Generar rutina de entrenamiento</h3>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 md:gap-6 items-end">
+                  <div className="space-y-3">
+                    <Label className="text-white/80">Tipo de entrenamiento</Label>
+                    <div className="flex gap-2">
+                      <Button
+                        variant={routineType === "gym" ? "default" : "outline"}
+                        onClick={() => setRoutineType("gym")}
+                        className={`flex-1 justify-center ${
+                          routineType === "gym"
+                            ? "bg-emerald-500 hover:bg-emerald-600 text-white"
+                            : "bg-white/5 border-white/20 text-white/80 hover:bg-white/10"
+                        }`}
+                      >
+                        <Dumbbell className="mr-2 h-4 w-4 shrink-0" />
+                        Gimnasio
+                      </Button>
+                      <Button
+                        variant={routineType === "calisthenics" ? "default" : "outline"}
+                        onClick={() => setRoutineType("calisthenics")}
+                        className={`flex-1 justify-center ${
+                          routineType === "calisthenics"
+                            ? "bg-emerald-500 hover:bg-emerald-600 text-white"
+                            : "bg-white/5 border-white/20 text-white/80 hover:bg-white/10"
+                        }`}
+                      >
+                        Calistenia
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="space-y-3">
+                    <Label className="text-white/80">Días por semana: {daysPerWeek[0]}</Label>
+                    <Slider
+                      value={daysPerWeek}
+                      onValueChange={setDaysPerWeek}
+                      min={2}
+                      max={6}
+                      step={1}
+                      className="mt-2"
+                    />
+                  </div>
+                  <Button
+                    onClick={handleGenerateRoutine}
+                    disabled={generating}
+                    className="w-full justify-center bg-emerald-500 hover:bg-emerald-600 text-white"
+                  >
+                    <Sparkles className={`mr-2 h-4 w-4 shrink-0 ${generating ? "animate-spin" : ""}`} />
+                    {generating ? "Generando..." : "Generar rutina"}
+                  </Button>
+                </div>
+              </Card>
+
+              {generatedRoutine.length > 0 && (
+                <div className="grid grid-cols-1 gap-4">
+                  {generatedRoutine.map((day, index) => (
+                    <Card
+                      key={index}
+                      className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-6"
+                    >
+                      <div className="flex items-center gap-2 mb-4">
+                        <CalendarDays className="h-5 w-5 text-emerald-400" />
+                        <h4 className="text-lg font-semibold text-white">{day.day}</h4>
+                      </div>
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="border-white/10">
+                            <TableHead className="text-white/60">Ejercicio</TableHead>
+                            <TableHead className="text-white/60">Series</TableHead>
+                            <TableHead className="text-white/60">Músculos</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {day.exercises.map((exercise, i) => (
+                            <TableRow key={i} className="border-white/10">
+                              <TableCell className="text-white font-medium">{exercise.name}</TableCell>
+                              <TableCell className="text-white/80">{exercise.sets}</TableCell>
+                              <TableCell className="text-white/60 text-sm">{exercise.muscles}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </div>
+          </TabsContent>
+        </Tabs>
+      </div>
+    </AppLayout>
+  )
+}
