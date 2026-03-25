@@ -23,6 +23,7 @@ import {
 } from "lucide-react"
 import type { SettingsData, UserProfile, FoodPreferences, UpcomingEvent } from "@/lib/api"
 import { fetchSettings, updateProfile, updateFoodPreferences, saveEvent, deleteEvent } from "@/lib/api"
+import { AppearanceSettings } from "@/components/appearance-settings"
 
 const mockSettingsData: SettingsData = {
   profile: {
@@ -128,10 +129,12 @@ export default function SettingsPage() {
       date: newEvent.date,
       daysToEvent: null,
     }
+    const eventName = newEvent.name;
+    const eventDate = newEvent.date;
     setData({ ...data, events: [...data.events, optimistic] })
     setNewEvent({ name: "", date: "" })
     try {
-      await saveEvent({ name: newEvent.name, date: newEvent.date })
+      await saveEvent({ name: eventName, date: eventDate })
     } catch {
       // optimistic update stays
     }
@@ -151,7 +154,7 @@ export default function SettingsPage() {
     return (
       <AppLayout>
         <div className="flex items-center justify-center h-full">
-          <div className="text-white/60">Cargando...</div>
+          <div className="text-muted-foreground">Cargando...</div>
         </div>
       </AppLayout>
     )
@@ -161,28 +164,30 @@ export default function SettingsPage() {
     <AppLayout>
       <div className="space-y-6">
         {/* Header */}
-        <Card className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-6">
+        <Card className="backdrop-blur-xl bg-black/5 dark:bg-white/10 border border-black/20 dark:border-white/20 rounded-3xl p-6">
           <div className="flex items-center gap-3">
             <Settings className="h-7 w-7 text-emerald-400" />
             <div>
-              <h2 className="text-3xl font-bold text-white">Configuración</h2>
-              <p className="text-white/60">Gestiona tu perfil, preferencias y eventos</p>
+              <h2 className="text-3xl font-bold text-foreground">Configuración</h2>
+              <p className="text-muted-foreground">Gestiona tu perfil, preferencias y eventos</p>
             </div>
           </div>
         </Card>
 
+        <AppearanceSettings />
+
         {/* Tabs */}
         <Tabs defaultValue="profile" className="space-y-6">
-          <TabsList className="bg-white/10 border border-white/20">
-            <TabsTrigger value="profile" className="data-[state=active]:bg-white/20 data-[state=active]:text-white text-white/70">
+          <TabsList className="bg-black/5 dark:bg-white/10 border border-black/20 dark:border-white/20">
+            <TabsTrigger value="profile" className="data-[state=active]:bg-black/10 dark:data-[state=active]:bg-white/20 data-[state=active]:text-foreground text-foreground/70">
               <User className="mr-2 h-4 w-4" />
               Perfil
             </TabsTrigger>
-            <TabsTrigger value="preferences" className="data-[state=active]:bg-white/20 data-[state=active]:text-white text-white/70">
+            <TabsTrigger value="preferences" className="data-[state=active]:bg-black/10 dark:data-[state=active]:bg-white/20 data-[state=active]:text-foreground text-foreground/70">
               <UtensilsCrossed className="mr-2 h-4 w-4" />
               Preferencias alimentarias
             </TabsTrigger>
-            <TabsTrigger value="events" className="data-[state=active]:bg-white/20 data-[state=active]:text-white text-white/70">
+            <TabsTrigger value="events" className="data-[state=active]:bg-black/10 dark:data-[state=active]:bg-white/20 data-[state=active]:text-foreground text-foreground/70">
               <Calendar className="mr-2 h-4 w-4" />
               Eventos
             </TabsTrigger>
@@ -190,21 +195,21 @@ export default function SettingsPage() {
 
           {/* Profile Tab */}
           <TabsContent value="profile">
-            <Card className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-6">
-              <h3 className="text-xl font-semibold text-white mb-6">Información personal</h3>
+            <Card className="backdrop-blur-xl bg-black/5 dark:bg-white/10 border border-black/20 dark:border-white/20 rounded-3xl p-6">
+              <h3 className="text-xl font-semibold text-foreground mb-6">Información personal</h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-6">
                 <div className="space-y-2">
-                  <Label className="text-white/80">Nombre</Label>
+                  <Label className="text-foreground/80">Nombre</Label>
                   <Input
                     value={profile.name}
                     onChange={(e) => setProfile({ ...profile, name: e.target.value })}
-                    className="bg-white/5 border-white/20 text-white"
+                    className="bg-black/5 dark:bg-white/5 border-black/20 dark:border-white/20 text-foreground"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-white/80">Género</Label>
+                  <Label className="text-foreground/80">Género</Label>
                   <Select value={profile.gender} onValueChange={(v) => setProfile({ ...profile, gender: v as UserProfile["gender"] })}>
-                    <SelectTrigger className="bg-white/5 border-white/20 text-white">
+                    <SelectTrigger className="bg-black/5 dark:bg-white/5 border-black/20 dark:border-white/20 text-foreground">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -215,37 +220,37 @@ export default function SettingsPage() {
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-white/80">Edad</Label>
+                  <Label className="text-foreground/80">Edad</Label>
                   <Input
                     type="number"
                     value={profile.age}
                     onChange={(e) => setProfile({ ...profile, age: parseInt(e.target.value) || 0 })}
-                    className="bg-white/5 border-white/20 text-white"
+                    className="bg-black/5 dark:bg-white/5 border-black/20 dark:border-white/20 text-foreground"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-white/80">Altura (cm)</Label>
+                  <Label className="text-foreground/80">Altura (cm)</Label>
                   <Input
                     type="number"
                     value={profile.height}
                     onChange={(e) => setProfile({ ...profile, height: parseInt(e.target.value) || 0 })}
-                    className="bg-white/5 border-white/20 text-white"
+                    className="bg-black/5 dark:bg-white/5 border-black/20 dark:border-white/20 text-foreground"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-white/80">Peso (kg)</Label>
+                  <Label className="text-foreground/80">Peso (kg)</Label>
                   <Input
                     type="number"
                     step="0.1"
                     value={profile.weight}
                     onChange={(e) => setProfile({ ...profile, weight: parseFloat(e.target.value) || 0 })}
-                    className="bg-white/5 border-white/20 text-white"
+                    className="bg-black/5 dark:bg-white/5 border-black/20 dark:border-white/20 text-foreground"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-white/80">Nivel de actividad</Label>
+                  <Label className="text-foreground/80">Nivel de actividad</Label>
                   <Select value={String(profile.activityLevel)} onValueChange={(v) => setProfile({ ...profile, activityLevel: parseInt(v) })}>
-                    <SelectTrigger className="bg-white/5 border-white/20 text-white">
+                    <SelectTrigger className="bg-black/5 dark:bg-white/5 border-black/20 dark:border-white/20 text-foreground">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -257,9 +262,9 @@ export default function SettingsPage() {
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-white/80">Objetivo</Label>
+                  <Label className="text-foreground/80">Objetivo</Label>
                   <Select value={profile.goal} onValueChange={(v) => setProfile({ ...profile, goal: v as UserProfile["goal"] })}>
-                    <SelectTrigger className="bg-white/5 border-white/20 text-white">
+                    <SelectTrigger className="bg-black/5 dark:bg-white/5 border-black/20 dark:border-white/20 text-foreground">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -270,12 +275,12 @@ export default function SettingsPage() {
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-white/80">Inicio de semana dietética</Label>
+                  <Label className="text-foreground/80">Inicio de semana dietética</Label>
                   <Select
                     value={String(profile.weekStartDay)}
                     onValueChange={(v) => setProfile({ ...profile, weekStartDay: parseInt(v) })}
                   >
-                    <SelectTrigger className="bg-white/5 border-white/20 text-white">
+                    <SelectTrigger className="bg-black/5 dark:bg-white/5 border-black/20 dark:border-white/20 text-foreground">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -288,7 +293,7 @@ export default function SettingsPage() {
                       <SelectItem value="6">Domingo</SelectItem>
                     </SelectContent>
                   </Select>
-                  <p className="text-white/40 text-xs">El menú semanal se renovará cada semana a partir de este día.</p>
+                  <p className="text-foreground/40 text-xs">El menú semanal se renovará cada semana a partir de este día.</p>
                 </div>
               </div>
               <div className="mt-6 flex items-center gap-4">
@@ -318,12 +323,12 @@ export default function SettingsPage() {
 
           {/* Preferences Tab */}
           <TabsContent value="preferences">
-            <Card className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-6">
-              <h3 className="text-xl font-semibold text-white mb-6">Preferencias alimentarias</h3>
+            <Card className="backdrop-blur-xl bg-black/5 dark:bg-white/10 border border-black/20 dark:border-white/20 rounded-3xl p-6">
+              <h3 className="text-xl font-semibold text-foreground mb-6">Preferencias alimentarias</h3>
               <div className="space-y-6">
                 {/* Excluded Foods */}
                 <div className="space-y-3">
-                  <Label className="text-white/80">Ingredientes excluidos (alergias/restricciones)</Label>
+                  <Label className="text-foreground/80">Ingredientes excluidos (alergias/restricciones)</Label>
                   <div className="flex flex-wrap gap-2">
                     {preferences.excluded.map((tag) => (
                       <Badge
@@ -346,13 +351,13 @@ export default function SettingsPage() {
                       value={newTag.excluded}
                       onChange={(e) => setNewTag({ ...newTag, excluded: e.target.value })}
                       onKeyDown={(e) => e.key === "Enter" && handleAddTag("excluded")}
-                      className="bg-white/5 border-white/20 text-white placeholder:text-white/40 max-w-xs"
+                      className="bg-black/5 dark:bg-white/5 border-black/20 dark:border-white/20 text-foreground placeholder:text-foreground/40 max-w-xs"
                     />
                     <Button
                       variant="outline"
                       size="icon"
                       onClick={() => handleAddTag("excluded")}
-                      className="bg-white/5 border-white/20 text-white hover:bg-white/10"
+                      className="bg-black/5 dark:bg-white/5 border-black/20 dark:border-white/20 text-foreground hover:bg-black/10 dark:hover:bg-white/10"
                     >
                       <Plus className="h-4 w-4" />
                     </Button>
@@ -361,7 +366,7 @@ export default function SettingsPage() {
 
                 {/* Favorite Foods */}
                 <div className="space-y-3">
-                  <Label className="text-white/80">Favoritos</Label>
+                  <Label className="text-foreground/80">Favoritos</Label>
                   <div className="flex flex-wrap gap-2">
                     {preferences.favorites.map((tag) => (
                       <Badge
@@ -384,13 +389,13 @@ export default function SettingsPage() {
                       value={newTag.favorites}
                       onChange={(e) => setNewTag({ ...newTag, favorites: e.target.value })}
                       onKeyDown={(e) => e.key === "Enter" && handleAddTag("favorites")}
-                      className="bg-white/5 border-white/20 text-white placeholder:text-white/40 max-w-xs"
+                      className="bg-black/5 dark:bg-white/5 border-black/20 dark:border-white/20 text-foreground placeholder:text-foreground/40 max-w-xs"
                     />
                     <Button
                       variant="outline"
                       size="icon"
                       onClick={() => handleAddTag("favorites")}
-                      className="bg-white/5 border-white/20 text-white hover:bg-white/10"
+                      className="bg-black/5 dark:bg-white/5 border-black/20 dark:border-white/20 text-foreground hover:bg-black/10 dark:hover:bg-white/10"
                     >
                       <Plus className="h-4 w-4" />
                     </Button>
@@ -399,7 +404,7 @@ export default function SettingsPage() {
 
                 {/* Disliked Foods */}
                 <div className="space-y-3">
-                  <Label className="text-white/80">No me gusta</Label>
+                  <Label className="text-foreground/80">No me gusta</Label>
                   <div className="flex flex-wrap gap-2">
                     {preferences.disliked.map((tag) => (
                       <Badge
@@ -422,13 +427,13 @@ export default function SettingsPage() {
                       value={newTag.disliked}
                       onChange={(e) => setNewTag({ ...newTag, disliked: e.target.value })}
                       onKeyDown={(e) => e.key === "Enter" && handleAddTag("disliked")}
-                      className="bg-white/5 border-white/20 text-white placeholder:text-white/40 max-w-xs"
+                      className="bg-black/5 dark:bg-white/5 border-black/20 dark:border-white/20 text-foreground placeholder:text-foreground/40 max-w-xs"
                     />
                     <Button
                       variant="outline"
                       size="icon"
                       onClick={() => handleAddTag("disliked")}
-                      className="bg-white/5 border-white/20 text-white hover:bg-white/10"
+                      className="bg-black/5 dark:bg-white/5 border-black/20 dark:border-white/20 text-foreground hover:bg-black/10 dark:hover:bg-white/10"
                     >
                       <Plus className="h-4 w-4" />
                     </Button>
@@ -464,25 +469,25 @@ export default function SettingsPage() {
           <TabsContent value="events">
             <div className="space-y-6">
               {/* Add Event Form */}
-              <Card className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-6">
-                <h3 className="text-xl font-semibold text-white mb-6">Registrar próximo evento</h3>
+              <Card className="backdrop-blur-xl bg-black/5 dark:bg-white/10 border border-black/20 dark:border-white/20 rounded-3xl p-6">
+                <h3 className="text-xl font-semibold text-foreground mb-6">Registrar próximo evento</h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label className="text-white/80">Nombre del evento</Label>
+                    <Label className="text-foreground/80">Nombre del evento</Label>
                     <Input
                       placeholder="Ej.: Vacaciones en la playa"
                       value={newEvent.name}
                       onChange={(e) => setNewEvent({ ...newEvent, name: e.target.value })}
-                      className="bg-white/5 border-white/20 text-white placeholder:text-white/40"
+                      className="bg-black/5 dark:bg-white/5 border-black/20 dark:border-white/20 text-foreground placeholder:text-foreground/40"
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-white/80">Fecha</Label>
+                    <Label className="text-foreground/80">Fecha</Label>
                     <Input
                       type="date"
                       value={newEvent.date}
                       onChange={(e) => setNewEvent({ ...newEvent, date: e.target.value })}
-                      className="bg-white/5 border-white/20 text-white"
+                      className="bg-black/5 dark:bg-white/5 border-black/20 dark:border-white/20 text-foreground"
                     />
                   </div>
                 </div>
@@ -497,24 +502,24 @@ export default function SettingsPage() {
               </Card>
 
               {/* Events List */}
-              <Card className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-6">
-                <h3 className="text-xl font-semibold text-white mb-6">Tus eventos</h3>
+              <Card className="backdrop-blur-xl bg-black/5 dark:bg-white/10 border border-black/20 dark:border-white/20 rounded-3xl p-6">
+                <h3 className="text-xl font-semibold text-foreground mb-6">Tus eventos</h3>
                 {data.events.length === 0 ? (
-                  <p className="text-white/60 text-center py-8">No hay próximos eventos registrados</p>
+                  <p className="text-muted-foreground text-center py-8">No hay próximos eventos registrados</p>
                 ) : (
                   <div className="space-y-3">
                     {data.events.map((event) => (
                       <div
                         key={event.id}
-                        className="flex items-center justify-between p-4 bg-white/5 rounded-xl border border-white/10"
+                        className="flex items-center justify-between p-4 bg-black/5 dark:bg-white/5 rounded-xl border border-black/10 dark:border-white/10"
                       >
                         <div className="flex items-center gap-4">
                           <div className="p-2 bg-emerald-500/20 rounded-lg">
                             <Calendar className="h-5 w-5 text-emerald-400" />
                           </div>
                           <div>
-                            <p className="text-white font-medium">{event.name}</p>
-                            <p className="text-white/60 text-sm">
+                            <p className="text-foreground font-medium">{event.name}</p>
+                            <p className="text-muted-foreground text-sm">
                               {new Date(event.date).toLocaleDateString("es-ES", {
                                 weekday: "long",
                                 month: "long",

@@ -21,6 +21,7 @@ import {
 import { LevelBadge } from "@/components/level-badge"
 import type { GamificationStatus } from "@/lib/api"
 import { fetchGamification } from "@/lib/api"
+import { ThemeToggle } from '@/components/theme-toggle'
 
 const navItems = [
   { href: "/", icon: LayoutDashboard, label: "Inicio" },
@@ -119,6 +120,11 @@ function SidebarContent({ collapsed, onToggleCollapse, onClose, showClose }: Sid
           )
         })}
       </nav>
+
+      {/* Theme toggle */}
+      <div className="mt-auto pt-4 border-t border-white/10">
+        <ThemeToggle collapsed={collapsed} />
+      </div>
     </Card>
   )
 }

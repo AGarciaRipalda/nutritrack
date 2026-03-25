@@ -75,14 +75,18 @@ app = FastAPI(
     title="Nutrition Assistant API",
     description="Backend para el asistente de nutrición y entrenamiento",
     version="1.0.0",
-)
+origins = [
+    "http://localhost:3000",      # Tu Next.js en el PC
+    "capacitor://localhost",      # Tu App en el iPhone (iOS)
+    "http://localhost",            # Tu App en Android
+]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],          # En producción limita a tu dominio
+    allow_origins=origins,         # Deja pasar a los de la lista
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["*"],           # Permite GET, POST, PUT, DELETE...
+    allow_headers=["*"],           # Permite cualquier cabecera (auth, etc)
 )
 
 # ── Helpers para acceso a datos (delegan a módulos DB-aware) ─────────────────

@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState, useRef, useCallback } from "react"
+import Link from "next/link"
 import { AppLayout } from "@/components/app-layout"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -15,10 +16,10 @@ import { fetchTodaysPlan, swapMeal, updateAdherence, fetchFavoriteCarbs, searchF
 import { useDietDay } from "@/context/DietDayContext"
 import { useCheatDay } from "@/context/CheatDayContext"
 
-const today = new Date().toISOString().slice(0, 10)
+const today = typeof window !== "undefined" ? new Date().toISOString().slice(0, 10) : ""
 const mockPlanDay: PlanDay = {
   date: today,
-  dayName: new Date().toLocaleDateString("es-ES", { weekday: "long" }),
+  dayName: typeof window !== "undefined" ? new Date().toLocaleDateString("es-ES", { weekday: "long" }) : "",
   meals: [
     { id: "desayuno",     type: "breakfast",   name: "Desayuno",     kcal: 380, description: "Yogur griego con frutos rojos, miel y copos de avena",                       note: "Añade semillas de chía para más fibra y omega-3" },
     { id: "media_manana", type: "mid-morning",  name: "Media mañana", kcal: 220, description: "Manzana en rodajas con 2 cucharadas de crema de almendras",                  note: "Elige manzanas de temporada" },
@@ -103,7 +104,10 @@ export default function DietPage() {
       })
       .catch(() => setPlanDay(mockPlanDay))
       .finally(() => setLoading(false))
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  // `init` comes from DietDayContext and is stable (wrapped in useCallback there),
+  // so this effect intentionally runs only once on mount.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [init])
 
   const handleSwap = async (mealId: string) => {
     if (!planDay) return
@@ -130,7 +134,7 @@ export default function DietPage() {
   ) => {
     const kcalMap: Record<string, number> = {}
     ;(planDay?.meals ?? []).forEach((m) => { kcalMap[m.id] = m.kcal })
-    try { await updateAdherence(newChecked, kcalMap, newSkipped) } catch {}
+    try { await updateAdherence(newChecked, kcalMap, newSkipped) } catch (err) { console.error("Failed to update adherence:", err) }
   }
 
   const handleAdherenceChange = async (itemId: string, checked: boolean) => {
@@ -155,7 +159,7 @@ export default function DietPage() {
 
   const handleAddFood = async (mealId: string) => {
     const input = foodInput[mealId]
-    if (!input?.name?.trim() || !input?.grams) return
+    if (!input?.name?.trim() || !input?.grams?.trim()) return
     const grams = parseInt(input.grams)
     if (isNaN(grams) || grams <= 0) return
     const kcalPer100g = input.kcalPer100g ?? 100
@@ -215,7 +219,7 @@ export default function DietPage() {
         {stale && (
           <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3 flex items-center justify-between shadow-sm">
             <span className="text-amber-800 text-xs font-medium">Plan desactualizado</span>
-            <a href="/weekly-plan" className="text-amber-600 text-xs font-bold hover:underline">Regenerar →</a>
+            <Link href="/weekly-plan" className="text-amber-600 text-xs font-bold hover:underline">Regenerar →</Link>
           </div>
         )}
 
@@ -391,7 +395,7 @@ export default function DietPage() {
                              value={foodInput[meal.id]?.name ?? ""}
                              onChange={(e) => {
                                const val = e.target.value
-                               setFoodInput(prev => ({ ...prev, [meal.id]: { ...prev[meal.id], name: val, kcalPer100g: prev[meal.id]?.kcalPer100g ?? null } }))
+                               setFoodInput(prev => ({ ...prev, [meal.id]: { ...(prev[meal.id] || {}), name: val, kcalPer100g: prev[meal.id]?.kcalPer100g ?? null } }))
                                debouncedFoodSearch(meal.id, val)
                              }}
                              className="w-full bg-white border border-slate-200 rounded-lg pl-7 pr-2 py-1.5 text-[11px] text-slate-700"

@@ -105,7 +105,7 @@ function getImpactStyle(impact: ExerciseImpact) {
     case "scheduled":
       return { bg: "bg-purple-500/20 border-purple-500/40", icon: <CalendarIcon className="h-4 w-4 text-purple-400" />, color: "text-purple-300" }
     default:
-      return { bg: "bg-white/10 border-white/20", icon: <Info className="h-4 w-4 text-white/60" />, color: "text-white/60" }
+      return { bg: "bg-black/5 dark:bg-white/10 border-black/20 dark:border-white/20", icon: <Info className="h-4 w-4 text-muted-foreground" />, color: "text-muted-foreground" }
   }
 }
 
@@ -285,7 +285,7 @@ export default function TrainingPage() {
     return (
       <AppLayout>
         <div className="flex items-center justify-center h-full">
-          <div className="text-white/60">Cargando...</div>
+          <div className="text-muted-foreground">Cargando...</div>
         </div>
       </AppLayout>
     )
@@ -302,34 +302,34 @@ export default function TrainingPage() {
     <AppLayout>
       <div className="space-y-6">
         {/* Header */}
-        <Card className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-6">
+        <Card className="backdrop-blur-xl bg-black/5 dark:bg-white/10 border border-black/20 dark:border-white/20 rounded-3xl p-6">
           <div className="flex items-center gap-3">
             <Dumbbell className="h-7 w-7 text-emerald-400" />
             <div>
-              <h2 className="text-3xl font-bold text-white">Entrenamiento</h2>
-              <p className="text-white/60">Registra ejercicios, consulta el historial y genera rutinas</p>
+              <h2 className="text-3xl font-bold text-foreground">Entrenamiento</h2>
+              <p className="text-muted-foreground">Registra ejercicios, consulta el historial y genera rutinas</p>
             </div>
           </div>
         </Card>
 
         {/* Tabs */}
         <Tabs defaultValue="log" className="space-y-6">
-          <TabsList className="bg-white/10 border border-white/20">
-            <TabsTrigger value="log" className="data-[state=active]:bg-white/20 data-[state=active]:text-white text-white/70">
+          <TabsList className="bg-black/5 dark:bg-white/10 border border-black/10 dark:border-white/20">
+            <TabsTrigger value="log" className="data-[state=active]:bg-black/10 dark:data-[state=active]:bg-white/20 data-[state=active]:text-foreground text-foreground/70">
               Registrar ejercicio
             </TabsTrigger>
-            <TabsTrigger value="history" className="data-[state=active]:bg-white/20 data-[state=active]:text-white text-white/70">
+            <TabsTrigger value="history" className="data-[state=active]:bg-black/10 dark:data-[state=active]:bg-white/20 data-[state=active]:text-foreground text-foreground/70">
               Historial 7 días
             </TabsTrigger>
             <TabsTrigger
               value="gym"
-              className="data-[state=active]:bg-white/20 data-[state=active]:text-white text-white/70"
+              className="data-[state=active]:bg-black/10 dark:data-[state=active]:bg-white/20 data-[state=active]:text-foreground text-foreground/70"
               onClick={() => { if (!gymLoading) loadGymHistory() }}
             >
               <Sheet className="mr-1.5 h-3.5 w-3.5" />
               Gym (Sheets)
             </TabsTrigger>
-            <TabsTrigger value="routine" className="data-[state=active]:bg-white/20 data-[state=active]:text-white text-white/70">
+            <TabsTrigger value="routine" className="data-[state=active]:bg-black/10 dark:data-[state=active]:bg-white/20 data-[state=active]:text-foreground text-foreground/70">
               Generador de rutinas
             </TabsTrigger>
           </TabsList>
@@ -337,20 +337,20 @@ export default function TrainingPage() {
           {/* ── Log Exercise Tab ── */}
           <TabsContent value="log">
             <div className="space-y-4">
-              <Card className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-6">
-                <h3 className="text-xl font-semibold text-white mb-6">Registrar ejercicio</h3>
+              <Card className="backdrop-blur-xl bg-black/5 dark:bg-white/10 border border-black/20 dark:border-white/20 rounded-3xl p-6">
+                <h3 className="text-xl font-semibold text-foreground mb-6">Registrar ejercicio</h3>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
                   {/* Date picker */}
                   <div className="space-y-2">
-                    <Label className="text-white/80">Fecha</Label>
+                    <Label className="text-foreground/80">Fecha</Label>
                     <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
                       <PopoverTrigger asChild>
                         <Button
                           variant="outline"
-                          className="w-full justify-start gap-2 bg-white/5 border-white/20 text-white hover:bg-white/10"
+                          className="w-full justify-start gap-2 bg-black/5 dark:bg-white/5 border-black/20 dark:border-white/20 text-foreground hover:bg-black/10 dark:hover:bg-white/10"
                         >
-                          <CalendarIcon className="h-4 w-4 text-white/40" />
+                          <CalendarIcon className="h-4 w-4 text-foreground/40" />
                           {getDateLabel()}
                         </Button>
                       </PopoverTrigger>
@@ -368,14 +368,14 @@ export default function TrainingPage() {
                       </PopoverContent>
                     </Popover>
                     {/* Preview impact badge */}
-                    <p className="text-xs text-white/50">{getPreviewImpact()}</p>
+                    <p className="text-xs text-foreground/50">{getPreviewImpact()}</p>
                   </div>
 
                   {/* Exercise type */}
                   <div className="space-y-2">
-                    <Label className="text-white/80">Tipo de ejercicio</Label>
+                    <Label className="text-foreground/80">Tipo de ejercicio</Label>
                     <Select value={selectedType} onValueChange={setSelectedType}>
-                      <SelectTrigger className="bg-white/5 border-white/20 text-white">
+                      <SelectTrigger className="bg-black/5 dark:bg-white/5 border-black/20 dark:border-white/20 text-foreground">
                         <SelectValue placeholder="Selecciona ejercicio" />
                       </SelectTrigger>
                       <SelectContent>
@@ -388,15 +388,15 @@ export default function TrainingPage() {
 
                   {/* Duration */}
                   <div className="space-y-2">
-                    <Label className="text-white/80">Duración (minutos)</Label>
+                    <Label className="text-foreground/80">Duración (minutos)</Label>
                     <div className="relative">
-                      <Clock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/40" />
+                      <Clock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-foreground/40" />
                       <Input
                         type="number"
                         placeholder="45"
                         value={minutes}
                         onChange={(e) => setMinutes(e.target.value)}
-                        className="pl-10 bg-white/5 border-white/20 text-white placeholder:text-white/40"
+                        className="pl-10 bg-black/5 dark:bg-white/5 border-black/20 dark:border-white/20 text-foreground placeholder:text-foreground/40"
                       />
                     </div>
                   </div>
@@ -428,7 +428,7 @@ export default function TrainingPage() {
                         {lastImpact.type === "scheduled" && "Actividad programada"}
                         {lastImpact.type === "past_week" && "Semana anterior"}
                       </p>
-                      <p className="text-white/80 text-sm">{lastImpact.message}</p>
+                      <p className="text-foreground/80 text-sm">{lastImpact.message}</p>
                       {savedKcal !== null && savedKcal > 0 && (
                         <div className="flex items-center gap-1.5 mt-2">
                           <Flame className="h-3.5 w-3.5 text-orange-400" />
@@ -436,7 +436,7 @@ export default function TrainingPage() {
                         </div>
                       )}
                     </div>
-                    <CheckCircle2 className="h-5 w-5 text-white/40 shrink-0 mt-0.5" />
+                    <CheckCircle2 className="h-5 w-5 text-foreground/40 shrink-0 mt-0.5" />
                   </div>
                 </Card>
               )}
@@ -452,7 +452,7 @@ export default function TrainingPage() {
               <div className="flex items-center justify-between gap-3 flex-wrap mb-4">
                 <div className="flex items-center gap-2">
                   <Heart className="h-5 w-5 text-red-400" />
-                  <h3 className="text-lg font-semibold text-white">Último sync Apple Health</h3>
+                  <h3 className="text-lg font-semibold text-foreground">Último sync Apple Health</h3>
                 </div>
                 <a
                   href={SHORTCUT_URL || undefined}
@@ -466,7 +466,7 @@ export default function TrainingPage() {
                     size="sm"
                     variant="outline"
                     disabled={!SHORTCUT_URL}
-                    className="bg-white/5 border-white/20 text-white/80 hover:bg-white/10 text-xs h-8 gap-1.5 disabled:opacity-40"
+                    className="bg-black/5 dark:bg-white/5 border-black/20 dark:border-white/20 text-foreground/80 hover:bg-black/10 dark:hover:bg-white/10 text-xs h-8 gap-1.5 disabled:opacity-40"
                   >
                     <Download className="h-3.5 w-3.5" />
                     Descargar Shortcut
@@ -476,52 +476,52 @@ export default function TrainingPage() {
 
               {lastHealthSync ? (
                 <div>
-                  <p className="text-white/50 text-xs mb-3">
+                  <p className="text-foreground/50 text-xs mb-3">
                     {new Date(lastHealthSync.date + "T12:00:00").toLocaleDateString("es-ES", {
                       weekday: "long", day: "numeric", month: "long",
                     })}
                     {lastHealthSync.healthData?.workout_type && (
-                      <> · <span className="text-white/70">{lastHealthSync.healthData.workout_type}</span></>
+                      <> · <span className="text-foreground/70">{lastHealthSync.healthData.workout_type}</span></>
                     )}
                   </p>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                    <div className="bg-white/5 rounded-2xl p-3 text-center">
+                    <div className="bg-black/5 dark:bg-white/5 rounded-2xl p-3 text-center">
                       <Flame className="h-4 w-4 text-orange-400 mx-auto mb-1" />
-                      <p className="text-white font-semibold">{lastHealthSync.caloriesBurned}</p>
-                      <p className="text-white/40 text-xs">kcal activas</p>
+                      <p className="text-foreground font-semibold">{lastHealthSync.caloriesBurned}</p>
+                      <p className="text-foreground/40 text-xs">kcal activas</p>
                     </div>
                     {lastHealthSync.minutes > 0 && (
-                      <div className="bg-white/5 rounded-2xl p-3 text-center">
+                      <div className="bg-black/5 dark:bg-white/5 rounded-2xl p-3 text-center">
                         <Clock className="h-4 w-4 text-emerald-400 mx-auto mb-1" />
-                        <p className="text-white font-semibold">{lastHealthSync.minutes}</p>
-                        <p className="text-white/40 text-xs">minutos</p>
+                        <p className="text-foreground font-semibold">{lastHealthSync.minutes}</p>
+                        <p className="text-foreground/40 text-xs">minutos</p>
                       </div>
                     )}
                     {lastHealthSync.healthData?.steps && (
-                      <div className="bg-white/5 rounded-2xl p-3 text-center">
+                      <div className="bg-black/5 dark:bg-white/5 rounded-2xl p-3 text-center">
                         <Activity className="h-4 w-4 text-blue-400 mx-auto mb-1" />
-                        <p className="text-white font-semibold">{lastHealthSync.healthData.steps.toLocaleString()}</p>
-                        <p className="text-white/40 text-xs">pasos</p>
+                        <p className="text-foreground font-semibold">{lastHealthSync.healthData.steps.toLocaleString()}</p>
+                        <p className="text-foreground/40 text-xs">pasos</p>
                       </div>
                     )}
                     {lastHealthSync.healthData?.heart_rate_avg && (
-                      <div className="bg-white/5 rounded-2xl p-3 text-center">
+                      <div className="bg-black/5 dark:bg-white/5 rounded-2xl p-3 text-center">
                         <Heart className="h-4 w-4 text-red-400 mx-auto mb-1" />
-                        <p className="text-white font-semibold">{lastHealthSync.healthData.heart_rate_avg}</p>
-                        <p className="text-white/40 text-xs">ppm prom</p>
+                        <p className="text-foreground font-semibold">{lastHealthSync.healthData.heart_rate_avg}</p>
+                        <p className="text-foreground/40 text-xs">ppm prom</p>
                       </div>
                     )}
                   </div>
                   {lastHealthSync.healthData?.heart_rate_max && (
-                    <p className="text-white/30 text-xs mt-2 text-right">
+                    <p className="text-foreground/30 text-xs mt-2 text-right">
                       FC máx: {lastHealthSync.healthData.heart_rate_max} ppm
                     </p>
                   )}
                 </div>
               ) : (
                 <div className="text-center py-3">
-                  <p className="text-white/40 text-sm">No hay datos de Apple Health todavía.</p>
-                  <p className="text-white/25 text-xs mt-1">
+                  <p className="text-muted-foreground text-sm">No hay datos de Apple Health todavía.</p>
+                  <p className="text-foreground/25 text-xs mt-1">
                     {SHORTCUT_URL
                       ? "Descarga el Shortcut y actívalo desde iOS tras cada entreno."
                       : "Configura y comparte el Shortcut desde tu iPhone para activar la integración."}
@@ -530,19 +530,19 @@ export default function TrainingPage() {
               )}
             </Card>
 
-            <Card className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-6">
+            <Card className="backdrop-blur-xl bg-black/5 dark:bg-white/10 border border-black/20 dark:border-white/20 rounded-3xl p-6">
               <div className="flex items-center gap-2 mb-6">
                 <History className="h-5 w-5 text-emerald-400" />
-                <h3 className="text-xl font-semibold text-white">Historial de ejercicio (7 días)</h3>
+                <h3 className="text-xl font-semibold text-foreground">Historial de ejercicio (7 días)</h3>
               </div>
               <Table>
                 <TableHeader>
-                  <TableRow className="border-white/10">
-                    <TableHead className="text-white/60">Fecha</TableHead>
-                    <TableHead className="text-white/60">Ejercicio</TableHead>
-                    <TableHead className="text-white/60">Duración</TableHead>
-                    <TableHead className="text-white/60">Calorías quemadas</TableHead>
-                    <TableHead className="text-white/60 w-10" />
+                  <TableRow className="border-black/10 dark:border-white/10">
+                    <TableHead className="text-muted-foreground">Fecha</TableHead>
+                    <TableHead className="text-muted-foreground">Ejercicio</TableHead>
+                    <TableHead className="text-muted-foreground">Duración</TableHead>
+                    <TableHead className="text-muted-foreground">Calorías quemadas</TableHead>
+                    <TableHead className="text-muted-foreground w-10" />
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -553,9 +553,9 @@ export default function TrainingPage() {
                     return (
                       <TableRow
                         key={log.id}
-                        className={`border-white/10 transition-colors ${isPendingDelete ? "bg-red-500/10" : ""}`}
+                        className={`border-black/10 dark:border-white/10 transition-colors ${isPendingDelete ? "bg-red-500/10" : ""}`}
                       >
-                        <TableCell className="text-white/80">
+                        <TableCell className="text-foreground/80">
                           <div>
                             {new Date(log.date + "T12:00:00").toLocaleDateString("es-ES", {
                               weekday: "short",
@@ -576,19 +576,19 @@ export default function TrainingPage() {
                             </div>
                           </div>
                         </TableCell>
-                        <TableCell className="text-white font-medium">
+                        <TableCell className="text-foreground font-medium">
                           <div>{log.type}</div>
                           {log.healthData?.steps && (
-                            <div className="text-white/40 text-xs">{log.healthData.steps.toLocaleString()} pasos</div>
+                            <div className="text-foreground/40 text-xs">{log.healthData.steps.toLocaleString()} pasos</div>
                           )}
                           {log.healthData?.heart_rate_avg && (
-                            <div className="text-white/40 text-xs">{log.healthData.heart_rate_avg} ppm avg</div>
+                            <div className="text-foreground/40 text-xs">{log.healthData.heart_rate_avg} ppm avg</div>
                           )}
                         </TableCell>
-                        <TableCell className="text-white/80">{log.minutes ? `${log.minutes} min` : "—"}</TableCell>
+                        <TableCell className="text-foreground/80">{log.minutes ? `${log.minutes} min` : "—"}</TableCell>
                         <TableCell>
                           <div className="flex items-center gap-3">
-                            <div className="flex-1 bg-white/10 rounded-full h-2 max-w-32">
+                            <div className="flex-1 bg-black/10 dark:bg-white/10 rounded-full h-2 max-w-32">
                               <div
                                 className="bg-gradient-to-r from-orange-400 to-red-500 h-2 rounded-full"
                                 style={{ width: `${(log.caloriesBurned / maxKcal) * 100}%` }}
@@ -613,7 +613,7 @@ export default function TrainingPage() {
                                   size="sm"
                                   variant="ghost"
                                   onClick={() => setConfirmDeleteId(null)}
-                                  className="h-7 w-7 p-0 text-white/40 hover:text-white hover:bg-white/10"
+                                  className="h-7 w-7 p-0 text-foreground/40 hover:text-foreground hover:bg-black/10 dark:hover:bg-white/10"
                                 >
                                   <X className="h-3.5 w-3.5" />
                                 </Button>
@@ -623,7 +623,7 @@ export default function TrainingPage() {
                                 size="sm"
                                 variant="ghost"
                                 onClick={() => handleDeleteExercise(log.id, log.date)}
-                                className="h-7 w-7 p-0 text-white/30 hover:text-red-400 hover:bg-red-500/10"
+                                className="h-7 w-7 p-0 text-foreground/30 hover:text-red-400 hover:bg-red-500/10"
                               >
                                 <Trash2 className="h-3.5 w-3.5" />
                               </Button>
@@ -643,11 +643,11 @@ export default function TrainingPage() {
           <TabsContent value="gym">
             <div className="space-y-4">
               {/* Source badge + refresh */}
-              <Card className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-5">
+              <Card className="backdrop-blur-xl bg-black/5 dark:bg-white/10 border border-black/20 dark:border-white/20 rounded-3xl p-5">
                 <div className="flex items-center justify-between gap-3 flex-wrap">
                   <div className="flex items-center gap-2">
                     <Dumbbell className="h-5 w-5 text-emerald-400" />
-                    <h3 className="text-xl font-semibold text-white">Historial de gym (últimos 7 días)</h3>
+                    <h3 className="text-xl font-semibold text-foreground">Historial de gym (últimos 7 días)</h3>
                   </div>
                   <div className="flex items-center gap-3">
                     {gymHistory && (
@@ -656,7 +656,7 @@ export default function TrainingPage() {
                           ? "bg-emerald-500/15 border-emerald-500/30 text-emerald-300"
                           : gymHistory.source === "excel"
                           ? "bg-blue-500/15 border-blue-500/30 text-blue-300"
-                          : "bg-white/10 border-white/20 text-white/50"
+                          : "bg-black/5 dark:bg-white/10 border-black/20 dark:border-white/20 text-foreground/50"
                       }`}>
                         {gymHistory.source === "sheets"
                           ? <><Sheet className="h-3 w-3" /> Google Sheets</>
@@ -670,7 +670,7 @@ export default function TrainingPage() {
                       variant="outline"
                       onClick={loadGymHistory}
                       disabled={gymLoading}
-                      className="bg-white/5 border-white/20 text-white/80 hover:bg-white/10 text-xs h-8"
+                      className="bg-black/5 dark:bg-white/5 border-black/20 dark:border-white/20 text-foreground/80 hover:bg-black/10 dark:hover:bg-white/10 text-xs h-8"
                     >
                       {gymLoading ? "Cargando..." : "Actualizar"}
                     </Button>
@@ -682,7 +682,7 @@ export default function TrainingPage() {
                     <p className="font-medium mb-1">Google Sheets no configurado</p>
                     <p className="text-amber-300/80 text-xs">
                       Crea un Service Account en Google Cloud, comparte el spreadsheet con su email y
-                      guarda el JSON como <code className="bg-white/10 px-1 rounded">nutrition_assistant/google_credentials.json</code>.
+                      guarda el JSON como <code className="bg-black/5 dark:bg-white/10 px-1 rounded">nutrition_assistant/google_credentials.json</code>.
                     </p>
                   </div>
                 )}
@@ -697,13 +697,13 @@ export default function TrainingPage() {
 
               {/* Loading */}
               {gymLoading && (
-                <div className="text-center py-12 text-white/40">Cargando sesiones...</div>
+                <div className="text-center py-12 text-muted-foreground">Cargando sesiones...</div>
               )}
 
               {/* No sessions */}
               {!gymLoading && gymHistory && gymHistory.sessions.length === 0 && (
-                <Card className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-8 text-center">
-                  <p className="text-white/50">No hay sesiones de gym registradas en los últimos 7 días.</p>
+                <Card className="backdrop-blur-xl bg-black/5 dark:bg-white/10 border border-black/20 dark:border-white/20 rounded-3xl p-8 text-center">
+                  <p className="text-muted-foreground">No hay sesiones de gym registradas en los últimos 7 días.</p>
                 </Card>
               )}
 
@@ -714,18 +714,18 @@ export default function TrainingPage() {
                 return (
                   <Card
                     key={sessionKey}
-                    className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl overflow-hidden"
+                    className="backdrop-blur-xl bg-black/5 dark:bg-white/10 border border-black/20 dark:border-white/20 rounded-3xl overflow-hidden"
                   >
                     {/* Session header */}
                     <button
-                      className="w-full flex items-center justify-between p-5 hover:bg-white/5 transition-colors text-left"
+                      className="w-full flex items-center justify-between p-5 hover:bg-black/5 dark:hover:bg-white/5 transition-colors text-left"
                       onClick={() => setExpandedSession(isExpanded ? null : sessionKey)}
                     >
                       <div className="flex items-center gap-3">
                         <CalendarDays className="h-4 w-4 text-emerald-400 shrink-0" />
                         <div>
-                          <p className="text-white font-semibold">{session.type}</p>
-                          <p className="text-white/50 text-sm">
+                          <p className="text-foreground font-semibold">{session.type}</p>
+                          <p className="text-foreground/50 text-sm">
                             {new Date(session.date + "T12:00:00").toLocaleDateString("es-ES", {
                               weekday: "long", day: "numeric", month: "long",
                             })}
@@ -737,42 +737,42 @@ export default function TrainingPage() {
                           <Flame className="h-4 w-4 text-orange-400" />
                           <span className="text-orange-400 font-semibold">{session.kcal} kcal</span>
                         </div>
-                        <span className="text-white/40 text-sm">{session.exercises.length} ejercicios</span>
+                        <span className="text-foreground/40 text-sm">{session.exercises.length} ejercicios</span>
                         {isExpanded
-                          ? <ChevronDown className="h-4 w-4 text-white/40" />
-                          : <ChevronRight className="h-4 w-4 text-white/40" />
+                          ? <ChevronDown className="h-4 w-4 text-foreground/40" />
+                          : <ChevronRight className="h-4 w-4 text-foreground/40" />
                         }
                       </div>
                     </button>
 
                     {/* Exercises detail */}
                     {isExpanded && (
-                      <div className="border-t border-white/10 px-5 pb-5 pt-4">
+                      <div className="border-t border-black/10 dark:border-white/10 px-5 pb-5 pt-4">
                         <Table>
                           <TableHeader>
-                            <TableRow className="border-white/10">
-                              <TableHead className="text-white/50 text-xs">Ejercicio</TableHead>
-                              <TableHead className="text-white/50 text-xs text-right">Serie 1</TableHead>
-                              <TableHead className="text-white/50 text-xs text-right">Serie 2</TableHead>
-                              <TableHead className="text-white/50 text-xs text-right">Volumen</TableHead>
+                            <TableRow className="border-black/10 dark:border-white/10">
+                              <TableHead className="text-muted-foreground text-xs">Ejercicio</TableHead>
+                              <TableHead className="text-muted-foreground text-xs text-right">Serie 1</TableHead>
+                              <TableHead className="text-muted-foreground text-xs text-right">Serie 2</TableHead>
+                              <TableHead className="text-muted-foreground text-xs text-right">Volumen</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
                             {session.exercises.map((ex, i) => (
-                              <TableRow key={i} className="border-white/10">
-                                <TableCell className="text-white text-sm py-2">
+                              <TableRow key={i} className="border-black/10 dark:border-white/10">
+                                <TableCell className="text-foreground text-sm py-2">
                                   <span className={ex.compound ? "font-medium" : ""}>{ex.name}</span>
                                   {ex.compound && (
                                     <span className="ml-1.5 text-[10px] text-emerald-400/70 border border-emerald-500/20 rounded px-1 py-0.5">C</span>
                                   )}
                                 </TableCell>
-                                <TableCell className="text-white/70 text-sm text-right py-2">
+                                <TableCell className="text-foreground/70 text-sm text-right py-2">
                                   {ex.reps_s1 > 0 ? `${ex.reps_s1}×${ex.kg_s1}kg` : "—"}
                                 </TableCell>
-                                <TableCell className="text-white/70 text-sm text-right py-2">
+                                <TableCell className="text-foreground/70 text-sm text-right py-2">
                                   {ex.reps_s2 > 0 ? `${ex.reps_s2}×${ex.kg_s2}kg` : "—"}
                                 </TableCell>
-                                <TableCell className="text-white/50 text-sm text-right py-2">
+                                <TableCell className="text-foreground/50 text-sm text-right py-2">
                                   {ex.volume > 0 ? `${ex.volume} kg·r` : "—"}
                                 </TableCell>
                               </TableRow>
@@ -790,14 +790,14 @@ export default function TrainingPage() {
           {/* ── Routine Generator Tab ── */}
           <TabsContent value="routine">
             <div className="space-y-6">
-              <Card className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-6">
+              <Card className="backdrop-blur-xl bg-black/5 dark:bg-white/10 border border-black/20 dark:border-white/20 rounded-3xl p-6">
                 <div className="flex items-center gap-2 mb-6">
                   <Sparkles className="h-5 w-5 text-emerald-400" />
-                  <h3 className="text-xl font-semibold text-white">Generar rutina de entrenamiento</h3>
+                  <h3 className="text-xl font-semibold text-foreground">Generar rutina de entrenamiento</h3>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 md:gap-6 items-end">
                   <div className="space-y-3">
-                    <Label className="text-white/80">Tipo de entrenamiento</Label>
+                    <Label className="text-foreground/80">Tipo de entrenamiento</Label>
                     <div className="flex gap-2">
                       <Button
                         variant={routineType === "gym" ? "default" : "outline"}
@@ -805,7 +805,7 @@ export default function TrainingPage() {
                         className={`flex-1 justify-center ${
                           routineType === "gym"
                             ? "bg-emerald-500 hover:bg-emerald-600 text-white"
-                            : "bg-white/5 border-white/20 text-white/80 hover:bg-white/10"
+                            : "bg-black/5 dark:bg-white/5 border-black/20 dark:border-white/20 text-foreground/80 hover:bg-black/10 dark:hover:bg-white/10"
                         }`}
                       >
                         <Dumbbell className="mr-2 h-4 w-4 shrink-0" />
@@ -817,7 +817,7 @@ export default function TrainingPage() {
                         className={`flex-1 justify-center ${
                           routineType === "calisthenics"
                             ? "bg-emerald-500 hover:bg-emerald-600 text-white"
-                            : "bg-white/5 border-white/20 text-white/80 hover:bg-white/10"
+                            : "bg-black/5 dark:bg-white/5 border-black/20 dark:border-white/20 text-foreground/80 hover:bg-black/10 dark:hover:bg-white/10"
                         }`}
                       >
                         Calistenia
@@ -825,7 +825,7 @@ export default function TrainingPage() {
                     </div>
                   </div>
                   <div className="space-y-3">
-                    <Label className="text-white/80">Días por semana: {daysPerWeek[0]}</Label>
+                    <Label className="text-foreground/80">Días por semana: {daysPerWeek[0]}</Label>
                     <Slider
                       value={daysPerWeek}
                       onValueChange={setDaysPerWeek}
@@ -851,26 +851,26 @@ export default function TrainingPage() {
                   {generatedRoutine.map((day, index) => (
                     <Card
                       key={index}
-                      className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-6"
+                      className="backdrop-blur-xl bg-black/5 dark:bg-white/10 border border-black/20 dark:border-white/20 rounded-3xl p-6"
                     >
                       <div className="flex items-center gap-2 mb-4">
                         <CalendarDays className="h-5 w-5 text-emerald-400" />
-                        <h4 className="text-lg font-semibold text-white">{day.day}</h4>
+                        <h4 className="text-lg font-semibold text-foreground">{day.day}</h4>
                       </div>
                       <Table>
                         <TableHeader>
-                          <TableRow className="border-white/10">
-                            <TableHead className="text-white/60">Ejercicio</TableHead>
-                            <TableHead className="text-white/60">Series</TableHead>
-                            <TableHead className="text-white/60">Músculos</TableHead>
+                          <TableRow className="border-black/10 dark:border-white/10">
+                            <TableHead className="text-muted-foreground">Ejercicio</TableHead>
+                            <TableHead className="text-muted-foreground">Series</TableHead>
+                            <TableHead className="text-muted-foreground">Músculos</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
                           {day.exercises.map((exercise, i) => (
-                            <TableRow key={i} className="border-white/10">
-                              <TableCell className="text-white font-medium">{exercise.name}</TableCell>
-                              <TableCell className="text-white/80">{exercise.sets}</TableCell>
-                              <TableCell className="text-white/60 text-sm">{exercise.muscles}</TableCell>
+                            <TableRow key={i} className="border-black/10 dark:border-white/10">
+                              <TableCell className="text-foreground font-medium">{exercise.name}</TableCell>
+                              <TableCell className="text-foreground/80">{exercise.sets}</TableCell>
+                              <TableCell className="text-muted-foreground text-sm">{exercise.muscles}</TableCell>
                             </TableRow>
                           ))}
                         </TableBody>

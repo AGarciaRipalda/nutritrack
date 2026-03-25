@@ -69,7 +69,7 @@ export default function ReportPage() {
     return (
       <AppLayout>
         <div className="flex items-center justify-center h-full">
-          <div className="text-white/60">Cargando...</div>
+          <div className="text-muted-foreground">Cargando...</div>
         </div>
       </AppLayout>
     )
@@ -79,7 +79,7 @@ export default function ReportPage() {
     return (
       <AppLayout>
         <div className="flex items-center justify-center h-full">
-          <div className="text-white/60">Error al cargar el informe</div>
+          <div className="text-muted-foreground">Error al cargar el informe</div>
         </div>
       </AppLayout>
     )
@@ -91,13 +91,13 @@ export default function ReportPage() {
     <AppLayout>
       <div className="space-y-6">
         {/* Header */}
-        <Card className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-6">
+        <Card className="backdrop-blur-xl bg-black/5 dark:bg-white/10 border border-black/20 dark:border-white/20 rounded-3xl p-6">
           <div className="flex items-center justify-between flex-wrap gap-3">
             <div className="flex items-center gap-3">
               <FileBarChart className="h-7 w-7 text-emerald-400" />
               <div>
-                <h2 className="text-3xl font-bold text-white">Informe semanal</h2>
-                <p className="text-white/60">Resumen de tu rendimiento esta semana</p>
+                <h2 className="text-3xl font-bold text-foreground">Informe semanal</h2>
+                <p className="text-muted-foreground">Resumen de tu rendimiento esta semana</p>
               </div>
             </div>
             <a
@@ -114,47 +114,47 @@ export default function ReportPage() {
 
         {/* Metric Cards */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
-          <Card className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-6 transition-all duration-300 hover:bg-white/15">
+          <Card className="backdrop-blur-xl bg-black/5 dark:bg-white/10 border border-black/20 dark:border-white/20 rounded-3xl p-6 transition-all duration-300 hover:bg-black/10 dark:hover:bg-white/15">
             <div className="flex items-start justify-between">
               <div>
-                <p className="text-white/60 text-sm">Días entrenados</p>
-                <p className="text-3xl font-bold text-white">{report.daysTrained}</p>
-                <p className="text-white/60 text-sm">esta semana</p>
+                <p className="text-muted-foreground text-sm">Días entrenados</p>
+                <p className="text-3xl font-bold text-foreground">{report.daysTrained}</p>
+                <p className="text-muted-foreground text-sm">esta semana</p>
               </div>
               <Dumbbell className="h-8 w-8 text-blue-400" />
             </div>
           </Card>
 
-          <Card className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-6 transition-all duration-300 hover:bg-white/15">
+          <Card className="backdrop-blur-xl bg-black/5 dark:bg-white/10 border border-black/20 dark:border-white/20 rounded-3xl p-6 transition-all duration-300 hover:bg-black/10 dark:hover:bg-white/15">
             <div className="flex items-start justify-between">
               <div>
-                <p className="text-white/60 text-sm">Calorías quemadas</p>
-                <p className="text-3xl font-bold text-white">{report.totalKcalBurned.toLocaleString()}</p>
-                <p className="text-white/60 text-sm">kcal totales</p>
+                <p className="text-muted-foreground text-sm">Calorías quemadas</p>
+                <p className="text-3xl font-bold text-foreground">{report.totalKcalBurned.toLocaleString()}</p>
+                <p className="text-muted-foreground text-sm">kcal totales</p>
               </div>
               <Flame className="h-8 w-8 text-orange-400" />
             </div>
           </Card>
 
-          <Card className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-6 transition-all duration-300 hover:bg-white/15">
+          <Card className="backdrop-blur-xl bg-black/5 dark:bg-white/10 border border-black/20 dark:border-white/20 rounded-3xl p-6 transition-all duration-300 hover:bg-black/10 dark:hover:bg-white/15">
             <div className="flex items-start justify-between">
               <div>
-                <p className="text-white/60 text-sm">Adherencia</p>
-                <p className="text-3xl font-bold text-white">{report.adherencePercent}%</p>
-                <p className="text-white/60 text-sm">plan de comidas</p>
+                <p className="text-muted-foreground text-sm">Adherencia</p>
+                <p className="text-3xl font-bold text-foreground">{report.adherencePercent}%</p>
+                <p className="text-muted-foreground text-sm">plan de comidas</p>
               </div>
               <CheckCircle className="h-8 w-8 text-emerald-400" />
             </div>
           </Card>
 
-          <Card className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-6 transition-all duration-300 hover:bg-white/15">
+          <Card className="backdrop-blur-xl bg-black/5 dark:bg-white/10 border border-black/20 dark:border-white/20 rounded-3xl p-6 transition-all duration-300 hover:bg-black/10 dark:hover:bg-white/15">
             <div className="flex items-start justify-between">
               <div>
-                <p className="text-white/60 text-sm">Cambio de peso</p>
+                <p className="text-muted-foreground text-sm">Cambio de peso</p>
                 <p className={`text-3xl font-bold ${(report.weightChange ?? 0) <= 0 ? "text-emerald-400" : "text-red-400"}`}>
                   {(report.weightChange ?? 0) > 0 ? "+" : ""}{report.weightChange ?? 0} kg
                 </p>
-                <p className="text-white/60 text-sm">esta semana</p>
+                <p className="text-muted-foreground text-sm">esta semana</p>
               </div>
               <Scale className="h-8 w-8 text-purple-400" />
             </div>
@@ -162,13 +162,13 @@ export default function ReportPage() {
         </div>
 
         {/* Sensations Survey */}
-        <Card className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-6">
-          <h3 className="text-xl font-semibold text-white mb-6">Encuesta de sensaciones semanales</h3>
+        <Card className="backdrop-blur-xl bg-black/5 dark:bg-white/10 border border-black/20 dark:border-white/20 rounded-3xl p-6">
+          <h3 className="text-xl font-semibold text-foreground mb-6">Encuesta de sensaciones semanales</h3>
           {submitted || report.sensationsSurvey ? (
             <div className="text-center py-8">
               <CheckCircle className="h-12 w-12 text-emerald-400 mx-auto mb-4" />
-              <p className="text-white text-lg">¡Gracias por completar la encuesta de esta semana!</p>
-              <p className="text-white/60">Tus respuestas nos ayudan a mejorar tus recomendaciones.</p>
+              <p className="text-foreground text-lg">¡Gracias por completar la encuesta de esta semana!</p>
+              <p className="text-muted-foreground">Tus respuestas nos ayudan a mejorar tus recomendaciones.</p>
             </div>
           ) : (
             <div className="space-y-6">
@@ -177,7 +177,7 @@ export default function ReportPage() {
                 <div className="space-y-3">
                   <div className="flex items-center gap-2">
                     <Zap className="h-5 w-5 text-yellow-400" />
-                    <Label className="text-white">Nivel de energía</Label>
+                    <Label className="text-foreground">Nivel de energía</Label>
                   </div>
                   <Slider
                     value={survey.energy}
@@ -186,7 +186,7 @@ export default function ReportPage() {
                     max={5}
                     step={1}
                   />
-                  <p className="text-white/60 text-sm text-center">
+                  <p className="text-muted-foreground text-sm text-center">
                     {sensationLabels.energy[survey.energy[0] - 1]}
                   </p>
                 </div>
@@ -195,7 +195,7 @@ export default function ReportPage() {
                 <div className="space-y-3">
                   <div className="flex items-center gap-2">
                     <Moon className="h-5 w-5 text-blue-400" />
-                    <Label className="text-white">Calidad del sueño</Label>
+                    <Label className="text-foreground">Calidad del sueño</Label>
                   </div>
                   <Slider
                     value={survey.sleep}
@@ -204,7 +204,7 @@ export default function ReportPage() {
                     max={5}
                     step={1}
                   />
-                  <p className="text-white/60 text-sm text-center">
+                  <p className="text-muted-foreground text-sm text-center">
                     {sensationLabels.sleep[survey.sleep[0] - 1]}
                   </p>
                 </div>
@@ -213,7 +213,7 @@ export default function ReportPage() {
                 <div className="space-y-3">
                   <div className="flex items-center gap-2">
                     <Smile className="h-5 w-5 text-emerald-400" />
-                    <Label className="text-white">Estado de ánimo general</Label>
+                    <Label className="text-foreground">Estado de ánimo general</Label>
                   </div>
                   <Slider
                     value={survey.mood}
@@ -222,7 +222,7 @@ export default function ReportPage() {
                     max={5}
                     step={1}
                   />
-                  <p className="text-white/60 text-sm text-center">
+                  <p className="text-muted-foreground text-sm text-center">
                     {sensationLabels.mood[survey.mood[0] - 1]}
                   </p>
                 </div>
@@ -231,7 +231,7 @@ export default function ReportPage() {
                 <div className="space-y-3">
                   <div className="flex items-center gap-2">
                     <Utensils className="h-5 w-5 text-orange-400" />
-                    <Label className="text-white">Nivel de hambre</Label>
+                    <Label className="text-foreground">Nivel de hambre</Label>
                   </div>
                   <Slider
                     value={survey.hunger}
@@ -240,7 +240,7 @@ export default function ReportPage() {
                     max={5}
                     step={1}
                   />
-                  <p className="text-white/60 text-sm text-center">
+                  <p className="text-muted-foreground text-sm text-center">
                     {sensationLabels.hunger[survey.hunger[0] - 1]}
                   </p>
                 </div>
@@ -259,21 +259,21 @@ export default function ReportPage() {
         </Card>
 
         {/* Recommendations */}
-        <Card className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-6">
+        <Card className="backdrop-blur-xl bg-black/5 dark:bg-white/10 border border-black/20 dark:border-white/20 rounded-3xl p-6">
           <div className="flex items-center gap-2 mb-6">
             <Lightbulb className="h-5 w-5 text-yellow-400" />
-            <h3 className="text-xl font-semibold text-white">Recomendaciones personalizadas</h3>
+            <h3 className="text-xl font-semibold text-foreground">Recomendaciones personalizadas</h3>
           </div>
           <div className="space-y-3">
             {report.recommendations.map((recommendation, index) => (
               <div
                 key={index}
-                className="flex items-start gap-3 p-4 bg-white/5 rounded-xl border border-white/10"
+                className="flex items-start gap-3 p-4 bg-black/5 dark:bg-white/5 rounded-xl border border-black/10 dark:border-white/10"
               >
                 <span className="flex-shrink-0 w-6 h-6 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-sm font-medium">
                   {index + 1}
                 </span>
-                <p className="text-white/80">{recommendation}</p>
+                <p className="text-foreground/80">{recommendation}</p>
               </div>
             ))}
           </div>

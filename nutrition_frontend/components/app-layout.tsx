@@ -11,9 +11,8 @@ export function AppLayout({ children }: { children: ReactNode }) {
 
   return (
     <div className="min-h-screen relative overflow-hidden font-sans">
-      {/* Background - Sporty Light Theme */}
-      <div className="fixed inset-0 bg-[#f8fafc] print:hidden" />
-      <div className="fixed inset-0 bg-gradient-to-br from-emerald-50/50 via-white to-blue-50/50 print:hidden" />
+      {/* Background */}
+      <div className="fixed inset-0 bg-background print:hidden" />
 
       {/* Decorative patterns */}
       <div className="fixed inset-0 opacity-[0.03] pointer-events-none print:hidden"
@@ -29,7 +28,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
 
       {/* Mobile hamburger button */}
       <button
-        className="fixed top-3 left-4 z-30 md:hidden p-2 bg-white/80 border border-emerald-100 rounded-xl text-emerald-700 shadow-sm backdrop-blur-md print:hidden"
+        className="fixed top-3 left-4 z-30 md:hidden p-2 bg-card/80 border border-border rounded-xl text-primary shadow-sm backdrop-blur-md print:hidden"
         onClick={() => setMobileOpen(true)}
         aria-label="Abrir menú"
       >

@@ -89,10 +89,10 @@ export function CheatDayProvider({ children }: { children: ReactNode }) {
     if (!record) return
     const perDay = Math.round(record.excess / 3)
     const entries: CompensationEntry[] = []
-    const d = new Date(fromDate + "T00:00:00")
-    for (let i = 0; i < 3; i++) {
-      d.setDate(d.getDate() + 1)
-      entries.push({ date: d.toISOString().slice(0, 10), reduction: perDay })
+    const base = new Date(fromDate + "T00:00:00").getTime()
+    for (let i = 1; i <= 3; i++) {
+      const nextDate = new Date(base + i * 86400000)
+      entries.push({ date: nextDate.toISOString().slice(0, 10), reduction: perDay })
     }
     persist({ ...record, compensating: true, compensation: entries })
   }, [record, persist])

@@ -20,7 +20,7 @@ import { fetchWeeklyPlan, regenerateWeeklyPlan, swapWeeklyMeal } from "@/lib/api
 import { loadDayFromStorage } from "@/context/DietDayContext"
 import { useCheatDay } from "@/context/CheatDayContext"
 
-const todayISO = new Date().toISOString().slice(0, 10)
+const todayISO = typeof window !== "undefined" ? new Date().toISOString().slice(0, 10) : ""
 
 const mockWeeklyPlanResponse: WeeklyPlanResponse = {
   stale: false,
@@ -159,11 +159,11 @@ function MealCard({
 }) {
   const MealIcon = mealIdIcons[meal.id] ?? mealTypeIcons[meal.type] ?? Utensils
   return (
-    <div className="p-3 bg-white/5 rounded-xl border border-white/10 flex flex-col gap-2">
+    <div className="p-3 bg-black/5 dark:bg-white/5 rounded-xl border border-black/10 dark:border-white/10 flex flex-col gap-2">
       {/* Title row: icon + meal name + kcal */}
-      <div className="flex items-center gap-2 border-b border-white/10 pb-2">
+      <div className="flex items-center gap-2 border-b border-black/10 dark:border-white/10 pb-2">
         <MealIcon className="h-4 w-4 text-emerald-400 shrink-0" />
-        <span className="text-white text-sm font-semibold flex-1">
+        <span className="text-foreground text-sm font-semibold flex-1">
           {mealDisplayName[meal.id] ?? meal.name}
         </span>
         {meal.kcal > 0 && (
@@ -173,7 +173,7 @@ function MealCard({
         )}
       </div>
       {/* Description */}
-      <p className="text-white/80 text-xs leading-snug flex-1">{meal.description}</p>
+      <p className="text-foreground/80 text-xs leading-snug flex-1">{meal.description}</p>
       {/* Note */}
       {meal.note && (
         <div className="flex items-start gap-1 mt-0.5">
@@ -186,7 +186,7 @@ function MealCard({
         <button
           onClick={onSwap}
           disabled={swapping}
-          className="mt-1 w-full flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-medium text-white/50 hover:text-white hover:bg-white/10 border border-white/10 hover:border-white/20 transition-colors disabled:opacity-40"
+          className="mt-1 w-full flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-medium text-foreground/50 hover:text-foreground hover:bg-black/10 dark:hover:bg-white/10 border border-black/10 dark:border-white/10 hover:border-black/20 dark:hover:border-white/20 transition-colors disabled:opacity-40"
         >
           <Shuffle className={`h-3 w-3 ${swapping ? "animate-spin" : ""}`} />
           {swapping ? "Cambiando..." : "Cambiar plato"}
@@ -517,7 +517,7 @@ export default function WeeklyPlanPage() {
     return (
       <AppLayout>
         <div className="flex items-center justify-center h-full">
-          <div className="text-white/60">Cargando...</div>
+          <div className="text-muted-foreground">Cargando...</div>
         </div>
       </AppLayout>
     )
@@ -525,9 +525,9 @@ export default function WeeklyPlanPage() {
 
   const weeklyPlan = data ?? mockWeeklyPlanResponse
   const totalWeekKcal = weeklyPlan.days.reduce((sum, day) => sum + day.totalKcal, 0)
-  const dateStr = new Date().toLocaleDateString("es-ES", {
+  const dateStr = typeof window !== "undefined" ? new Date().toLocaleDateString("es-ES", {
     weekday: "long", year: "numeric", month: "long", day: "numeric",
-  })
+  }) : ""
 
   return (
     <AppLayout>
@@ -558,21 +558,21 @@ export default function WeeklyPlanPage() {
 
         {/* ── Adaptive summary card ── */}
         {data?.summary && (
-          <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl p-4 mb-4">
-            <p className="text-white/60 text-sm">
+          <div className="backdrop-blur-xl bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-2xl p-4 mb-4">
+            <p className="text-muted-foreground text-sm">
               Plan ajustado por:{" "}
               {data.summary.weight_delta !== null && (
-                <span className="text-white font-medium">
+                <span className="text-foreground font-medium">
                   {data.summary.weight_delta > 0 ? "+" : ""}{data.summary.weight_delta}kg semana anterior
                 </span>
               )}
               {data.summary.total_exercise_kcal > 0 && (
-                <span className="text-white font-medium ml-2">
+                <span className="text-foreground font-medium ml-2">
                   · {data.summary.total_exercise_kcal.toLocaleString()} kcal ejercicio
                 </span>
               )}
               {" · "}
-              <span className="text-white font-medium">
+              <span className="text-foreground font-medium">
                 {Math.round(data.summary.avg_adherence * 100)}% adherencia
               </span>
             </p>
@@ -580,19 +580,19 @@ export default function WeeklyPlanPage() {
         )}
 
         {/* ── Screen header ── */}
-        <Card className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-6 print:hidden">
+        <Card className="backdrop-blur-xl bg-black/5 dark:bg-white/10 border border-black/10 dark:border-white/20 rounded-3xl p-6 print:hidden">
           <div className="flex items-center justify-between flex-wrap gap-3">
             <div className="flex items-center gap-3">
               <CalendarDays className="h-7 w-7 text-emerald-400" />
               <div>
-                <h2 className="text-3xl font-bold text-white">Plan semanal</h2>
-                <p className="text-white/60">Tus comidas planificadas para toda la semana</p>
+                <h2 className="text-3xl font-bold text-foreground">Plan semanal</h2>
+                <p className="text-muted-foreground">Tus comidas planificadas para toda la semana</p>
               </div>
             </div>
             <div className="flex items-center gap-3 flex-wrap">
               <Button
                 onClick={() => window.print()}
-                className="bg-white/10 hover:bg-white/20 border border-white/20 text-white"
+                className="bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/20 border border-black/20 dark:border-white/20 text-foreground"
               >
                 <FileDown className="mr-2 h-4 w-4" />
                 Exportar PDF
@@ -603,7 +603,7 @@ export default function WeeklyPlanPage() {
 
         {/* ── Screen accordion view ── */}
         <div className="print:hidden">
-          <Card className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-6">
+          <Card className="backdrop-blur-xl bg-black/5 dark:bg-white/10 border border-black/10 dark:border-white/20 rounded-3xl p-6">
             <Accordion type="single" collapsible className="space-y-2">
               {weeklyPlan.days.map((dayPlan) => {
                 const isToday      = dayPlan.date === todayISO
@@ -615,17 +615,17 @@ export default function WeeklyPlanPage() {
                   <AccordionItem
                     key={dayPlan.date}
                     value={dayPlan.date}
-                    className={`bg-white/5 rounded-xl border px-4 data-[state=open]:bg-white/10 ${
+                    className={`bg-black/5 dark:bg-white/5 rounded-xl border px-4 data-[state=open]:bg-black/10 dark:data-[state=open]:bg-white/10 ${
                       isToday       ? "border-emerald-400/50"
                       : cheatDay    ? "border-amber-400/30"
                       : nonCompliant ? "border-red-400/30"
-                      : "border-white/10"
+                      : "border-black/10 dark:border-white/10"
                     }`}
                   >
                     <AccordionTrigger className="hover:no-underline py-4">
                       <div className="flex items-center justify-between w-full pr-4">
                         <div className="flex items-center gap-2">
-                          <span className="text-lg font-semibold text-white">{dayPlan.dayName}</span>
+                          <span className="text-lg font-semibold text-foreground">{dayPlan.dayName}</span>
                           {isToday && (
                             <span className="bg-emerald-500 text-white text-xs px-2 py-0.5 rounded-full font-medium">
                               HOY
@@ -678,20 +678,20 @@ export default function WeeklyPlanPage() {
 
         {/* ── Screen shopping list ── */}
         {shoppingList.length > 0 && (
-          <Card className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-6 print:hidden">
+          <Card className="backdrop-blur-xl bg-black/5 dark:bg-white/10 border border-black/10 dark:border-white/20 rounded-3xl p-6 print:hidden">
             <div className="flex items-center gap-2 mb-6">
               <ShoppingCart className="h-5 w-5 text-emerald-400" />
-              <h3 className="text-xl font-semibold text-white">Lista de la compra</h3>
+              <h3 className="text-xl font-semibold text-foreground">Lista de la compra</h3>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-6">
               {shoppingList.map((category) => (
                 <div key={category.category} className="space-y-3">
-                  <h4 className="text-white font-semibold border-b border-white/10 pb-2">
+                  <h4 className="text-foreground font-semibold border-b border-black/10 dark:border-white/10 pb-2">
                     {category.category}
                   </h4>
                   <ul className="space-y-2">
                     {category.items.map((item, index) => (
-                      <li key={index} className="text-white/80 text-sm flex items-center gap-2">
+                      <li key={index} className="text-foreground/80 text-sm flex items-center gap-2">
                         <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full shrink-0" />
                         {item}
                       </li>
@@ -761,17 +761,17 @@ export default function WeeklyPlanPage() {
 
         {/* ── Regenerar plan completo (acción avanzada) ── */}
         <div className="print:hidden">
-          <div className="bg-white/5 border border-white/10 rounded-2xl p-4 flex items-center justify-between gap-4 flex-wrap">
+          <div className="bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-2xl p-4 flex items-center justify-between gap-4 flex-wrap">
             <div className="flex items-start gap-3">
-              <AlertTriangle className="h-4 w-4 text-white/30 shrink-0 mt-0.5" />
+              <AlertTriangle className="h-4 w-4 text-foreground/30 shrink-0 mt-0.5" />
               <div>
-                <p className="text-white/50 text-sm font-medium">Regenerar todo el menú semanal</p>
-                <p className="text-white/30 text-xs mt-0.5">Sustituye todos los platos de la semana. Usa "Cambiar plato" para ajustes individuales.</p>
+                <p className="text-muted-foreground text-sm font-medium">Regenerar todo el menú semanal</p>
+                <p className="text-foreground/30 text-xs mt-0.5">Sustituye todos los platos de la semana. Usa "Cambiar plato" para ajustes individuales.</p>
               </div>
             </div>
             <button
               onClick={() => setShowRegenModal(true)}
-              className="flex items-center gap-2 px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/15 rounded-xl text-white/40 hover:text-white/60 text-xs font-medium transition-colors shrink-0"
+              className="flex items-center gap-2 px-3 py-1.5 bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 border border-black/15 dark:border-white/15 rounded-xl text-foreground/40 hover:text-foreground/60 text-xs font-medium transition-colors shrink-0"
             >
               <RefreshCw className="w-3.5 h-3.5" />
               Regenerar semana completa
@@ -782,28 +782,28 @@ export default function WeeklyPlanPage() {
         {/* Regeneration modal */}
         {showRegenModal && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-6 w-full max-w-md">
+            <div className="backdrop-blur-xl bg-white dark:bg-white/10 border border-black/10 dark:border-white/20 rounded-3xl p-6 w-full max-w-md">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-white font-bold text-lg">Regenerar plan semanal</h3>
-                <button onClick={() => setShowRegenModal(false)} className="text-white/60 hover:text-white">
+                <h3 className="text-foreground font-bold text-lg">Regenerar plan semanal</h3>
+                <button onClick={() => setShowRegenModal(false)} className="text-muted-foreground hover:text-foreground">
                   <X className="w-5 h-5" />
                 </button>
               </div>
 
               {data?.summary ? (
-                <div className="bg-white/5 rounded-xl p-4 mb-4 text-sm text-white/70 space-y-1">
+                <div className="bg-black/5 dark:bg-white/5 rounded-xl p-4 mb-4 text-sm text-foreground/70 space-y-1">
                   <p>Basado en tu semana anterior:</p>
-                  <p>· Adherencia: <span className="text-white">{Math.round(data.summary.avg_adherence * 100)}%</span></p>
-                  <p>· Ejercicio acumulado: <span className="text-white">{data.summary.total_exercise_kcal.toLocaleString()} kcal</span></p>
+                  <p>· Adherencia: <span className="text-foreground">{Math.round(data.summary.avg_adherence * 100)}%</span></p>
+                  <p>· Ejercicio acumulado: <span className="text-foreground">{data.summary.total_exercise_kcal.toLocaleString()} kcal</span></p>
                   {data.summary.weight_delta !== null && (
-                    <p>· Peso: <span className="text-white">{data.summary.weight_delta > 0 ? "+" : ""}{data.summary.weight_delta} kg</span></p>
+                    <p>· Peso: <span className="text-foreground">{data.summary.weight_delta > 0 ? "+" : ""}{data.summary.weight_delta} kg</span></p>
                   )}
                 </div>
               ) : (
-                <p className="text-white/50 text-sm mb-4">No hay historial de la semana anterior disponible.</p>
+                <p className="text-muted-foreground text-sm mb-4">No hay historial de la semana anterior disponible.</p>
               )}
 
-              <p className="text-white/70 text-sm mb-3">¿Desde cuándo aplicar el nuevo plan?</p>
+              <p className="text-foreground/70 text-sm mb-3">¿Desde cuándo aplicar el nuevo plan?</p>
               <div className="space-y-2 mb-4">
                 <label className="flex items-center gap-3 cursor-pointer">
                   <input
@@ -814,7 +814,7 @@ export default function WeeklyPlanPage() {
                     onChange={() => setRegenApplyFrom("today")}
                     className="accent-emerald-400"
                   />
-                  <span className="text-white text-sm">Desde hoy (reemplaza el menú de hoy)</span>
+                  <span className="text-foreground text-sm">Desde hoy (reemplaza el menú de hoy)</span>
                 </label>
                 <label className="flex items-center gap-3 cursor-pointer">
                   <input
@@ -825,7 +825,7 @@ export default function WeeklyPlanPage() {
                     onChange={() => setRegenApplyFrom("tomorrow")}
                     className="accent-emerald-400"
                   />
-                  <span className="text-white text-sm">Desde mañana (mantiene el menú de hoy)</span>
+                  <span className="text-foreground text-sm">Desde mañana (mantiene el menú de hoy)</span>
                 </label>
               </div>
 
@@ -836,7 +836,7 @@ export default function WeeklyPlanPage() {
               <div className="flex gap-3">
                 <button
                   onClick={() => setShowRegenModal(false)}
-                  className="flex-1 px-4 py-2 border border-white/20 rounded-xl text-white/70 text-sm hover:bg-white/5 transition-colors"
+                  className="flex-1 px-4 py-2 border border-black/20 dark:border-white/20 rounded-xl text-foreground/70 text-sm hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
                 >
                   Cancelar
                 </button>

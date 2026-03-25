@@ -16,7 +16,7 @@ import { fetchDashboard, fetchGamification } from "@/lib/api"
 import { LevelBadge } from "@/components/level-badge"
 import { useCheatDay } from "@/context/CheatDayContext"
 
-const todayISO = new Date().toISOString().slice(0, 10)
+const todayISO = typeof window !== "undefined" ? new Date().toISOString().slice(0, 10) : ""
 
 export default function DashboardPage() {
   const [data, setData]         = useState<DashboardData | null>(null)
@@ -30,11 +30,17 @@ export default function DashboardPage() {
   const weeklyUsed   = isWeeklyLimitReached(todayISO) && !cheatActive
 
   useEffect(() => {
-    fetchDashboard()
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 8000)
+
+    fetchDashboard(controller.signal)
       .then(setData)
-      .catch((err) => console.error("Dashboard fetch failed:", err))
-      .finally(() => setLoading(false))
+      .catch((err) => console.error("Dashboard fetch failed:", err instanceof Error ? err.message : String(err)))
+      .finally(() => { clearTimeout(timeout); setLoading(false) })
+
     fetchGamification().then(setGamification).catch(() => null)
+
+    return () => { clearTimeout(timeout); controller.abort() }
   }, [])
 
   if (loading || !data) {
@@ -85,7 +91,7 @@ export default function DashboardPage() {
             <div>
               <h2 className="text-2xl font-bold text-slate-800 leading-tight">Panel</h2>
               <p className="text-slate-500 text-xs">
-                {new Date().toLocaleDateString("es-ES", { weekday: "long", month: "short", day: "numeric" })}
+                {typeof window !== "undefined" ? new Date().toLocaleDateString("es-ES", { weekday: "long", month: "short", day: "numeric" }) : ""}
               </p>
             </div>
             <div className="flex items-center gap-2">

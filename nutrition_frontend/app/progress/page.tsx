@@ -1,5 +1,3 @@
-// @ts-nocheck
-
 "use client"
 
 import { useEffect, useState } from "react"
@@ -86,7 +84,7 @@ export default function ProgressPage() {
     setData((prev) =>
       prev
         ? { ...prev, weightHistory: [...prev.weightHistory, newEntry] }
-        : prev
+        : { ...mockProgressData, weightHistory: [newEntry] }
     )
     setWeight("")
     setLogging(false)
@@ -96,7 +94,7 @@ export default function ProgressPage() {
     return (
       <AppLayout>
         <div className="flex items-center justify-center h-full">
-          <div className="text-white/60">Cargando...</div>
+          <div className="text-muted-foreground">Cargando...</div>
         </div>
       </AppLayout>
     )
@@ -119,31 +117,31 @@ export default function ProgressPage() {
     <AppLayout>
       <div className="space-y-6">
         {/* Header */}
-        <Card className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-6">
+        <Card className="backdrop-blur-xl bg-black/5 dark:bg-white/10 border border-black/20 dark:border-white/20 rounded-3xl p-6">
           <div className="flex items-center gap-3">
             <TrendingUp className="h-7 w-7 text-emerald-400" />
             <div>
-              <h2 className="text-3xl font-bold text-white">Seguimiento</h2>
-              <p className="text-white/60">Controla tu peso y adherencia a lo largo del tiempo</p>
+              <h2 className="text-3xl font-bold text-foreground">Seguimiento</h2>
+              <p className="text-muted-foreground">Controla tu peso y adherencia a lo largo del tiempo</p>
             </div>
           </div>
         </Card>
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 md:gap-6">
-          <Card className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-6">
+          <Card className="backdrop-blur-xl bg-black/5 dark:bg-white/10 border border-black/20 dark:border-white/20 rounded-3xl p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-white/60 text-sm">Peso actual</p>
-                <p className="text-3xl font-bold text-white">{currentWeight} kg</p>
+                <p className="text-muted-foreground text-sm">Peso actual</p>
+                <p className="text-3xl font-bold text-foreground">{currentWeight} kg</p>
               </div>
               <Scale className="h-8 w-8 text-blue-400" />
             </div>
           </Card>
-          <Card className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-6">
+          <Card className="backdrop-blur-xl bg-black/5 dark:bg-white/10 border border-black/20 dark:border-white/20 rounded-3xl p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-white/60 text-sm">Cambio total</p>
+                <p className="text-muted-foreground text-sm">Cambio total</p>
                 <p className={`text-3xl font-bold ${weightChange <= 0 ? "text-emerald-400" : "text-red-400"}`}>
                   {weightChange > 0 ? "+" : ""}{weightChange.toFixed(1)} kg
                 </p>
@@ -151,15 +149,14 @@ export default function ProgressPage() {
               <TrendingUp className={`h-8 w-8 ${weightChange <= 0 ? "text-emerald-400" : "text-red-400"}`} />
             </div>
           </Card>
-          <Card className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-6">
+          <Card className="backdrop-blur-xl bg-black/5 dark:bg-white/10 border border-black/20 dark:border-white/20 rounded-3xl p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-white/60 text-sm">Adherencia media</p>
-                <p className="text-3xl font-bold text-white">
-                  {Math.round(
-                    progress.adherenceByWeek.reduce((sum, w) => sum + w.adherence, 0) /
-                    progress.adherenceByWeek.length
-                  )}%
+                <p className="text-muted-foreground text-sm">Adherencia media</p>
+                <p className="text-3xl font-bold text-foreground">
+                  {progress.adherenceByWeek.length > 0
+                    ? Math.round(progress.adherenceByWeek.reduce((sum, w) => sum + w.adherence, 0) / progress.adherenceByWeek.length)
+                    : 0}%
                 </p>
               </div>
               <CheckCircle className="h-8 w-8 text-emerald-400" />
@@ -168,20 +165,20 @@ export default function ProgressPage() {
         </div>
 
         {/* Weight Registration Form */}
-        <Card className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-6">
-          <h3 className="text-xl font-semibold text-white mb-4">Registrar peso de hoy</h3>
+        <Card className="backdrop-blur-xl bg-black/5 dark:bg-white/10 border border-black/20 dark:border-white/20 rounded-3xl p-6">
+          <h3 className="text-xl font-semibold text-foreground mb-4">Registrar peso de hoy</h3>
           <div className="flex gap-4 items-end">
             <div className="flex-1 max-w-xs space-y-2">
-              <Label className="text-white/80">Peso (kg)</Label>
+              <Label className="text-foreground/80">Peso (kg)</Label>
               <div className="relative">
-                <Scale className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/40" />
+                <Scale className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-foreground/40" />
                 <Input
                   type="number"
                   step="0.1"
                   placeholder="79.5"
                   value={weight}
                   onChange={(e) => setWeight(e.target.value)}
-                  className="pl-10 bg-white/5 border-white/20 text-white placeholder:text-white/40"
+                  className="pl-10 bg-black/5 dark:bg-white/5 border-black/20 dark:border-white/20 text-foreground placeholder:text-foreground/40"
                 />
               </div>
             </div>
@@ -197,16 +194,16 @@ export default function ProgressPage() {
         </Card>
 
         {/* Weight Chart */}
-        <Card className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-6">
-          <h3 className="text-xl font-semibold text-white mb-6">Progreso de peso</h3>
+        <Card className="backdrop-blur-xl bg-black/5 dark:bg-white/10 border border-black/20 dark:border-white/20 rounded-3xl p-6">
+          <h3 className="text-xl font-semibold text-foreground mb-6">Progreso de peso</h3>
           <div className="h-80">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={weightChartData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
-                <XAxis dataKey="date" stroke="rgba(255,255,255,0.6)" tick={{ fill: "rgba(255,255,255,0.6)" }} />
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(128,128,128,0.2)" />
+                <XAxis dataKey="date" stroke="rgba(128,128,128,0.6)" tick={{ fill: "rgba(128,128,128,0.8)" }} />
                 <YAxis
-                  stroke="rgba(255,255,255,0.6)"
-                  tick={{ fill: "rgba(255,255,255,0.6)" }}
+                  stroke="rgba(128,128,128,0.6)"
+                  tick={{ fill: "rgba(128,128,128,0.8)" }}
                   domain={["dataMin - 1", "dataMax + 1"]}
                 />
                 <Tooltip
@@ -241,16 +238,16 @@ export default function ProgressPage() {
         </Card>
 
         {/* Adherence Chart */}
-        <Card className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-6">
-          <h3 className="text-xl font-semibold text-white mb-6">Adherencia semanal</h3>
+        <Card className="backdrop-blur-xl bg-black/5 dark:bg-white/10 border border-black/20 dark:border-white/20 rounded-3xl p-6">
+          <h3 className="text-xl font-semibold text-foreground mb-6">Adherencia semanal</h3>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={progress.adherenceByWeek}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
-                <XAxis dataKey="week" stroke="rgba(255,255,255,0.6)" tick={{ fill: "rgba(255,255,255,0.6)" }} />
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(128,128,128,0.2)" />
+                <XAxis dataKey="week" stroke="rgba(128,128,128,0.6)" tick={{ fill: "rgba(128,128,128,0.8)" }} />
                 <YAxis
-                  stroke="rgba(255,255,255,0.6)"
-                  tick={{ fill: "rgba(255,255,255,0.6)" }}
+                  stroke="rgba(128,128,128,0.6)"
+                  tick={{ fill: "rgba(128,128,128,0.8)" }}
                   domain={[0, 100]}
                 />
                 <Tooltip

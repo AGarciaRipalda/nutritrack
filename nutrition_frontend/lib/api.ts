@@ -1,8 +1,8 @@
+// On Capacitor/iOS the origin is capacitor://localhost, so window.location
+// resolves to capacitor://localhost:8000 which is not a valid HTTP URL.
+// Always use an explicit base URL: set NEXT_PUBLIC_API_URL in .env.production.
 const API_BASE =
-  process.env.NEXT_PUBLIC_API_URL ||
-  (typeof window !== "undefined"
-    ? `${window.location.protocol}//${window.location.hostname}:8000`
-    : "http://localhost:8000")
+  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -16,10 +16,11 @@ function getHeaders(extra?: Record<string, string>): Record<string, string> {
   }
 }
 
-async function get<T>(path: string): Promise<T> {
+async function get<T>(path: string, signal?: AbortSignal): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     cache: "no-store",
     headers: getHeaders(),
+    signal,
   })
   if (!res.ok) throw new Error(`GET ${path} failed: ${res.status}`)
   return res.json()
@@ -330,8 +331,8 @@ function transformPlanDay(d: any): PlanDay & { stale: boolean } {
 
 // ── API Functions ─────────────────────────────────────────────────────────────
 
-export async function fetchDashboard(): Promise<DashboardData> {
-  const d = await get<any>("/dashboard")
+export async function fetchDashboard(signal?: AbortSignal): Promise<DashboardData> {
+  const d = await get<any>("/dashboard", signal)
   const ex = d.exercise_data
   const macros = d.nutrition.macros
   const exHealth = ex?.health_data          // yesterday's health (from exercise history)
