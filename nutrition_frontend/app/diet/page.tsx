@@ -395,7 +395,7 @@ export default function DietPage() {
                              value={foodInput[meal.id]?.name ?? ""}
                              onChange={(e) => {
                                const val = e.target.value
-                               setFoodInput(prev => ({ ...prev, [meal.id]: { ...(prev[meal.id] || {}), name: val, kcalPer100g: prev[meal.id]?.kcalPer100g ?? null } }))
+                               setFoodInput(prev => ({ ...prev, [meal.id]: { name: val, grams: prev[meal.id]?.grams ?? "", kcalPer100g: prev[meal.id]?.kcalPer100g ?? null } }))
                                debouncedFoodSearch(meal.id, val)
                              }}
                              className="w-full bg-white border border-slate-200 rounded-lg pl-7 pr-2 py-1.5 text-[11px] text-slate-700"
@@ -422,7 +422,7 @@ export default function DietPage() {
                            type="number"
                            placeholder="g"
                            value={foodInput[meal.id]?.grams ?? ""}
-                           onChange={(e) => setFoodInput(prev => ({ ...prev, [meal.id]: { ...prev[meal.id], grams: e.target.value, kcalPer100g: prev[meal.id]?.kcalPer100g ?? null } }))}
+                           onChange={(e) => setFoodInput(prev => ({ ...prev, [meal.id]: { name: prev[meal.id]?.name ?? "", grams: e.target.value, kcalPer100g: prev[meal.id]?.kcalPer100g ?? null } }))}
                            className="w-12 bg-white border border-slate-200 rounded-lg py-1.5 text-center text-[11px]"
                          />
                          <button

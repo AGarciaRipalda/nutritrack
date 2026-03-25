@@ -53,7 +53,13 @@ const mockProgressData: ProgressData = {
   currentWeight: 81.5,
   needsWeighIn: false,
   expectedWeekly: -0.5,
-  analysis: "Tu progreso va según lo previsto.",
+  analysis: {
+    totalChange: -2.0,
+    realWeekly: -0.33,
+    expectedWeekly: -0.5,
+    status: "on_track",
+    message: "Tu progreso va según lo previsto.",
+  },
 }
 
 export default function ProgressPage() {
