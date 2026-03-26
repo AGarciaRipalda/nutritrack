@@ -12,8 +12,7 @@ import {
   Lightbulb, CheckCircle2, Wheat, Scale, Star, X, Ban, Plus, Search, Zap,
 } from "lucide-react"
 import type { PlanDay, FoodSearchResult } from "@/lib/api"
-import { fetchTodaysPlan, swapMeal, updateAdherence, fetchFavoriteCarbs, fetchTodayTraining } from "@/lib/api"
-import { searchFoodAction } from "@/app/actions/food"
+import { fetchTodaysPlan, swapMeal, updateAdherence, fetchFavoriteCarbs, fetchTodayTraining, searchFood } from "@/lib/api"
 import { useDietDay } from "@/context/DietDayContext"
 import { useCheatDay } from "@/context/CheatDayContext"
 
@@ -128,7 +127,7 @@ export default function DietPage() {
     searchTimers.current[mealId] = setTimeout(async () => {
       setSearchingFood((prev) => ({ ...prev, [mealId]: true }))
       try {
-        const results = await searchFoodAction(query)
+        const results = await searchFood(query)
         setFoodSuggestions((prev) => ({ ...prev, [mealId]: results }))
       } catch {
         setFoodSuggestions((prev) => ({ ...prev, [mealId]: [] }))

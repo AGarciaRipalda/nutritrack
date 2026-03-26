@@ -17,6 +17,8 @@ export function AppearanceSettings() {
 
   const current = theme ?? 'system'
 
+  const appearanceDescription = "Elige el tema de la aplicaci" + String.fromCharCode(243) + "n."
+
   const options = [
     { value: 'light', label: 'Claro', Icon: Sun },
     { value: 'dark', label: 'Oscuro', Icon: Moon },
@@ -24,24 +26,24 @@ export function AppearanceSettings() {
   ]
 
   return (
-    <Card className="p-6 mb-6">
-      <h2 className="text-lg font-semibold mb-1">Apariencia</h2>
-      <p className="text-sm text-muted-foreground mb-4">Elige el tema de la aplicación.</p>
-      <div className="flex gap-3">
+    <Card className="mb-6 min-w-0 overflow-hidden p-4 sm:p-6">
+      <h2 className="mb-1 text-lg font-semibold">Apariencia</h2>
+      <p className="mb-4 text-sm text-muted-foreground">{appearanceDescription}</p>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         {options.map(({ value, label, Icon }) => {
           const isActive = current === value
           return (
             <button
               key={value}
               onClick={() => setTheme(value)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg border text-sm font-medium transition-colors ${
+              className={`flex min-w-0 items-center justify-start gap-2 rounded-lg border px-4 py-3 text-left text-sm font-medium transition-colors sm:justify-center sm:text-center ${
                 isActive
-                  ? 'bg-primary text-primary-foreground border-primary'
-                  : 'bg-card text-foreground border-border hover:bg-muted'
+                  ? 'border-primary bg-primary text-primary-foreground'
+                  : 'border-border bg-card text-foreground hover:bg-muted'
               }`}
             >
-              <Icon className="h-4 w-4" />
-              {label}
+              <Icon className="h-4 w-4 shrink-0" />
+              <span className="min-w-0 break-words">{label}</span>
             </button>
           )
         })}

@@ -1,5 +1,5 @@
 // ============================================================================
-// Training 2.0 — API Client
+// Training 2.0 â€” API Client
 // ============================================================================
 //
 // Mirrors the helper pattern from lib/api.ts (get / post / put / del).
@@ -21,13 +21,18 @@ import type {
   TrainingCalendarDay,
   PRRecord,
 } from "./workout-types"
+import {
+  FALLBACK_EQUIPMENT,
+  FALLBACK_MUSCLES,
+  filterFallbackExercises,
+} from "./workout-fallback"
 
-// ── Config ──────────────────────────────────────────────────────────────────
+// â”€â”€ Config â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const API_BASE =
   (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000").replace(/\/+$/, "")
 
-// ── Helpers (same pattern as lib/api.ts) ────────────────────────────────────
+// â”€â”€ Helpers (same pattern as lib/api.ts) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function getHeaders(extra?: Record<string, string>): Record<string, string> {
   return {
@@ -77,7 +82,7 @@ async function del(path: string): Promise<void> {
   if (!res.ok) throw new Error(`DELETE ${path} failed: ${res.status}`)
 }
 
-// ── Exercise Library ────────────────────────────────────────────────────────
+// â”€â”€ Exercise Library â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export async function searchExercises(params: {
   q?: string
@@ -91,7 +96,12 @@ export async function searchExercises(params: {
   if (params.equipment) sp.set("equipment", params.equipment)
   if (params.category) sp.set("category", params.category)
   const qs = sp.toString()
-  return get<LibraryExercise[]>(`/v2/training/exercises${qs ? `?${qs}` : ""}`)
+  try {
+    const results = await get<LibraryExercise[]>(`/v2/training/exercises${qs ? `?${qs}` : ""}`)
+    return results.length > 0 ? results : filterFallbackExercises(params)
+  } catch {
+    return filterFallbackExercises(params)
+  }
 }
 
 export async function getExercise(id: string): Promise<LibraryExercise> {
@@ -99,14 +109,24 @@ export async function getExercise(id: string): Promise<LibraryExercise> {
 }
 
 export async function getMuscleGroups(): Promise<{ id: string; label: string }[]> {
-  return get<{ id: string; label: string }[]>("/v2/training/muscles")
+  try {
+    const results = await get<{ id: string; label: string }[]>("/v2/training/muscles")
+    return results.length > 0 ? results : FALLBACK_MUSCLES
+  } catch {
+    return FALLBACK_MUSCLES
+  }
 }
 
 export async function getEquipmentTypes(): Promise<{ id: string; label: string }[]> {
-  return get<{ id: string; label: string }[]>("/v2/training/equipment")
+  try {
+    const results = await get<{ id: string; label: string }[]>("/v2/training/equipment")
+    return results.length > 0 ? results : FALLBACK_EQUIPMENT
+  } catch {
+    return FALLBACK_EQUIPMENT
+  }
 }
 
-// ── Routines ────────────────────────────────────────────────────────────────
+// â”€â”€ Routines â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export async function listRoutines(): Promise<Routine[]> {
   return get<Routine[]>("/v2/training/routines")
@@ -128,7 +148,7 @@ export async function deleteRoutine(id: string): Promise<void> {
   return del(`/v2/training/routines/${id}`)
 }
 
-// ── Workouts ────────────────────────────────────────────────────────────────
+// â”€â”€ Workouts â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export async function startWorkout(data: StartWorkoutRequest): Promise<Workout> {
   return post<Workout>("/v2/training/workouts", data)
@@ -216,7 +236,7 @@ export async function listWorkouts(
   return get<WorkoutSummary[]>(`/v2/training/workouts${qs ? `?${qs}` : ""}`)
 }
 
-// ── Analytics ───────────────────────────────────────────────────────────────
+// â”€â”€ Analytics â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export async function getExerciseStats(exerciseId: string): Promise<ExerciseStats> {
   return get<ExerciseStats>(`/v2/training/analytics/exercise/${exerciseId}`)

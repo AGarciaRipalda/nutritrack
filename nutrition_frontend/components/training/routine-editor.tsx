@@ -16,6 +16,14 @@ interface RoutineEditorProps {
   onCancel: () => void
 }
 
+const ROUTINE_TEXT = {
+  description: `Descripci${String.fromCharCode(243)}n (opcional)`,
+  routinePlaceholder: `Ej: Rutina de 6 d${String.fromCharCode(237)}as enfocada en hipertrofia`,
+  day: `D${String.fromCharCode(237)}a`,
+  dayPlaceholder: `Nombre del d${String.fromCharCode(237)}a (ej: Push, Pull, Legs)`,
+  addExercise: `A${String.fromCharCode(241)}adir ejercicio`,
+}
+
 const MUSCLE_COLORS: Record<string, string> = {
   pecho: "bg-rose-400/20 text-rose-300",
   espalda: "bg-blue-400/20 text-blue-300",
@@ -129,7 +137,7 @@ export default function RoutineEditor({ routine, onSave, onCancel }: RoutineEdit
   const currentDay = days[activeDay]
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex h-full min-w-0 flex-col overflow-x-hidden">
       {/* Header */}
       <div className="flex items-center justify-between p-4 border-b border-white/10">
         <h2 className="text-lg font-bold text-foreground">
@@ -145,8 +153,8 @@ export default function RoutineEditor({ routine, onSave, onCancel }: RoutineEdit
         </div>
       </div>
 
-      <ScrollArea className="flex-1">
-        <div className="p-4 space-y-4">
+      <ScrollArea className="min-w-0 flex-1">
+        <div className="min-w-0 space-y-4 p-4">
           {/* Name & description */}
           <div className="space-y-2">
             <Label className="text-foreground/80">Nombre</Label>
@@ -158,11 +166,11 @@ export default function RoutineEditor({ routine, onSave, onCancel }: RoutineEdit
             />
           </div>
           <div className="space-y-2">
-            <Label className="text-foreground/80">Descripción (opcional)</Label>
+            <Label className="text-foreground/80">{"Descripción (opcional)"}</Label>
             <Input
               value={description}
               onChange={e => setDescription(e.target.value)}
-              placeholder="Ej: Rutina de 6 días enfocada en hipertrofia"
+              placeholder={ROUTINE_TEXT.routinePlaceholder}
               className="bg-white/5 border-white/20 text-foreground"
             />
           </div>
@@ -179,26 +187,26 @@ export default function RoutineEditor({ routine, onSave, onCancel }: RoutineEdit
                     : "bg-white/5 text-foreground/60 border-white/10 hover:bg-white/10"
                 }`}
               >
-                {d.label || `Día ${i + 1}`}
+                {d.label || `${ROUTINE_TEXT.day} ${i + 1}`}
               </button>
             ))}
             <button
               onClick={addDay}
               className="shrink-0 px-3 py-1.5 rounded-xl text-sm font-medium bg-white/5 text-foreground/40 border border-dashed border-white/20 hover:bg-white/10 transition-colors"
             >
-              <Plus className="h-3 w-3 inline mr-1" />Día
+              <Plus className="h-3 w-3 inline mr-1" />{ROUTINE_TEXT.day}
             </button>
           </div>
 
           {/* Current day editor */}
           {currentDay && (
-            <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl p-4 space-y-3">
-              <div className="flex items-center gap-2">
+            <div className="min-w-0 space-y-3 rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur-xl overflow-x-hidden">
+              <div className="flex min-w-0 items-center gap-2">
                 <Input
                   value={currentDay.label}
                   onChange={e => updateDay(activeDay, { label: e.target.value })}
-                  placeholder="Nombre del día (ej: Push, Pull, Legs)"
-                  className="bg-white/5 border-white/20 text-foreground text-sm flex-1"
+                  placeholder={ROUTINE_TEXT.dayPlaceholder}
+                  className="flex-1 bg-white/5 border-white/20 text-sm text-foreground min-w-0"
                 />
                 {days.length > 1 && (
                   <Button
@@ -219,9 +227,9 @@ export default function RoutineEditor({ routine, onSave, onCancel }: RoutineEdit
                   return (
                     <div
                       key={`${currentDay.id}-${exIdx}`}
-                      className="bg-white/5 border border-white/10 rounded-xl p-3 space-y-2"
+                      className="min-w-0 space-y-3 rounded-xl border border-white/10 bg-white/5 p-3 overflow-x-hidden"
                     >
-                      <div className="flex items-center gap-2">
+                      <div className="flex min-w-0 items-start gap-2">
                         <div className="flex flex-col gap-0.5 shrink-0">
                           <button
                             onClick={() => moveExercise(activeDay, exIdx, "up")}
@@ -239,7 +247,7 @@ export default function RoutineEditor({ routine, onSave, onCancel }: RoutineEdit
                           </button>
                         </div>
                         <Dumbbell className="h-4 w-4 text-emerald-400 shrink-0" />
-                        <span className="text-sm font-medium text-foreground flex-1 truncate">{ex.exercise_name}</span>
+                        <span className="min-w-0 flex-1 break-words text-sm font-medium leading-tight text-foreground">{ex.exercise_name}</span>
                         <Badge variant="outline" className={`text-[10px] ${mc} border-0`}>
                           {ex.muscle_primary}
                         </Badge>
@@ -252,8 +260,8 @@ export default function RoutineEditor({ routine, onSave, onCancel }: RoutineEdit
                       </div>
 
                       {/* Set config */}
-                      <div className="flex gap-2 items-center">
-                        <div className="flex-1 space-y-0.5">
+                      <div className="grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-3">
+                        <div className="min-w-0 space-y-0.5">
                           <label className="text-[10px] text-foreground/50">Series</label>
                           <Input
                             type="number"
@@ -261,19 +269,19 @@ export default function RoutineEditor({ routine, onSave, onCancel }: RoutineEdit
                             max={10}
                             value={ex.target_sets}
                             onChange={e => updateExercise(activeDay, exIdx, { target_sets: Number(e.target.value) || 3 })}
-                            className="h-8 text-xs bg-white/5 border-white/10 text-foreground"
+                            className="h-8 min-w-0 bg-white/5 text-xs text-foreground border-white/10"
                           />
                         </div>
-                        <div className="flex-1 space-y-0.5">
+                        <div className="min-w-0 space-y-0.5">
                           <label className="text-[10px] text-foreground/50">Reps</label>
                           <Input
                             value={ex.target_reps}
                             onChange={e => updateExercise(activeDay, exIdx, { target_reps: e.target.value })}
-                            className="h-8 text-xs bg-white/5 border-white/10 text-foreground"
+                            className="h-8 min-w-0 bg-white/5 text-xs text-foreground border-white/10"
                             placeholder="8-12"
                           />
                         </div>
-                        <div className="flex-1 space-y-0.5">
+                        <div className="min-w-0 space-y-0.5">
                           <label className="text-[10px] text-foreground/50">Descanso</label>
                           <Input
                             type="number"
@@ -281,7 +289,7 @@ export default function RoutineEditor({ routine, onSave, onCancel }: RoutineEdit
                             step={15}
                             value={ex.rest_seconds}
                             onChange={e => updateExercise(activeDay, exIdx, { rest_seconds: Number(e.target.value) || 90 })}
-                            className="h-8 text-xs bg-white/5 border-white/10 text-foreground"
+                            className="h-8 min-w-0 bg-white/5 text-xs text-foreground border-white/10"
                           />
                         </div>
                       </div>
@@ -295,7 +303,7 @@ export default function RoutineEditor({ routine, onSave, onCancel }: RoutineEdit
                   className="w-full flex items-center justify-center gap-2 p-3 rounded-xl border border-dashed border-white/20 text-foreground/40 hover:text-emerald-400 hover:border-emerald-500/30 hover:bg-emerald-500/5 transition-colors"
                 >
                   <Plus className="h-4 w-4" />
-                  <span className="text-sm">Añadir ejercicio</span>
+                  <span className="text-sm">{ROUTINE_TEXT.addExercise}</span>
                 </button>
               </div>
             </div>

@@ -1,10 +1,13 @@
+import { searchFood as searchFoodClient, type FoodSearchResult } from "./food-search"
+export type { FoodSearchResult } from "./food-search"
+
 // On Capacitor/iOS the origin is capacitor://localhost, so window.location
 // resolves to capacitor://localhost:8000 which is not a valid HTTP URL.
 // Always use an explicit base URL: set NEXT_PUBLIC_API_URL in .env.production.
 const API_BASE =
   (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000").replace(/\/+$/, "")
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+// â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function getHeaders(extra?: Record<string, string>): Record<string, string> {
   const base: Record<string, string> = {}
@@ -54,7 +57,7 @@ async function del(path: string): Promise<void> {
   if (!res.ok) throw new Error(`DELETE ${path} failed: ${res.status}`)
 }
 
-// ── Tipos públicos (usados por los componentes de v0) ─────────────────────────
+// â”€â”€ Tipos pÃºblicos (usados por los componentes de v0) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export interface GoalBalance {
   goal: "lose" | "maintain" | "gain"
@@ -123,7 +126,7 @@ export interface Meal {
 }
 
 export interface PlanDay {
-  date: string          // "2026-03-17" — real date, not just "Monday"
+  date: string          // "2026-03-17" â€” real date, not just "Monday"
   dayName: string       // "Lunes"
   meals: Meal[]
   totalKcal: number     // base sum
@@ -139,7 +142,7 @@ export interface PlanDay {
 
 export interface WeeklyHistorySummary {
   week_start: string            // "2026-03-10"
-  avg_adherence: number         // 0.0–1.0
+  avg_adherence: number         // 0.0â€“1.0
   total_exercise_kcal: number
   weight_start: number | null
   weight_end: number | null
@@ -231,7 +234,7 @@ export interface UserProfile {
   weight: number
   activityLevel: number
   goal: "lose" | "maintain" | "gain"
-  weekStartDay: number  // 0=Monday … 6=Sunday
+  weekStartDay: number  // 0=Monday â€¦ 6=Sunday
 }
 
 export interface FoodPreferences {
@@ -254,18 +257,18 @@ export interface SettingsData {
   events: UpcomingEvent[]   // array para compatibilidad con el componente v0
 }
 
-// ── Deprecated aliases (kept so existing imports in other pages don't break) ──
+// â”€â”€ Deprecated aliases (kept so existing imports in other pages don't break) â”€â”€
 
 /** @deprecated Use PlanDay instead */
 export type TodaysDiet = PlanDay & { adherenceChecklist: { id: string; label: string; checked: boolean }[] }
 /** @deprecated Use WeeklyPlanResponse instead */
 export type WeeklyPlan = WeeklyPlanResponse & { shoppingList: { category: string; items: string[] }[] }
 
-// ── Transformadores (backend → frontend) ──────────────────────────────────────
+// â”€â”€ Transformadores (backend â†’ frontend) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const MEAL_MAP: Record<string, { type: string; label: string }> = {
   desayuno:    { type: "breakfast",   label: "Desayuno" },
-  media_manana:{ type: "mid-morning", label: "Media mañana" },
+  media_manana:{ type: "mid-morning", label: "Media maÃ±ana" },
   almuerzo:    { type: "lunch",       label: "Almuerzo" },
   merienda:    { type: "snack",       label: "Merienda" },
   cena:        { type: "dinner",      label: "Cena" },
@@ -275,12 +278,12 @@ const MEAL_MAP: Record<string, { type: string; label: string }> = {
 const MEAL_ORDER = ["desayuno", "media_manana", "almuerzo", "merienda", "cena", "postre"]
 
 const DAYS_ES: Record<string, string> = {
-  LUNES: "Lunes", MARTES: "Martes", "MIÉRCOLES": "Miércoles",
-  JUEVES: "Jueves", VIERNES: "Viernes", "SÁBADO": "Sábado", DOMINGO: "Domingo",
+  LUNES: "Lunes", MARTES: "Martes", "MIÃ‰RCOLES": "MiÃ©rcoles",
+  JUEVES: "Jueves", VIERNES: "Viernes", "SÃBADO": "SÃ¡bado", DOMINGO: "Domingo",
 }
 
 const CATEGORY_LABELS: Record<string, string> = {
-  proteinas: "Proteínas", lacteos: "Lácteos", cereales: "Cereales",
+  proteinas: "ProteÃ­nas", lacteos: "LÃ¡cteos", cereales: "Cereales",
   frutas: "Frutas", verduras: "Verduras", grasas: "Grasas y frutos secos",
   legumbres: "Legumbres", otros: "Otros",
 }
@@ -349,7 +352,7 @@ function trendLine(points: WeightEntry[]): WeightEntry[] {
 }
 
 // NOTE: The new backend returns `type` and `name` directly on each meal object
-// (per the unified spec model). MEAL_MAP lookup is therefore NOT used here —
+// (per the unified spec model). MEAL_MAP lookup is therefore NOT used here â€”
 // using it would silently overwrite correct backend values with stale frontend data.
 // MEAL_MAP can be removed entirely once the backend migration is complete.
 // `d` is typed as `any` intentionally: the backend response shape is being
@@ -388,7 +391,7 @@ function transformPlanDay(d: any): PlanDay & { stale: boolean } {
   }
 }
 
-// ── API Functions ─────────────────────────────────────────────────────────────
+// â”€â”€ API Functions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export async function fetchDashboard(signal?: AbortSignal): Promise<DashboardData> {
   const d = await get<any>("/dashboard", signal)
@@ -528,10 +531,7 @@ export async function fetchTraining(): Promise<TrainingData> {
     .map((e: any) => ({
       id:             e.date,
       date:           e.date,
-      type:           e.session_type
-                        ?? e.health_data?.workout_type
-                        ?? e.exercises?.[0]?.name
-                        ?? "Ejercicio",
+      type:           e.session_type ?? e.health_data?.workout_type ?? e.exercises?.[0]?.name ?? "Ejercicio",
       minutes:        e.health_data?.duration_min ?? e.exercises?.[0]?.minutes ?? 0,
       caloriesBurned: e.burned_kcal,
       sources:        e.sources ?? (e.source ? [e.source] : []),
@@ -827,7 +827,7 @@ export async function submitSensationsSurvey(data: {
 }
 
 export async function fetchSettings(): Promise<SettingsData> {
-  // Profile is fetched alone — if it fails the whole function throws (correct).
+  // Profile is fetched alone â€” if it fails the whole function throws (correct).
   // Preferences and event failures are tolerated so they don't mask the profile.
   const profileRaw = await get<any>("/profile")
 
@@ -875,7 +875,7 @@ export async function updateProfile(profile: UserProfile): Promise<UserProfile> 
     goal:            profile.goal,
     week_start_day:  profile.weekStartDay,
   })
-  // Backend returns { ok, profile } — map back to frontend shape
+  // Backend returns { ok, profile } â€” map back to frontend shape
   const p = res.profile
   return {
     name:          p.name,
@@ -907,7 +907,7 @@ export async function fetchFavoriteCarbs(): Promise<FavoriteCarb[]> {
   return d.carbs ?? []
 }
 
-// ── Gamificación ──────────────────────────────────────────────────────────────
+// â”€â”€ GamificaciÃ³n â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export interface GamificationStatus {
   level: number
@@ -933,22 +933,16 @@ export async function fetchGamification(): Promise<GamificationStatus> {
   return get<GamificationStatus>("/gamification/status")
 }
 
-// ── PDF Export ─────────────────────────────────────────────────────────────────
+// â”€â”€ PDF Export â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export function getReportPdfUrl(): string {
   return `${API_BASE}/report/download`
 }
 
-// ── Food Search (OpenFoodFacts) ──────────────────────────────────────────────
+// â”€â”€ Food Search (OpenFoodFacts) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-export interface FoodSearchResult {
-  name: string
-  kcal_100g: number
-  image: string | null
-}
+
 
 export async function searchFood(query: string): Promise<FoodSearchResult[]> {
-  if (query.length < 2) return []
-  const { searchFoodAction } = await import("@/app/actions/food")
-  return searchFoodAction(query)
+  return searchFoodClient(query)
 }

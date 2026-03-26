@@ -25,6 +25,23 @@ import type { SettingsData, UserProfile, FoodPreferences, UpcomingEvent } from "
 import { fetchSettings, updateProfile, updateFoodPreferences, saveEvent, deleteEvent } from "@/lib/api"
 import { AppearanceSettings } from "@/components/appearance-settings"
 
+const SETTINGS_TEXT = {
+  title: `Configuraci${String.fromCharCode(243)}n`,
+  profileInfo: `Informaci${String.fromCharCode(243)}n personal`,
+  gender: `G${String.fromCharCode(233)}nero`,
+  gainMuscle: `Ganar m${String.fromCharCode(250)}sculo`,
+  weekStart: `Inicio de semana diet${String.fromCharCode(233)}tica`,
+  wednesday: `Mi${String.fromCharCode(233)}rcoles`,
+  saturday: `S${String.fromCharCode(225)}bado`,
+  weeklyHint: `El men${String.fromCharCode(250)} semanal se renovar${String.fromCharCode(225)} cada semana a partir de este d${String.fromCharCode(237)}a.`,
+  addExcluded: `A${String.fromCharCode(241)}adir alimento a excluir...`,
+  addFavorite: `A${String.fromCharCode(241)}adir alimento favorito...`,
+  addDisliked: `A${String.fromCharCode(241)}adir alimento que no te gusta...`,
+  nextEvent: `Registrar pr${String.fromCharCode(243)}ximo evento`,
+  addEvent: `A${String.fromCharCode(241)}adir evento`,
+  noEvents: `No hay pr${String.fromCharCode(243)}ximos eventos registrados`,
+}
+
 const mockSettingsData: SettingsData = {
   profile: {
     name: "John Doe",
@@ -162,13 +179,13 @@ export default function SettingsPage() {
 
   return (
     <AppLayout>
-      <div className="space-y-6">
+      <div className="min-w-0 space-y-6 overflow-x-hidden">
         {/* Header */}
         <Card className="backdrop-blur-xl bg-black/5 dark:bg-white/10 border border-black/20 dark:border-white/20 rounded-3xl p-6">
           <div className="flex items-center gap-3">
             <Settings className="h-7 w-7 text-emerald-400" />
             <div>
-              <h2 className="text-3xl font-bold text-foreground">Configuración</h2>
+              <h2 className="text-3xl font-bold text-foreground">{SETTINGS_TEXT.title}</h2>
               <p className="text-muted-foreground">Gestiona tu perfil, preferencias y eventos</p>
             </div>
           </div>
@@ -177,26 +194,26 @@ export default function SettingsPage() {
         <AppearanceSettings />
 
         {/* Tabs */}
-        <Tabs defaultValue="profile" className="space-y-6">
-          <TabsList className="bg-black/5 dark:bg-white/10 border border-black/20 dark:border-white/20">
-            <TabsTrigger value="profile" className="data-[state=active]:bg-black/10 dark:data-[state=active]:bg-white/20 data-[state=active]:text-foreground text-foreground/70">
-              <User className="mr-2 h-4 w-4" />
-              Perfil
+        <Tabs defaultValue="profile" className="min-w-0 space-y-6 overflow-x-hidden">
+          <TabsList className="grid h-auto min-w-0 w-full grid-cols-1 gap-2 overflow-hidden border border-black/20 bg-black/5 p-2 dark:border-white/20 dark:bg-white/10 sm:grid-cols-3">
+            <TabsTrigger value="profile" className="flex min-w-0 items-start justify-start gap-2 whitespace-normal break-words px-3 py-2 text-left text-foreground/70 data-[state=active]:bg-black/10 data-[state=active]:text-foreground dark:data-[state=active]:bg-white/20 sm:items-center sm:justify-center sm:text-center">
+              <User className="mt-0.5 h-4 w-4 shrink-0 sm:mt-0" />
+              <span className="min-w-0 break-words">Perfil</span>
             </TabsTrigger>
-            <TabsTrigger value="preferences" className="data-[state=active]:bg-black/10 dark:data-[state=active]:bg-white/20 data-[state=active]:text-foreground text-foreground/70">
-              <UtensilsCrossed className="mr-2 h-4 w-4" />
-              Preferencias alimentarias
+            <TabsTrigger value="preferences" className="flex min-w-0 items-start justify-start gap-2 whitespace-normal break-words px-3 py-2 text-left text-foreground/70 data-[state=active]:bg-black/10 data-[state=active]:text-foreground dark:data-[state=active]:bg-white/20 sm:items-center sm:justify-center sm:text-center">
+              <UtensilsCrossed className="mt-0.5 h-4 w-4 shrink-0 sm:mt-0" />
+              <span className="min-w-0 break-words">Preferencias alimentarias</span>
             </TabsTrigger>
-            <TabsTrigger value="events" className="data-[state=active]:bg-black/10 dark:data-[state=active]:bg-white/20 data-[state=active]:text-foreground text-foreground/70">
-              <Calendar className="mr-2 h-4 w-4" />
-              Eventos
+            <TabsTrigger value="events" className="flex min-w-0 items-start justify-start gap-2 whitespace-normal break-words px-3 py-2 text-left text-foreground/70 data-[state=active]:bg-black/10 data-[state=active]:text-foreground dark:data-[state=active]:bg-white/20 sm:items-center sm:justify-center sm:text-center">
+              <Calendar className="mt-0.5 h-4 w-4 shrink-0 sm:mt-0" />
+              <span className="min-w-0 break-words">Eventos</span>
             </TabsTrigger>
           </TabsList>
 
           {/* Profile Tab */}
           <TabsContent value="profile">
             <Card className="backdrop-blur-xl bg-black/5 dark:bg-white/10 border border-black/20 dark:border-white/20 rounded-3xl p-6">
-              <h3 className="text-xl font-semibold text-foreground mb-6">Información personal</h3>
+              <h3 className="text-xl font-semibold text-foreground mb-6">{"Información personal"}</h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-6">
                 <div className="space-y-2">
                   <Label className="text-foreground/80">Nombre</Label>
@@ -207,7 +224,7 @@ export default function SettingsPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-foreground/80">Género</Label>
+                  <Label className="text-foreground/80">{"Género"}</Label>
                   <Select value={profile.gender} onValueChange={(v) => setProfile({ ...profile, gender: v as UserProfile["gender"] })}>
                     <SelectTrigger className="bg-black/5 dark:bg-white/5 border-black/20 dark:border-white/20 text-foreground">
                       <SelectValue />
@@ -270,12 +287,12 @@ export default function SettingsPage() {
                     <SelectContent>
                       <SelectItem value="lose">Perder peso</SelectItem>
                       <SelectItem value="maintain">Mantener peso</SelectItem>
-                      <SelectItem value="gain">Ganar músculo</SelectItem>
+                      <SelectItem value="gain">{SETTINGS_TEXT.gainMuscle}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-foreground/80">Inicio de semana dietética</Label>
+                  <Label className="text-foreground/80">{SETTINGS_TEXT.weekStart}</Label>
                   <Select
                     value={String(profile.weekStartDay)}
                     onValueChange={(v) => setProfile({ ...profile, weekStartDay: parseInt(v) })}
@@ -286,14 +303,14 @@ export default function SettingsPage() {
                     <SelectContent>
                       <SelectItem value="0">Lunes</SelectItem>
                       <SelectItem value="1">Martes</SelectItem>
-                      <SelectItem value="2">Miércoles</SelectItem>
+                      <SelectItem value="2">{SETTINGS_TEXT.wednesday}</SelectItem>
                       <SelectItem value="3">Jueves</SelectItem>
                       <SelectItem value="4">Viernes</SelectItem>
-                      <SelectItem value="5">Sábado</SelectItem>
+                      <SelectItem value="5">{SETTINGS_TEXT.saturday}</SelectItem>
                       <SelectItem value="6">Domingo</SelectItem>
                     </SelectContent>
                   </Select>
-                  <p className="text-foreground/40 text-xs">El menú semanal se renovará cada semana a partir de este día.</p>
+                  <p className="text-foreground/40 text-xs">{SETTINGS_TEXT.weeklyHint}</p>
                 </div>
               </div>
               <div className="mt-6 flex items-center gap-4">
@@ -325,7 +342,7 @@ export default function SettingsPage() {
           <TabsContent value="preferences">
             <Card className="backdrop-blur-xl bg-black/5 dark:bg-white/10 border border-black/20 dark:border-white/20 rounded-3xl p-6">
               <h3 className="text-xl font-semibold text-foreground mb-6">Preferencias alimentarias</h3>
-              <div className="space-y-6">
+              <div className="min-w-0 space-y-6 overflow-x-hidden">
                 {/* Excluded Foods */}
                 <div className="space-y-3">
                   <Label className="text-foreground/80">Ingredientes excluidos (alergias/restricciones)</Label>
@@ -345,13 +362,13 @@ export default function SettingsPage() {
                       </Badge>
                     ))}
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex flex-col gap-2 sm:flex-row">
                     <Input
-                      placeholder="Añadir alimento a excluir..."
+                      placeholder={SETTINGS_TEXT.addExcluded}
                       value={newTag.excluded}
                       onChange={(e) => setNewTag({ ...newTag, excluded: e.target.value })}
                       onKeyDown={(e) => e.key === "Enter" && handleAddTag("excluded")}
-                      className="bg-black/5 dark:bg-white/5 border-black/20 dark:border-white/20 text-foreground placeholder:text-foreground/40 max-w-xs"
+                      className="w-full bg-black/5 dark:bg-white/5 border-black/20 dark:border-white/20 text-foreground placeholder:text-foreground/40 sm:max-w-xs"
                     />
                     <Button
                       variant="outline"
@@ -383,13 +400,13 @@ export default function SettingsPage() {
                       </Badge>
                     ))}
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex flex-col gap-2 sm:flex-row">
                     <Input
-                      placeholder="Añadir alimento favorito..."
+                      placeholder={SETTINGS_TEXT.addFavorite}
                       value={newTag.favorites}
                       onChange={(e) => setNewTag({ ...newTag, favorites: e.target.value })}
                       onKeyDown={(e) => e.key === "Enter" && handleAddTag("favorites")}
-                      className="bg-black/5 dark:bg-white/5 border-black/20 dark:border-white/20 text-foreground placeholder:text-foreground/40 max-w-xs"
+                      className="w-full bg-black/5 dark:bg-white/5 border-black/20 dark:border-white/20 text-foreground placeholder:text-foreground/40 sm:max-w-xs"
                     />
                     <Button
                       variant="outline"
@@ -421,13 +438,13 @@ export default function SettingsPage() {
                       </Badge>
                     ))}
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex flex-col gap-2 sm:flex-row">
                     <Input
-                      placeholder="Añadir alimento que no te gusta..."
+                      placeholder={SETTINGS_TEXT.addDisliked}
                       value={newTag.disliked}
                       onChange={(e) => setNewTag({ ...newTag, disliked: e.target.value })}
                       onKeyDown={(e) => e.key === "Enter" && handleAddTag("disliked")}
-                      className="bg-black/5 dark:bg-white/5 border-black/20 dark:border-white/20 text-foreground placeholder:text-foreground/40 max-w-xs"
+                      className="w-full bg-black/5 dark:bg-white/5 border-black/20 dark:border-white/20 text-foreground placeholder:text-foreground/40 sm:max-w-xs"
                     />
                     <Button
                       variant="outline"
@@ -467,10 +484,10 @@ export default function SettingsPage() {
 
           {/* Events Tab */}
           <TabsContent value="events">
-            <div className="space-y-6">
+            <div className="min-w-0 space-y-6 overflow-x-hidden">
               {/* Add Event Form */}
               <Card className="backdrop-blur-xl bg-black/5 dark:bg-white/10 border border-black/20 dark:border-white/20 rounded-3xl p-6">
-                <h3 className="text-xl font-semibold text-foreground mb-6">Registrar próximo evento</h3>
+                <h3 className="text-xl font-semibold text-foreground mb-6">{SETTINGS_TEXT.nextEvent}</h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label className="text-foreground/80">Nombre del evento</Label>
@@ -497,7 +514,7 @@ export default function SettingsPage() {
                   className="mt-4 bg-emerald-500 hover:bg-emerald-600 text-white"
                 >
                   <Plus className="mr-2 h-4 w-4" />
-                  Añadir evento
+                  {SETTINGS_TEXT.addEvent}
                 </Button>
               </Card>
 
@@ -505,7 +522,7 @@ export default function SettingsPage() {
               <Card className="backdrop-blur-xl bg-black/5 dark:bg-white/10 border border-black/20 dark:border-white/20 rounded-3xl p-6">
                 <h3 className="text-xl font-semibold text-foreground mb-6">Tus eventos</h3>
                 {data.events.length === 0 ? (
-                  <p className="text-muted-foreground text-center py-8">No hay próximos eventos registrados</p>
+                  <p className="text-muted-foreground text-center py-8">{SETTINGS_TEXT.noEvents}</p>
                 ) : (
                   <div className="space-y-3">
                     {data.events.map((event) => (
@@ -526,7 +543,7 @@ export default function SettingsPage() {
                                 day: "numeric",
                                 year: "numeric",
                               })}
-                              {event.daysToEvent !== null && ` · faltan ${event.daysToEvent} días`}
+                              {event.daysToEvent !== null && ` ${String.fromCharCode(183)} faltan ${event.daysToEvent} d${String.fromCharCode(237)}as`}
                             </p>
                           </div>
                         </div>

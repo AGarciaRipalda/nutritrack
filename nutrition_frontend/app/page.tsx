@@ -78,11 +78,19 @@ export default function DashboardPage() {
   const activeCaloriesReference = Math.max(dashboard.exerciseYesterday?.caloriesBurned ?? 400, 400)
   const activeCaloriesProgress = Math.min(Math.round((activeCaloriesToday / activeCaloriesReference) * 100), 100)
 
-  const macroData = [
-    { name: "Proteínas", value: dashboard.macros.protein.current, color: "#ef4444" },
-    { name: "Carbohidratos", value: dashboard.macros.carbs.current, color: "#f59e0b" },
-    { name: "Grasas", value: dashboard.macros.fat.current, color: "#3b82f6" },
+  const macroSummary = [
+    { label: "Pro", name: "Prote?nas", current: dashboard.macros.protein.current, target: dashboard.macros.protein.target, color: "bg-red-500", chartColor: "#ef4444" },
+    { label: "Car", name: "Carbohidratos", current: dashboard.macros.carbs.current, target: dashboard.macros.carbs.target, color: "bg-amber-500", chartColor: "#f59e0b" },
+    { label: "Fat", name: "Grasas", current: dashboard.macros.fat.current, target: dashboard.macros.fat.target, color: "bg-blue-500", chartColor: "#3b82f6" },
   ]
+
+  const macroData = macroSummary.map((macro) => ({
+    name: macro.name,
+    value: Math.max(macro.current, macro.target, 0),
+    color: macro.chartColor,
+  }))
+  const macroTotalGrams = macroSummary.reduce((sum, macro) => sum + Math.max(macro.current, macro.target, 0), 0)
+  const hasMacroCurrentData = macroSummary.some((macro) => macro.current > 0)
 
   const getAlertIcon = (type: string) => {
     switch (type) {
@@ -263,6 +271,15 @@ export default function DashboardPage() {
 
         {/* Macros - Red/Amber/Blue */}
         <Card className="relative overflow-hidden bg-white dark:bg-white/[0.05] border-slate-100 dark:border-white/[0.08] rounded-2xl p-4 shadow-sm md:col-span-1">
+          <div className="mb-3 flex items-start justify-between gap-3">
+            <div>
+              <p className="text-slate-500 dark:text-slate-300 text-[10px] uppercase font-bold tracking-wider">Macros</p>
+              <p className="text-2xl font-black text-slate-800 dark:text-white">{macroTotalGrams}g</p>
+            </div>
+            <span className="text-[10px] font-medium text-slate-400 dark:text-slate-400 text-right">
+              {hasMacroCurrentData ? "Consumido hoy" : "Objetivo diario"}
+            </span>
+          </div>
           <div className="flex items-center gap-3">
             <div className="w-20 h-20 shrink-0">
               <ResponsiveContainer width="100%" height="100%">
@@ -274,17 +291,13 @@ export default function DashboardPage() {
               </ResponsiveContainer>
             </div>
             <div className="flex-1 space-y-1.5">
-              {[
-                { label: "Pro", cur: dashboard.macros.protein.current, tgt: dashboard.macros.protein.target, color: "bg-red-500", icon: Beef },
-                { label: "Car", cur: dashboard.macros.carbs.current, tgt: dashboard.macros.carbs.target, color: "bg-amber-500", icon: Wheat },
-                { label: "Fat", cur: dashboard.macros.fat.current, tgt: dashboard.macros.fat.target, color: "bg-blue-500", icon: Droplet },
-              ].map((m) => (
+              {macroSummary.map((m) => (
                 <div key={m.label} className="flex items-center justify-between text-[11px]">
                   <div className="flex items-center gap-1.5">
                     <div className={`w-1.5 h-1.5 rounded-full ${m.color}`} />
                     <span className="text-slate-600 dark:text-slate-300 font-medium">{m.label}</span>
                   </div>
-                  <span className="text-slate-800 dark:text-white font-bold">{m.cur}g</span>
+                  <span className="text-slate-800 dark:text-white font-bold">{m.current > 0 ? `${m.current}g` : `${m.target}g`}</span>
                 </div>
               ))}
             </div>
