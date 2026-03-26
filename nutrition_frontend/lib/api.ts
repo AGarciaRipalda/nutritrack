@@ -6,12 +6,13 @@ const API_BASE =
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-// Bypass ngrok browser-warning interstitial (no-op for non-ngrok URLs)
-// Also injects X-User-Timezone so the backend can resolve "today" correctly.
 function getHeaders(extra?: Record<string, string>): Record<string, string> {
+  const base: Record<string, string> = {}
+  if (API_BASE.includes("ngrok")) {
+    base["ngrok-skip-browser-warning"] = "true"
+  }
   return {
-    "ngrok-skip-browser-warning": "true",
-    "X-User-Timezone": Intl.DateTimeFormat().resolvedOptions().timeZone,
+    ...base,
     ...extra,
   }
 }
