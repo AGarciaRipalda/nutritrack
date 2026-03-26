@@ -2,7 +2,7 @@
 // resolves to capacitor://localhost:8000 which is not a valid HTTP URL.
 // Always use an explicit base URL: set NEXT_PUBLIC_API_URL in .env.production.
 const API_BASE =
-  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"
+  (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000").replace(/\/+$/, "")
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
