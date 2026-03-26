@@ -44,6 +44,48 @@ const mealIdIcons: Record<string, typeof Coffee> = {
   desayuno: Coffee, media_manana: Sun, almuerzo: Utensils, merienda: Cookie, cena: Moon,
 }
 
+function deriveMealCarbKcalPer100g(meal: PlanDay["meals"][0]): number | null {
+  if (meal.fixedKcal == null || meal.carbG == null || meal.carbG <= 0) return null
+  const target = meal.targetKcal ?? meal.adjustedKcal ?? meal.kcal
+  const carbKcal = target - meal.fixedKcal
+  if (carbKcal <= 0) return null
+  return (carbKcal / meal.carbG) * 100
+}
+
+function computeDisplayedCarbGrams(
+  meal: PlanDay["meals"][0],
+  effectiveKcal: number,
+  selectedCarbKcalPer100g: number | null,
+): number | null {
+  if (meal.fixedKcal == null) return null
+  const kcalPer100g = selectedCarbKcalPer100g ?? deriveMealCarbKcalPer100g(meal)
+  if (!kcalPer100g || kcalPer100g <= 0) return null
+  return Math.max(Math.round(((effectiveKcal - meal.fixedKcal) / kcalPer100g) * 100), 0)
+}
+
+function renderAdjustedDescription(
+  meal: PlanDay["meals"][0],
+  effectiveKcal: number,
+  selectedCarbName: string | null,
+  selectedCarbKcalPer100g: number | null,
+): string {
+  const adjustedCarbG = computeDisplayedCarbGrams(meal, effectiveKcal, selectedCarbKcalPer100g)
+  if (adjustedCarbG == null || meal.carbG == null || meal.carbG <= 0) return meal.description
+
+  let description = meal.description
+  const gramsPattern = new RegExp(`\\b${meal.carbG}g\\b`)
+  description = description.replace(gramsPattern, `${adjustedCarbG}g`)
+
+  if (selectedCarbName) {
+    const afterOriginalCarb = new RegExp(`\\b${adjustedCarbG}g de [^,;+()]+`, "i")
+    if (afterOriginalCarb.test(description)) {
+      description = description.replace(afterOriginalCarb, `${adjustedCarbG}g de ${selectedCarbName}`)
+    }
+  }
+
+  return description
+}
+
 export default function DietPage() {
   const { state, derived, init, setMealCarb, setMealGrams } = useDietDay()
   const { isCheatDay, finalizeExcess, setupCompensation, declineCompensation, record: cheatRecord } = useCheatDay()
@@ -311,6 +353,7 @@ export default function DietPage() {
             const selCarb     = override?.selectedCarb ?? null
             const customG     = override?.customGrams ?? null
             const effKcal     = state.initialized ? effectiveKcalPerMeal[meal.id] ?? (meal.adjustedKcal ?? meal.kcal) : (meal.adjustedKcal ?? meal.kcal)
+            const displayedDescription = renderAdjustedDescription(meal, effKcal, selCarb?.name ?? null, selCarb?.kcal ?? null)
             const isSkipped   = !!skippedMeals[meal.id]
             const isChecked   = checkedMeals[meal.id]
             const hasFoodDropdown =
@@ -351,7 +394,7 @@ export default function DietPage() {
                   </div>
 
                   <p className={`text-xs leading-snug mb-3 ${isSkipped ? 'text-slate-400 dark:text-slate-400 italic' : 'text-slate-700 dark:text-foreground/80'}`}>
-                    {meal.description}
+                    {displayedDescription}
                   </p>
 
                   {meal.note && !isSkipped && (
