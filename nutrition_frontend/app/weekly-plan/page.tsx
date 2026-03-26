@@ -147,6 +147,39 @@ const mealTypeColor: Record<string, { bg: string; text: string; border: string }
   dinner:       { bg: "#e0f2fe", text: "#0c4a6e", border: "#bae6fd" },
 }
 
+const mealCardTone: Record<string, { card: string; icon: string; iconText: string; badge: string }> = {
+  breakfast: {
+    card: "bg-amber-50/90 dark:bg-amber-500/10 border-amber-200/80 dark:border-amber-400/15",
+    icon: "bg-amber-100 dark:bg-amber-500/15",
+    iconText: "text-amber-700 dark:text-amber-300",
+    badge: "bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-500/15 dark:text-amber-300 dark:border-amber-400/20",
+  },
+  "mid-morning": {
+    card: "bg-rose-50/85 dark:bg-rose-500/10 border-rose-200/75 dark:border-rose-400/15",
+    icon: "bg-rose-100 dark:bg-rose-500/15",
+    iconText: "text-rose-700 dark:text-rose-300",
+    badge: "bg-rose-100 text-rose-800 border-rose-200 dark:bg-rose-500/15 dark:text-rose-300 dark:border-rose-400/20",
+  },
+  lunch: {
+    card: "bg-emerald-50/85 dark:bg-emerald-500/10 border-emerald-200/75 dark:border-emerald-400/15",
+    icon: "bg-emerald-100 dark:bg-emerald-500/15",
+    iconText: "text-emerald-700 dark:text-emerald-300",
+    badge: "bg-emerald-100 text-emerald-800 border-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-300 dark:border-emerald-400/20",
+  },
+  snack: {
+    card: "bg-violet-50/85 dark:bg-violet-500/10 border-violet-200/75 dark:border-violet-400/15",
+    icon: "bg-violet-100 dark:bg-violet-500/15",
+    iconText: "text-violet-700 dark:text-violet-300",
+    badge: "bg-violet-100 text-violet-800 border-violet-200 dark:bg-violet-500/15 dark:text-violet-300 dark:border-violet-400/20",
+  },
+  dinner: {
+    card: "bg-sky-50/90 dark:bg-sky-500/10 border-sky-200/80 dark:border-sky-400/15",
+    icon: "bg-sky-100 dark:bg-sky-500/15",
+    iconText: "text-sky-700 dark:text-sky-300",
+    badge: "bg-sky-100 text-sky-800 border-sky-200 dark:bg-sky-500/15 dark:text-sky-300 dark:border-sky-400/20",
+  },
+}
+
 // ── Screen meal card ────────────────────────────────────────────────────────
 function MealCard({
   meal,
@@ -158,16 +191,19 @@ function MealCard({
   swapping?: boolean
 }) {
   const MealIcon = mealIdIcons[meal.id] ?? mealTypeIcons[meal.type] ?? Utensils
+  const tone = mealCardTone[meal.type] ?? mealCardTone.lunch
   return (
-    <div className="p-3 rounded-xl border border-black/10 dark:border-white/10 bg-black/5 dark:bg-white/5 flex flex-col gap-2 shadow-sm">
+    <div className={`p-3 rounded-xl border flex flex-col gap-2 shadow-sm ${tone.card}`}>
       {/* Title row: icon + meal name + kcal */}
-      <div className="flex items-center gap-2 border-b border-black/10 dark:border-white/10 pb-2">
-        <MealIcon className="h-4 w-4 text-emerald-400 shrink-0" />
+      <div className="flex items-center gap-2 border-b border-black/5 dark:border-white/10 pb-2">
+        <div className={`shrink-0 rounded-lg p-1.5 ${tone.icon}`}>
+          <MealIcon className={`h-4 w-4 ${tone.iconText}`} />
+        </div>
         <span className="text-foreground text-sm font-semibold flex-1">
           {mealDisplayName[meal.id] ?? meal.name}
         </span>
         {meal.kcal > 0 && (
-          <Badge className="bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 border-emerald-400/30 text-xs px-1.5 py-0 shrink-0">
+          <Badge className={`text-xs px-1.5 py-0 shrink-0 ${tone.badge}`}>
             {meal.kcal} kcal
           </Badge>
         )}
@@ -615,7 +651,7 @@ export default function WeeklyPlanPage() {
                   <AccordionItem
                     key={dayPlan.date}
                     value={dayPlan.date}
-                    className={`bg-transparent rounded-xl border px-4 shadow-sm ${
+                    className={`bg-background rounded-xl border px-4 shadow-sm ${
                       isToday       ? "border-emerald-400/50"
                       : cheatDay    ? "border-amber-400/30"
                       : nonCompliant ? "border-red-400/30"
