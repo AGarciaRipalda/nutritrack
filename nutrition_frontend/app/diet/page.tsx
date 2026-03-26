@@ -44,15 +44,6 @@ const mealIdIcons: Record<string, typeof Coffee> = {
   desayuno: Coffee, media_manana: Sun, almuerzo: Utensils, merienda: Cookie, cena: Moon,
 }
 
-// Colors for each meal type
-const mealColors: Record<string, { bg: string, border: string, text: string, iconBg: string, iconText: string }> = {
-  desayuno:     { bg: "bg-black/5 dark:bg-white/5",    border: "border-black/10 dark:border-white/10",    text: "text-amber-700 dark:text-amber-400",    iconBg: "bg-amber-500/20",    iconText: "text-amber-700 dark:text-amber-400" },
-  media_manana: { bg: "bg-black/5 dark:bg-white/5",   border: "border-black/10 dark:border-white/10",   text: "text-orange-700 dark:text-orange-400",   iconBg: "bg-orange-500/20",   iconText: "text-orange-700 dark:text-orange-400" },
-  almuerzo:     { bg: "bg-black/5 dark:bg-white/5",  border: "border-black/10 dark:border-white/10",  text: "text-emerald-700 dark:text-emerald-400",  iconBg: "bg-emerald-500/20",  iconText: "text-emerald-700 dark:text-emerald-400" },
-  merienda:     { bg: "bg-black/5 dark:bg-white/5",     border: "border-black/10 dark:border-white/10",     text: "text-rose-700 dark:text-rose-400",     iconBg: "bg-rose-500/20",     iconText: "text-rose-700 dark:text-rose-400" },
-  cena:         { bg: "bg-black/5 dark:bg-white/5",   border: "border-black/10 dark:border-white/10",   text: "text-indigo-700 dark:text-indigo-400",   iconBg: "bg-indigo-500/20",   iconText: "text-indigo-700 dark:text-indigo-400" },
-}
-
 export default function DietPage() {
   const { state, derived, init, setMealCarb, setMealGrams } = useDietDay()
   const { isCheatDay, finalizeExcess, setupCompensation, declineCompensation, record: cheatRecord } = useCheatDay()
@@ -73,6 +64,7 @@ export default function DietPage() {
     if (searchTimers.current[mealId]) clearTimeout(searchTimers.current[mealId])
     if (query.length < 2) {
       setFoodSuggestions((prev) => ({ ...prev, [mealId]: [] }))
+      setSearchingFood((prev) => ({ ...prev, [mealId]: false }))
       return
     }
     searchTimers.current[mealId] = setTimeout(async () => {
@@ -85,6 +77,12 @@ export default function DietPage() {
       }
       setSearchingFood((prev) => ({ ...prev, [mealId]: false }))
     }, 400)
+  }, [])
+
+  useEffect(() => {
+    return () => {
+      Object.values(searchTimers.current).forEach(clearTimeout)
+    }
   }, [])
 
   useEffect(() => {
@@ -281,7 +279,6 @@ export default function DietPage() {
         {/* Meal Cards - Tighter spacing, color-coded, background icons */}
         <div className="grid grid-cols-1 gap-3">
           {day.meals.map((meal) => {
-            const colors      = mealColors[meal.id] || mealColors.cena
             const MealIcon    = mealIdIcons[meal.id] ?? mealIcons[meal.type] ?? Utensils
             const label       = mealLabels[meal.type] ?? mealIdLabels[meal.id]
             const override    = state.overrides[meal.id]
@@ -298,22 +295,22 @@ export default function DietPage() {
             return (
               <Card
                 key={meal.id}
-                className={`relative overflow-hidden border transition-all duration-300 rounded-2xl ${
-                  isSkipped ? "bg-slate-50 dark:bg-white/5 border-slate-200 opacity-80" : `${colors.bg} ${colors.border}`
+                className={`relative overflow-visible border transition-all duration-300 rounded-2xl ${
+                  isSkipped ? "bg-slate-50 dark:bg-white/5 border-slate-200 opacity-80" : "bg-black/5 dark:bg-white/5 border-black/10 dark:border-white/10"
                 } shadow-sm`}
               >
                 {/* Visual context icon */}
-                <MealIcon className={`absolute -right-2 -bottom-2 h-16 w-16 opacity-[0.05] ${isSkipped ? 'text-slate-400 dark:text-slate-400' : colors.iconText}`} />
+                <MealIcon className={`absolute -right-2 -bottom-2 h-16 w-16 opacity-[0.05] ${isSkipped ? 'text-slate-400 dark:text-slate-400' : 'text-emerald-400 dark:text-emerald-400'}`} />
 
                 <div className="p-4 relative z-10">
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className={`p-2 rounded-xl shrink-0 ${isSkipped ? 'bg-slate-200 text-slate-500 dark:text-slate-300' : `${colors.iconBg} ${colors.iconText}`}`}>
-                      <MealIcon className="h-4 w-4" />
-                    </div>
+                  <div className="flex items-center gap-2 border-b border-black/10 dark:border-white/10 pb-2 mb-2">
+                    <MealIcon className={`h-4 w-4 shrink-0 ${isSkipped ? 'text-slate-400 dark:text-slate-400' : 'text-emerald-400 dark:text-emerald-400'}`} />
                     <div className="flex-1">
-                      <h3 className={`text-sm font-bold ${isSkipped ? 'text-slate-500 dark:text-slate-300 line-through' : colors.text}`}>{label}</h3>
-                      <p className={`text-[10px] font-bold ${isSkipped ? 'text-slate-400 dark:text-slate-400' : 'text-slate-500 dark:text-slate-300'}`}>{effKcal} kcal</p>
+                      <h3 className={`text-sm font-semibold ${isSkipped ? 'text-slate-500 dark:text-slate-300 line-through' : 'text-foreground dark:text-foreground'}`}>{label}</h3>
                     </div>
+                    <Badge className={`${isSkipped ? "bg-slate-200 border-slate-300 text-slate-500 dark:text-slate-300" : "bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 border-emerald-400/30"} text-xs px-1.5 py-0 shrink-0`}>
+                      {effKcal} kcal
+                    </Badge>
                     <Checkbox
                       checked={isChecked && !isSkipped}
                       disabled={isSkipped}
@@ -322,9 +319,16 @@ export default function DietPage() {
                     />
                   </div>
 
-                  <p className={`text-xs leading-relaxed mb-3 font-medium ${isSkipped ? 'text-slate-400 dark:text-slate-400 italic' : 'text-slate-700 dark:text-slate-200'}`}>
+                  <p className={`text-xs leading-snug mb-3 ${isSkipped ? 'text-slate-400 dark:text-slate-400 italic' : 'text-slate-700 dark:text-foreground/80'}`}>
                     {meal.description}
                   </p>
+
+                  {meal.note && !isSkipped && (
+                    <div className="flex items-start gap-1 mt-0.5 mb-3">
+                      <Lightbulb className="h-3 w-3 text-amber-700 dark:text-amber-400 shrink-0 mt-0.5" />
+                      <span className="text-amber-700 dark:text-amber-400/80 text-xs leading-snug">{meal.note}</span>
+                    </div>
+                  )}
 
                   {/* Dynamic Controls - Compact */}
                   {!isSkipped && (
@@ -340,7 +344,7 @@ export default function DietPage() {
                                 const found = state.favoriteCarbs.find((c) => c.key === e.target.value) ?? null
                                 setMealCarb(meal.id, found)
                               }}
-                              className="w-full bg-white dark:bg-white/10/60 border border-slate-200 rounded-lg pl-7 pr-2 py-1.5 text-[11px] font-bold text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                              className="w-full bg-white dark:bg-white/10 border border-slate-200 dark:border-white/10 rounded-lg pl-7 pr-2 py-1.5 text-[11px] font-bold text-slate-700 dark:text-foreground/80 focus:outline-none focus:ring-1 focus:ring-emerald-500"
                             >
                               <option value="">Ajustar carbohidratos...</option>
                               {state.favoriteCarbs.map((c) => (
@@ -358,7 +362,7 @@ export default function DietPage() {
                                    const val = parseInt(e.target.value)
                                    setMealGrams(meal.id, isNaN(val) ? null : val)
                                  }}
-                                 className="w-14 bg-white dark:bg-white/10 border border-slate-200 rounded-lg py-1.5 text-center text-[11px] font-black text-emerald-600 focus:outline-none"
+                                 className="w-14 bg-white dark:bg-white/10 border border-slate-200 dark:border-white/10 rounded-lg py-1.5 text-center text-[11px] font-black text-emerald-600 dark:text-emerald-400 focus:outline-none"
                                />
                                <span className="text-[10px] font-bold text-slate-400 dark:text-slate-400 uppercase">Grams</span>
                              </div>
@@ -370,13 +374,13 @@ export default function DietPage() {
                       <div className="flex gap-2">
                         <button
                           onClick={() => handleSwap(meal.id)}
-                          className="flex-1 bg-white dark:bg-white/10/50 hover:bg-white dark:bg-white/10 border border-slate-200 rounded-xl py-1.5 text-[10px] font-bold text-slate-600 transition-colors flex items-center justify-center gap-1"
+                          className="flex-1 bg-white dark:bg-white/10 hover:bg-white dark:hover:bg-white/10 border border-slate-200 dark:border-white/10 rounded-xl py-1.5 text-[10px] font-bold text-slate-600 dark:text-foreground/60 dark:hover:text-foreground transition-colors flex items-center justify-center gap-1"
                         >
                           <Shuffle className={`h-3 w-3 ${swapping === meal.id ? 'animate-spin' : ''}`} /> Cambiar
                         </button>
                         <button
                           onClick={() => handleSkipMeal(meal.id)}
-                          className="px-3 bg-white dark:bg-white/10/50 hover:bg-rose-50 border border-slate-200 hover:border-rose-100 rounded-xl py-1.5 text-[10px] font-bold text-slate-500 dark:text-slate-300 hover:text-rose-600 transition-colors"
+                          className="px-3 bg-white dark:bg-white/10 hover:bg-rose-50 dark:hover:bg-rose-500/10 border border-slate-200 dark:border-white/10 hover:border-rose-100 dark:hover:border-rose-400/20 rounded-xl py-1.5 text-[10px] font-bold text-slate-500 dark:text-foreground/60 hover:text-rose-600 transition-colors"
                         >
                           <Ban className="h-3 w-3" />
                         </button>
@@ -399,10 +403,15 @@ export default function DietPage() {
                                setFoodInput(prev => ({ ...prev, [meal.id]: { name: val, grams: prev[meal.id]?.grams ?? "", kcalPer100g: prev[meal.id]?.kcalPer100g ?? null } }))
                                debouncedFoodSearch(meal.id, val)
                              }}
-                             className="w-full bg-white dark:bg-white/10 border border-slate-200 rounded-lg pl-7 pr-2 py-1.5 text-[11px] text-slate-700 dark:text-slate-200"
+                             className="w-full bg-white dark:bg-white/10 border border-slate-200 dark:border-white/10 rounded-lg pl-7 pr-2 py-1.5 text-[11px] text-slate-700 dark:text-foreground/80"
                            />
+                           {searchingFood[meal.id] && (
+                             <div className="absolute left-0 right-0 top-full mt-1 z-20 rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-[#111111] px-3 py-2 text-[10px] font-medium text-slate-500 dark:text-foreground/60 shadow-lg">
+                               Buscando alimentos...
+                             </div>
+                           )}
                            {foodSuggestions[meal.id]?.length > 0 && (
-                              <div className="absolute z-20 left-0 right-0 top-full mt-1 bg-white dark:bg-white/10 border border-slate-200 rounded-lg shadow-lg overflow-hidden">
+                              <div className="absolute z-20 left-0 right-0 top-full mt-1 bg-white dark:bg-[#111111] border border-slate-200 dark:border-white/10 rounded-lg shadow-lg overflow-hidden">
                                 {foodSuggestions[meal.id].map((item, idx) => (
                                   <button
                                     key={idx}
@@ -410,13 +419,18 @@ export default function DietPage() {
                                       setFoodInput(prev => ({ ...prev, [meal.id]: { name: item.name, grams: prev[meal.id]?.grams ?? "", kcalPer100g: item.kcal_100g } }))
                                       setFoodSuggestions(prev => ({ ...prev, [meal.id]: [] }))
                                     }}
-                                    className="w-full text-left px-3 py-2 text-[10px] hover:bg-slate-50 dark:bg-white/5 border-b border-slate-100 last:border-0"
+                                    className="w-full text-left px-3 py-2 text-[10px] hover:bg-slate-50 dark:hover:bg-white/5 border-b border-slate-100 dark:border-white/10 last:border-0"
                                   >
-                                    <span className="font-bold text-slate-700 dark:text-slate-200">{item.name}</span>
-                                    <span className="ml-2 text-slate-400 dark:text-slate-400">{item.kcal_100g}k/100g</span>
+                                    <span className="font-bold text-slate-700 dark:text-foreground/90">{item.name}</span>
+                                    <span className="ml-2 text-slate-400 dark:text-foreground/50">{item.kcal_100g}k/100g</span>
                                   </button>
                                 ))}
                               </div>
+                           )}
+                           {!searchingFood[meal.id] && (foodInput[meal.id]?.name?.trim().length ?? 0) >= 2 && (foodSuggestions[meal.id]?.length ?? 0) === 0 && (
+                             <div className="absolute left-0 right-0 top-full mt-1 z-20 rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-[#111111] px-3 py-2 text-[10px] font-medium text-slate-500 dark:text-foreground/60 shadow-lg">
+                               Sin resultados en OpenFoodFacts. Puedes añadirlo manualmente.
+                             </div>
                            )}
                          </div>
                          <input
@@ -424,7 +438,7 @@ export default function DietPage() {
                            placeholder="g"
                            value={foodInput[meal.id]?.grams ?? ""}
                            onChange={(e) => setFoodInput(prev => ({ ...prev, [meal.id]: { name: prev[meal.id]?.name ?? "", grams: e.target.value, kcalPer100g: prev[meal.id]?.kcalPer100g ?? null } }))}
-                           className="w-12 bg-white dark:bg-white/10 border border-slate-200 rounded-lg py-1.5 text-center text-[11px]"
+                           className="w-12 bg-white dark:bg-white/10 border border-slate-200 dark:border-white/10 rounded-lg py-1.5 text-center text-[11px] dark:text-foreground/80"
                          />
                          <button
                            onClick={() => handleAddFood(meal.id)}
