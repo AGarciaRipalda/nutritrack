@@ -97,6 +97,15 @@ export interface FavoriteCarb {
   kcal: number   // kcal per 100g
 }
 
+export type TrainingBlock = "morning" | "midday" | "afternoon" | "evening"
+
+export interface TodayTrainingData {
+  bonus_kcal: number
+  training_type: string | null
+  exercise_key?: string | null
+  training_block?: TrainingBlock | null
+}
+
 export interface Meal {
   id: string            // "desayuno", "almuerzo", etc.
   type: string          // "breakfast", "lunch", etc.
@@ -173,7 +182,7 @@ export interface TrainingData {
   totalKcal: number
   trainedDays: number
   yesterdayExercise: { burned_kcal: number; adjustment_kcal: number; exercises: unknown[] } | null
-  todayTraining: { bonus_kcal: number; training_type: string | null } | null
+  todayTraining: TodayTrainingData | null
 }
 
 export interface WeightEntry {
@@ -273,6 +282,55 @@ const CATEGORY_LABELS: Record<string, string> = {
   proteinas: "Proteínas", lacteos: "Lácteos", cereales: "Cereales",
   frutas: "Frutas", verduras: "Verduras", grasas: "Grasas y frutos secos",
   legumbres: "Legumbres", otros: "Otros",
+}
+
+const TODAY_TRAINING_STORAGE_KEY = "nutritrack_today_training"
+
+function normalizeTodayTraining(raw: any): TodayTrainingData | null {
+  if (!raw || typeof raw !== "object") return null
+  return {
+    bonus_kcal: Number(raw.bonus_kcal ?? 0),
+    training_type: raw.training_type ?? null,
+    exercise_key: raw.exercise_key ?? null,
+    training_block: raw.training_block ?? null,
+  }
+}
+
+export function loadStoredTodayTraining(): TodayTrainingData | null {
+  if (typeof window === "undefined") return null
+  try {
+    const raw = window.localStorage.getItem(TODAY_TRAINING_STORAGE_KEY)
+    return raw ? normalizeTodayTraining(JSON.parse(raw)) : null
+  } catch {
+    return null
+  }
+}
+
+export function saveStoredTodayTraining(data: TodayTrainingData | null) {
+  if (typeof window === "undefined") return
+  try {
+    if (!data || (!data.exercise_key && !data.bonus_kcal)) {
+      window.localStorage.removeItem(TODAY_TRAINING_STORAGE_KEY)
+      return
+    }
+    window.localStorage.setItem(TODAY_TRAINING_STORAGE_KEY, JSON.stringify(data))
+  } catch {}
+}
+
+function resolveTodayTraining(raw: any): TodayTrainingData | null {
+  const remote = normalizeTodayTraining(raw)
+  const local = loadStoredTodayTraining()
+  if (!remote && !local) return null
+
+  const resolved: TodayTrainingData = {
+    bonus_kcal: remote?.bonus_kcal ?? local?.bonus_kcal ?? 0,
+    training_type: remote?.training_type ?? local?.training_type ?? null,
+    exercise_key: remote?.exercise_key ?? local?.exercise_key ?? null,
+    training_block: remote?.training_block ?? local?.training_block ?? null,
+  }
+
+  saveStoredTodayTraining(resolved)
+  return resolved
 }
 
 function trendLine(points: WeightEntry[]): WeightEntry[] {
@@ -486,7 +544,16 @@ export async function fetchTraining(): Promise<TrainingData> {
     totalKcal:        historyRaw.total_kcal,
     trainedDays:      historyRaw.trained_days,
     yesterdayExercise: yesterdayRaw,
-    todayTraining:    todayRaw,
+    todayTraining:    resolveTodayTraining(todayRaw),
+  }
+}
+
+export async function fetchTodayTraining(): Promise<TodayTrainingData | null> {
+  try {
+    const d = await get<any>("/exercise/today-training")
+    return resolveTodayTraining(d)
+  } catch {
+    return loadStoredTodayTraining()
   }
 }
 
@@ -617,8 +684,21 @@ export async function logYesterdayExercise(data: {
 export async function logTodayTraining(data: {
   trains: boolean
   exercise_key?: string
-}): Promise<void> {
-  await post("/exercise/today-training", data)
+  training_block?: TrainingBlock
+}): Promise<TodayTrainingData> {
+  const result = await post<any>("/exercise/today-training", data)
+  const resolved = resolveTodayTraining({
+    ...result,
+    training_block: data.trains ? (data.training_block ?? result?.training_block ?? null) : null,
+    exercise_key: data.trains ? (data.exercise_key ?? result?.exercise_key ?? null) : null,
+  }) ?? {
+    bonus_kcal: 0,
+    training_type: null,
+    exercise_key: null,
+    training_block: null,
+  }
+  saveStoredTodayTraining(resolved)
+  return resolved
 }
 
 export async function fetchRoutine(params: {

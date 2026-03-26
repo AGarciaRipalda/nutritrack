@@ -9,10 +9,10 @@ import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
 import {
   Shuffle, Coffee, Sun, Utensils, Cookie, Moon,
-  Lightbulb, CheckCircle2, Wheat, Scale, Star, X, Ban, Plus, Search,
+  Lightbulb, CheckCircle2, Wheat, Scale, Star, X, Ban, Plus, Search, Zap,
 } from "lucide-react"
 import type { PlanDay, FoodSearchResult } from "@/lib/api"
-import { fetchTodaysPlan, swapMeal, updateAdherence, fetchFavoriteCarbs } from "@/lib/api"
+import { fetchTodaysPlan, swapMeal, updateAdherence, fetchFavoriteCarbs, fetchTodayTraining } from "@/lib/api"
 import { searchFoodAction } from "@/app/actions/food"
 import { useDietDay } from "@/context/DietDayContext"
 import { useCheatDay } from "@/context/CheatDayContext"
@@ -43,6 +43,13 @@ const mealIdLabels: Record<string, string> = {
 const mealIdIcons: Record<string, typeof Coffee> = {
   desayuno: Coffee, media_manana: Sun, almuerzo: Utensils, merienda: Cookie, cena: Moon,
 }
+
+const trainingBlockLabels = {
+  morning: "por la mañana",
+  midday: "a mediodía",
+  afternoon: "por la tarde",
+  evening: "por la noche",
+} as const
 
 function deriveMealCarbKcalPer100g(meal: PlanDay["meals"][0]): number | null {
   if (meal.fixedKcal == null || meal.carbG == null || meal.carbG <= 0) return null
@@ -154,12 +161,12 @@ export default function DietPage() {
   }, [closeFoodDropdown])
 
   useEffect(() => {
-    Promise.all([fetchTodaysPlan(), fetchFavoriteCarbs()])
-      .then(([d, carbs]) => {
+    Promise.all([fetchTodaysPlan(), fetchFavoriteCarbs(), fetchTodayTraining()])
+      .then(([d, carbs, todayTraining]) => {
         setStale(d.stale ?? false)
         setPlanDay(d)
         const target = d.exerciseAdj?.adjustedTotal ?? d.totalKcal
-        init(d.date, target, d.meals, carbs)
+        init(d.date, target, d.meals, carbs, todayTraining)
         if (d.adherence) {
           if (Object.keys(d.adherence.meals).length > 0) {
             setCheckedMeals(d.adherence.meals)
@@ -169,7 +176,10 @@ export default function DietPage() {
           }
         }
       })
-      .catch(() => setPlanDay(mockPlanDay))
+      .catch(() => {
+        setPlanDay(mockPlanDay)
+        init(mockPlanDay.date, mockPlanDay.totalKcal, mockPlanDay.meals, [], null)
+      })
       .finally(() => setLoading(false))
   // `init` comes from DietDayContext and is stable (wrapped in useCallback there),
   // so this effect intentionally runs only once on mount.
@@ -184,7 +194,7 @@ export default function DietPage() {
       setPlanDay((prev) => prev ? { ...updated, stale: prev.stale } : updated)
       const carbs = state.favoriteCarbs
       const target = updated.exerciseAdj?.adjustedTotal ?? updated.totalKcal
-      init(updated.date, target, updated.meals, carbs)
+      init(updated.date, target, updated.meals, carbs, state.todayTraining)
     } catch {}
     setSwapping(null)
   }
@@ -260,7 +270,10 @@ export default function DietPage() {
 
   const day = planDay ?? mockPlanDay
   const cheatActive = isCheatDay(day.date)
-  const { totalEffective, remaining, exceeded, overLimit, rebalancedTargets, effectiveKcalPerMeal } = derived
+  const {
+    totalEffective, remaining, exceeded, overLimit,
+    rebalancedTargets, effectiveKcalPerMeal, trainingAutoAllocation,
+  } = derived
   const dailyTarget   = state.dailyTarget || day.totalKcal
 
   const replacementKcal = Object.values(skippedMeals)
@@ -330,6 +343,30 @@ export default function DietPage() {
           </div>
         </Card>
 
+        {trainingAutoAllocation && (
+          <Card className="bg-emerald-50 border-emerald-100 dark:bg-emerald-500/10 dark:border-emerald-400/20 rounded-2xl p-4 shadow-sm">
+            <div className="flex items-start gap-3">
+              <div className="rounded-xl bg-emerald-500/15 p-2">
+                <Zap className="h-4 w-4 text-emerald-600 dark:text-emerald-300" />
+              </div>
+              <div className="space-y-1">
+                <p className="text-sm font-semibold text-emerald-800 dark:text-emerald-200">
+                  Ajuste automático por entreno {trainingBlockLabels[trainingAutoAllocation.trainingBlock]}
+                </p>
+                <p className="text-xs text-emerald-700 dark:text-emerald-300/90">
+                  +{trainingAutoAllocation.bonusKcal} kcal repartidas en
+                  {trainingAutoAllocation.preMealId ? ` ${mealIdLabels[trainingAutoAllocation.preMealId]}` : ""}
+                  {trainingAutoAllocation.preMealId ? ` (+${trainingAutoAllocation.preExtraKcal})` : ""}
+                  {trainingAutoAllocation.postMealId
+                    ? ` y ${mealIdLabels[trainingAutoAllocation.postMealId]} (+${trainingAutoAllocation.postExtraKcal})`
+                    : ""}
+                  .
+                </p>
+              </div>
+            </div>
+          </Card>
+        )}
+
         {/* Compensation/Cheat Banners - Compact */}
         {cheatActive && excessKcal > 0 && !cheatRecord?.compensating && (
           <button
@@ -357,6 +394,18 @@ export default function DietPage() {
             const kcalDelta   = effKcal - baseKcal
             const hasKcalDelta = Math.abs(kcalDelta) >= 5
             const displayedDescription = renderAdjustedDescription(meal, effKcal, selCarb?.name ?? null, selCarb?.kcal ?? null)
+            const trainingRole =
+              trainingAutoAllocation?.preMealId === meal.id
+                ? "pre"
+                : trainingAutoAllocation?.postMealId === meal.id
+                  ? "post"
+                  : null
+            const trainingRoleKcal =
+              trainingRole === "pre"
+                ? trainingAutoAllocation?.preExtraKcal ?? 0
+                : trainingRole === "post"
+                  ? trainingAutoAllocation?.postExtraKcal ?? 0
+                  : 0
             const isSkipped   = !!skippedMeals[meal.id]
             const isChecked   = checkedMeals[meal.id]
             const hasFoodDropdown =
@@ -384,6 +433,11 @@ export default function DietPage() {
                     <MealIcon className={`h-4 w-4 shrink-0 ${isSkipped ? 'text-slate-400 dark:text-slate-400' : 'text-emerald-400 dark:text-emerald-400'}`} />
                     <div className="flex-1">
                       <h3 className={`text-sm font-semibold ${isSkipped ? 'text-slate-500 dark:text-slate-300 line-through' : 'text-foreground dark:text-foreground'}`}>{label}</h3>
+                      {!isSkipped && trainingRole && trainingRoleKcal > 0 && (
+                        <p className="mt-0.5 text-[10px] font-bold text-sky-700 dark:text-sky-300">
+                          {trainingRole === "pre" ? "Pre-entreno" : "Post-entreno"} +{trainingRoleKcal} kcal
+                        </p>
+                      )}
                       {!isSkipped && hasKcalDelta && (
                         <p className={`mt-0.5 text-[10px] font-bold ${
                           kcalDelta > 0

@@ -36,8 +36,8 @@ import {
   Activity,
   Download,
 } from "lucide-react"
-import type { TrainingData, ExerciseRoutine, ExerciseImpact, GymHistoryData } from "@/lib/api"
-import { fetchTraining, logExerciseForDate, generateRoutine, deleteExerciseByDate, fetchGymHistory } from "@/lib/api"
+import type { TrainingData, ExerciseRoutine, ExerciseImpact, GymHistoryData, TrainingBlock, TodayTrainingData } from "@/lib/api"
+import { fetchTraining, logExerciseForDate, generateRoutine, deleteExerciseByDate, fetchGymHistory, logTodayTraining, saveStoredTodayTraining } from "@/lib/api"
 
 const mockTrainingData: TrainingData = {
   exerciseTypes: ["Correr", "Ciclismo", "Natación", "Pesas", "HIIT", "Yoga", "Caminar", "Remo"],
@@ -73,6 +73,33 @@ const mockCalisthenicsRoutine: ExerciseRoutine[] = [
 // Pega aquí el enlace iCloud cuando compartas el Shortcut desde tu iPhone:
 // Shortcuts → ··· → Compartir → Copiar enlace iCloud
 const SHORTCUT_URL = "https://www.icloud.com/shortcuts/ce9f7daa9e0d4b50af2fe50cb9e63096"
+
+const TODAY_TRAINING_BONUS: Record<string, number> = {
+  "1": 150,
+  "2": 200,
+  "3": 200,
+  "4": 300,
+  "5": 400,
+  "6": 300,
+  "7": 450,
+}
+
+const TODAY_TRAINING_TYPE: Record<string, string> = {
+  "1": "cardio",
+  "2": "cardio",
+  "3": "fuerza",
+  "4": "fuerza",
+  "5": "fuerza",
+  "6": "fuerza",
+  "7": "fuerza",
+}
+
+const TRAINING_BLOCK_OPTIONS: { value: TrainingBlock; label: string; description: string }[] = [
+  { value: "morning", label: "Mañana", description: "Desayuno + media mañana" },
+  { value: "midday", label: "Mediodía", description: "Almuerzo + merienda" },
+  { value: "afternoon", label: "Tarde", description: "Merienda + cena" },
+  { value: "evening", label: "Noche", description: "Cena" },
+]
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -123,6 +150,10 @@ export default function TrainingPage() {
   const [logging, setLogging] = useState(false)
   const [lastImpact, setLastImpact] = useState<ExerciseImpact | null>(null)
   const [savedKcal, setSavedKcal] = useState<number | null>(null)
+  const [todayTrainingType, setTodayTrainingType] = useState("")
+  const [todayTrainingBlock, setTodayTrainingBlock] = useState<TrainingBlock | "">("")
+  const [savingTodayTraining, setSavingTodayTraining] = useState(false)
+  const [todayTrainingFeedback, setTodayTrainingFeedback] = useState<string | null>(null)
 
   // Gym history from Google Sheets / Excel
   const [gymHistory, setGymHistory] = useState<GymHistoryData | null>(null)
@@ -142,6 +173,12 @@ export default function TrainingPage() {
       .catch(() => setData(mockTrainingData))
       .finally(() => setLoading(false))
   }, [])
+
+  useEffect(() => {
+    const todayTraining = data?.todayTraining
+    setTodayTrainingType(todayTraining?.exercise_key ?? "")
+    setTodayTrainingBlock(todayTraining?.training_block ?? "")
+  }, [data?.todayTraining?.exercise_key, data?.todayTraining?.training_block])
 
   const loadGymHistory = () => {
     setGymLoading(true)
@@ -245,6 +282,52 @@ export default function TrainingPage() {
     setSelectedType("")
     setMinutes("")
     setLogging(false)
+  }
+
+  const handleSaveTodayTraining = async (
+    selectedTrainingType: string = todayTrainingType,
+    selectedTrainingBlock: TrainingBlock | "" = todayTrainingBlock,
+  ) => {
+    const trains = !!selectedTrainingType
+    if (trains && !selectedTrainingBlock) return
+
+    setSavingTodayTraining(true)
+    setTodayTrainingFeedback(null)
+    try {
+      const saved = await logTodayTraining({
+        trains,
+        exercise_key: trains ? selectedTrainingType : undefined,
+        training_block: trains && selectedTrainingBlock ? selectedTrainingBlock : undefined,
+      })
+      setData((prev) => prev ? { ...prev, todayTraining: saved } : prev)
+      setTodayTrainingFeedback(
+        trains
+          ? `Entreno de hoy guardado: +${saved.bonus_kcal} kcal en ${TRAINING_BLOCK_OPTIONS.find((option) => option.value === saved.training_block)?.label?.toLowerCase() ?? "la franja seleccionada"}.`
+          : "Entreno de hoy eliminado."
+      )
+    } catch {
+      const fallback: TodayTrainingData = trains
+        ? {
+            bonus_kcal: TODAY_TRAINING_BONUS[selectedTrainingType] ?? 250,
+            training_type: TODAY_TRAINING_TYPE[selectedTrainingType] ?? "fuerza",
+            exercise_key: selectedTrainingType,
+            training_block: selectedTrainingBlock || null,
+          }
+        : {
+            bonus_kcal: 0,
+            training_type: null,
+            exercise_key: null,
+            training_block: null,
+          }
+      saveStoredTodayTraining(trains ? fallback : null)
+      setData((prev) => prev ? { ...prev, todayTraining: fallback } : prev)
+      setTodayTrainingFeedback(
+        trains
+          ? `Entreno de hoy guardado localmente: +${fallback.bonus_kcal} kcal.`
+          : "Entreno de hoy eliminado."
+      )
+    }
+    setSavingTodayTraining(false)
   }
 
   // ── Delete exercise ─────────────────────────────────────────────────────────
@@ -413,6 +496,95 @@ export default function TrainingPage() {
                     </Button>
                   </div>
                 </div>
+              </Card>
+
+              <Card className="backdrop-blur-xl bg-black/5 dark:bg-white/10 border border-black/20 dark:border-white/20 rounded-3xl p-6">
+                <div className="flex items-start justify-between gap-4 mb-6">
+                  <div>
+                    <h3 className="text-xl font-semibold text-foreground">Entreno de hoy</h3>
+                    <p className="text-sm text-foreground/60 mt-1">
+                      Define el entreno previsto y la franja horaria para que la dieta de hoy reparta automáticamente los carbohidratos.
+                    </p>
+                  </div>
+                  {training.todayTraining?.bonus_kcal ? (
+                    <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-right">
+                      <p className="text-xs uppercase tracking-wide text-emerald-300">Ajuste activo</p>
+                      <p className="text-sm font-semibold text-emerald-200">+{training.todayTraining.bonus_kcal} kcal</p>
+                    </div>
+                  ) : null}
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+                  <div className="space-y-2">
+                    <Label className="text-foreground/80">Tipo de entreno</Label>
+                    <Select value={todayTrainingType} onValueChange={setTodayTrainingType}>
+                      <SelectTrigger className="bg-black/5 dark:bg-white/5 border-black/20 dark:border-white/20 text-foreground">
+                        <SelectValue placeholder="No entreno hoy" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="rest">No entreno hoy</SelectItem>
+                        {training.exerciseTypes.map((type) => (
+                          <SelectItem key={`today-${type}`} value={type.split("|")[0]}>
+                            {type.split("|")[1] ?? type}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-foreground/80">Franja horaria</Label>
+                    <Select
+                      value={todayTrainingBlock}
+                      onValueChange={(value) => setTodayTrainingBlock(value as TrainingBlock)}
+                      disabled={!todayTrainingType || todayTrainingType === "rest"}
+                    >
+                      <SelectTrigger className="bg-black/5 dark:bg-white/5 border-black/20 dark:border-white/20 text-foreground">
+                        <SelectValue placeholder="Selecciona la hora" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {TRAINING_BLOCK_OPTIONS.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="flex items-end sm:col-span-2">
+                    <Button
+                      onClick={async () => {
+                        if (todayTrainingType === "rest") {
+                          setTodayTrainingType("")
+                          setTodayTrainingBlock("")
+                          await handleSaveTodayTraining("", "")
+                          return
+                        }
+                        await handleSaveTodayTraining(todayTrainingType, todayTrainingBlock)
+                      }}
+                      disabled={savingTodayTraining || (!!todayTrainingType && todayTrainingType !== "rest" && !todayTrainingBlock)}
+                      className="w-full bg-emerald-500 hover:bg-emerald-600 text-white"
+                    >
+                      {savingTodayTraining ? "Guardando..." : "Aplicar a dieta de hoy"}
+                    </Button>
+                  </div>
+                </div>
+
+                {todayTrainingType && todayTrainingType !== "rest" && todayTrainingBlock && (
+                  <div className="mt-4 rounded-2xl border border-black/10 dark:border-white/10 bg-white/70 dark:bg-black/20 px-4 py-3">
+                    <p className="text-sm font-medium text-foreground">
+                      La dieta añadirá más carbohidrato antes y después del entreno.
+                    </p>
+                    <p className="text-xs text-foreground/60 mt-1">
+                      {TRAINING_BLOCK_OPTIONS.find((option) => option.value === todayTrainingBlock)?.description}
+                    </p>
+                  </div>
+                )}
+
+                {todayTrainingFeedback && (
+                  <p className="mt-4 text-sm text-emerald-300">{todayTrainingFeedback}</p>
+                )}
               </Card>
 
               {/* Impact evaluation card */}

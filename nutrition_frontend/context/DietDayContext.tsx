@@ -4,7 +4,7 @@ import {
   createContext, useContext, useState, useCallback,
   useMemo, type ReactNode,
 } from "react"
-import type { Meal, FavoriteCarb } from "@/lib/api"
+import type { Meal, FavoriteCarb, TodayTrainingData, TrainingBlock } from "@/lib/api"
 
 // ── Storage helpers ────────────────────────────────────────────────────────
 
@@ -48,6 +48,17 @@ interface DietDayState {
   meals: Meal[]
   favoriteCarbs: FavoriteCarb[]
   overrides: Record<string, MealOverride>
+  todayTraining: TodayTrainingData | null
+}
+
+interface TrainingAutoAllocation {
+  bonusKcal: number
+  trainingType: string | null
+  trainingBlock: TrainingBlock
+  preMealId: string | null
+  postMealId: string | null
+  preExtraKcal: number
+  postExtraKcal: number
 }
 
 interface DietDayDerived {
@@ -57,14 +68,16 @@ interface DietDayDerived {
   overLimit: boolean
   rebalancedTargets: Record<string, number>
   effectiveKcalPerMeal: Record<string, number>
+  trainingAutoAllocation: TrainingAutoAllocation | null
 }
 
 interface DietDayContextValue {
   state: DietDayState
   derived: DietDayDerived
-  init: (date: string, dailyTarget: number, meals: Meal[], favoriteCarbs: FavoriteCarb[]) => void
+  init: (date: string, dailyTarget: number, meals: Meal[], favoriteCarbs: FavoriteCarb[], todayTraining?: TodayTrainingData | null) => void
   setMealCarb: (mealId: string, carb: FavoriteCarb | null) => void
   setMealGrams: (mealId: string, grams: number | null) => void
+  setTodayTraining: (todayTraining: TodayTrainingData | null) => void
 }
 
 // ── Context ────────────────────────────────────────────────────────────────
@@ -78,6 +91,7 @@ const EMPTY_STATE: DietDayState = {
   meals: [],
   favoriteCarbs: [],
   overrides: {},
+  todayTraining: null,
 }
 
 function roundKcal(value: number): number {
@@ -109,6 +123,65 @@ function getMealOverrideTarget(meal: Meal, override: MealOverride | undefined): 
   if (grams == null) return null
 
   return meal.fixedKcal + roundKcal((override.selectedCarb.kcal / 100) * grams)
+}
+
+function getTrainingMealAllocation(block: TrainingBlock): { preMealId: string | null; postMealId: string | null } {
+  switch (block) {
+    case "morning":
+      return { preMealId: "desayuno", postMealId: "media_manana" }
+    case "midday":
+      return { preMealId: "almuerzo", postMealId: "merienda" }
+    case "afternoon":
+      return { preMealId: "merienda", postMealId: "cena" }
+    case "evening":
+      return { preMealId: "cena", postMealId: null }
+    default:
+      return { preMealId: null, postMealId: null }
+  }
+}
+
+function buildAutoTrainingTargets(
+  meals: Meal[],
+  todayTraining: TodayTrainingData | null,
+): { lockedTargets: Record<string, number>; allocation: TrainingAutoAllocation | null } {
+  if (!todayTraining?.training_block || todayTraining.bonus_kcal <= 0) {
+    return { lockedTargets: {}, allocation: null }
+  }
+
+  const byId = new Map(meals.map((meal) => [meal.id, meal]))
+  const { preMealId, postMealId } = getTrainingMealAllocation(todayTraining.training_block)
+  const preMeal = preMealId ? byId.get(preMealId) : null
+  const postMeal = postMealId ? byId.get(postMealId) : null
+  const preShare = todayTraining.training_block === "evening"
+    ? 1
+    : todayTraining.training_type === "cardio"
+      ? 0.55
+      : 0.65
+
+  let preExtraKcal = todayTraining.bonus_kcal
+  let postExtraKcal = 0
+
+  if (preMeal && postMeal) {
+    preExtraKcal = roundKcal(todayTraining.bonus_kcal * preShare)
+    postExtraKcal = todayTraining.bonus_kcal - preExtraKcal
+  }
+
+  const lockedTargets: Record<string, number> = {}
+  if (preMeal) lockedTargets[preMeal.id] = getBaseMealKcal(preMeal) + preExtraKcal
+  if (postMeal && postExtraKcal > 0) lockedTargets[postMeal.id] = getBaseMealKcal(postMeal) + postExtraKcal
+
+  return {
+    lockedTargets,
+    allocation: {
+      bonusKcal: todayTraining.bonus_kcal,
+      trainingType: todayTraining.training_type ?? null,
+      trainingBlock: todayTraining.training_block,
+      preMealId: preMeal?.id ?? null,
+      postMealId: postMeal?.id ?? null,
+      preExtraKcal: preMeal ? preExtraKcal : 0,
+      postExtraKcal: postMeal ? postExtraKcal : 0,
+    },
+  }
 }
 
 function distributeRemainingKcal(
@@ -163,7 +236,7 @@ function distributeRemainingKcal(
 }
 
 function computeDerived(state: DietDayState): DietDayDerived {
-  const lockedTargets: Record<string, number> = {}
+  const { lockedTargets, allocation } = buildAutoTrainingTargets(state.meals, state.todayTraining)
 
   for (const meal of state.meals) {
     const overrideTarget = getMealOverrideTarget(meal, state.overrides[meal.id])
@@ -183,17 +256,25 @@ function computeDerived(state: DietDayState): DietDayDerived {
   const exceeded = totalEffective > state.dailyTarget
   const overLimit = totalEffective > state.dailyTarget * 1.1
 
-  return { totalEffective, remaining, exceeded, overLimit, rebalancedTargets, effectiveKcalPerMeal }
+  return {
+    totalEffective,
+    remaining,
+    exceeded,
+    overLimit,
+    rebalancedTargets,
+    effectiveKcalPerMeal,
+    trainingAutoAllocation: allocation,
+  }
 }
 
 export function DietDayProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<DietDayState>(EMPTY_STATE)
 
   const init = useCallback(
-    (date: string, dailyTarget: number, meals: Meal[], favoriteCarbs: FavoriteCarb[]) => {
+    (date: string, dailyTarget: number, meals: Meal[], favoriteCarbs: FavoriteCarb[], todayTraining: TodayTrainingData | null = null) => {
       const stored = loadDayFromStorage(date)
       const overrides = stored?.overrides ?? {}
-      setState({ initialized: true, date, dailyTarget, meals, favoriteCarbs, overrides })
+      setState({ initialized: true, date, dailyTarget, meals, favoriteCarbs, overrides, todayTraining })
     },
     [],
   )
@@ -222,10 +303,14 @@ export function DietDayProvider({ children }: { children: ReactNode }) {
     })
   }, [])
 
+  const setTodayTraining = useCallback((todayTraining: TodayTrainingData | null) => {
+    setState((prev) => ({ ...prev, todayTraining }))
+  }, [])
+
   const derived = useMemo(() => computeDerived(state), [state])
 
   return (
-    <Ctx.Provider value={{ state, derived, init, setMealCarb, setMealGrams }}>
+    <Ctx.Provider value={{ state, derived, init, setMealCarb, setMealGrams, setTodayTraining }}>
       {children}
     </Ctx.Provider>
   )

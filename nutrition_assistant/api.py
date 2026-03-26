@@ -200,6 +200,7 @@ class HealthSyncModel(BaseModel):
 class TodayTrainingModel(BaseModel):
     trains: bool
     exercise_key: Optional[str] = None   # "1"-"7"
+    training_block: Optional[str] = None
 
 
 class WeightModel(BaseModel):
@@ -621,18 +622,23 @@ def log_yesterday_exercise(data: YesterdayExerciseModel):
 @app.get("/exercise/today-training", tags=["Ejercicio"])
 def get_today_training():
     session = _get_session()
-    return session.get("today_training") or {"bonus_kcal": 0, "training_type": None}
+    return session.get("today_training") or {"bonus_kcal": 0, "training_type": None, "training_block": None}
 
 
 @app.post("/exercise/today-training", tags=["Ejercicio"])
 def log_today_training(data: TodayTrainingModel):
     """Registra si el usuario entrena hoy y qué tipo."""
     if not data.trains or not data.exercise_key:
-        today_data = {"bonus_kcal": 0, "training_type": None, "exercise_key": None}
+        today_data = {"bonus_kcal": 0, "training_type": None, "exercise_key": None, "training_block": None}
     else:
         bonus = TODAY_BONUS_KCAL.get(data.exercise_key, 250)
         ttype = TODAY_TIMING.get(data.exercise_key, "fuerza")
-        today_data = {"bonus_kcal": bonus, "training_type": ttype, "exercise_key": data.exercise_key}
+        today_data = {
+            "bonus_kcal": bonus,
+            "training_type": ttype,
+            "exercise_key": data.exercise_key,
+            "training_block": data.training_block,
+        }
 
     save_session(today_training=today_data, adaptive_day=None)
     return today_data
@@ -1611,4 +1617,3 @@ def search_food(q: str = Query(..., min_length=2, description="Nombre del alimen
         })
 
     return {"results": results}
-
