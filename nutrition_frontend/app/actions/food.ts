@@ -40,26 +40,22 @@ function parseProductName(product: any): string | null {
   const name = rawName.trim()
   if (!name) return null
 
-  const brand = typeof product.brands === "string" ? product.brands.split(",")[0]?.trim() : ""
+  const brand = Array.isArray(product.brands)
+    ? product.brands[0]?.trim()
+    : typeof product.brands === "string"
+      ? product.brands.split(",")[0]?.trim()
+      : ""
   return brand && !name.toLowerCase().includes(brand.toLowerCase()) ? `${name} · ${brand}` : name
 }
 
 export async function searchFoodAction(query: string): Promise<FoodSearchResult[]> {
   const normalizedQuery = query.trim()
   if (normalizedQuery.length < 2) return []
-
   const params = new URLSearchParams({
-    search_terms: normalizedQuery,
-    search_simple: "1",
-    action: "process",
-    json: "1",
-    page_size: "15",
-    page: "1",
-    sort_by: "unique_scans_n",
-    fields: "product_name,product_name_es,generic_name,generic_name_es,brands,nutriments,image_small_url",
+    q: normalizedQuery,
+    size: "15",
   })
-
-  const url = `https://world.openfoodfacts.org/cgi/search.pl?${params.toString()}`
+  const url = `https://search.openfoodfacts.org/search?${params.toString()}`
 
   try {
     const res = await fetch(url, {
@@ -79,7 +75,7 @@ export async function searchFoodAction(query: string): Promise<FoodSearchResult[
     const results: FoodSearchResult[] = []
     const seen = new Set<string>()
 
-    for (const product of data.products || []) {
+    for (const product of data.hits || []) {
       const name = parseProductName(product)
       const kcal = parseKcalPer100g(product)
 
@@ -92,7 +88,7 @@ export async function searchFoodAction(query: string): Promise<FoodSearchResult[
       results.push({
         name,
         kcal_100g: kcal,
-        image: product.image_small_url || null,
+        image: product.image_front_small_url || product.image_small_url || product.image_url || null,
       })
     }
 
