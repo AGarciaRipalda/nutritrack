@@ -58,9 +58,18 @@ export default function DietPage() {
   const [showCompModal, setShowCompModal] = useState(false)
   const [foodSuggestions, setFoodSuggestions] = useState<Record<string, FoodSearchResult[]>>({})
   const [searchingFood, setSearchingFood] = useState<Record<string, boolean>>({})
+  const [activeFoodMealId, setActiveFoodMealId] = useState<string | null>(null)
   const searchTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
+  const activeFoodContainerRef = useRef<HTMLDivElement | null>(null)
+
+  const closeFoodDropdown = useCallback(() => {
+    setFoodSuggestions({})
+    setSearchingFood({})
+    setActiveFoodMealId(null)
+  }, [])
 
   const debouncedFoodSearch = useCallback((mealId: string, query: string) => {
+    setActiveFoodMealId(mealId)
     if (searchTimers.current[mealId]) clearTimeout(searchTimers.current[mealId])
     if (query.length < 2) {
       setFoodSuggestions((prev) => ({ ...prev, [mealId]: [] }))
@@ -84,6 +93,23 @@ export default function DietPage() {
       Object.values(searchTimers.current).forEach(clearTimeout)
     }
   }, [])
+
+  useEffect(() => {
+    const handlePointerDown = (event: MouseEvent | TouchEvent) => {
+      if (!activeFoodContainerRef.current) return
+      const target = event.target
+      if (target instanceof Node && !activeFoodContainerRef.current.contains(target)) {
+        closeFoodDropdown()
+      }
+    }
+
+    document.addEventListener("mousedown", handlePointerDown)
+    document.addEventListener("touchstart", handlePointerDown)
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown)
+      document.removeEventListener("touchstart", handlePointerDown)
+    }
+  }, [closeFoodDropdown])
 
   useEffect(() => {
     Promise.all([fetchTodaysPlan(), fetchFavoriteCarbs()])
@@ -396,12 +422,16 @@ export default function DietPage() {
                   {isSkipped && (
                     <div className="space-y-2">
                        <div className="flex gap-1.5">
-                         <div className="relative flex-1">
+                         <div
+                           ref={activeFoodMealId === meal.id ? activeFoodContainerRef : undefined}
+                           className="relative flex-1"
+                         >
                            <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-slate-400 dark:text-slate-400" />
                            <input
                              type="text"
                              placeholder="¿Qué has comido?"
                              value={foodInput[meal.id]?.name ?? ""}
+                             onFocus={() => setActiveFoodMealId(meal.id)}
                              onChange={(e) => {
                                const val = e.target.value
                                setFoodInput(prev => ({ ...prev, [meal.id]: { name: val, grams: prev[meal.id]?.grams ?? "", kcalPer100g: prev[meal.id]?.kcalPer100g ?? null } }))
@@ -415,15 +445,16 @@ export default function DietPage() {
                              </div>
                            )}
                            {foodSuggestions[meal.id]?.length > 0 && (
-                              <div className="absolute z-50 left-0 right-0 top-full mt-1 max-h-56 overflow-y-auto overscroll-contain rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-zinc-950 shadow-2xl">
+                              <div className="absolute z-50 left-0 right-0 top-full mt-1 max-h-56 overflow-y-auto overscroll-contain rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-zinc-950 shadow-2xl ring-1 ring-slate-950/5 dark:ring-black">
                                 {foodSuggestions[meal.id].map((item, idx) => (
                                   <button
                                     key={idx}
                                     onClick={() => {
                                       setFoodInput(prev => ({ ...prev, [meal.id]: { name: item.name, grams: prev[meal.id]?.grams ?? "", kcalPer100g: item.kcal_100g } }))
                                       setFoodSuggestions(prev => ({ ...prev, [meal.id]: [] }))
+                                      setActiveFoodMealId(null)
                                     }}
-                                    className="block w-full bg-white dark:bg-zinc-950 text-left px-3 py-2 text-[10px] hover:bg-slate-50 dark:hover:bg-white/5 border-b border-slate-100 dark:border-white/10 last:border-0"
+                                    className="block w-full bg-white dark:bg-zinc-950 text-left px-3 py-2 text-[10px] hover:bg-slate-50 dark:hover:bg-zinc-900 border-b border-slate-100 dark:border-white/10 last:border-0"
                                   >
                                     <span className="font-bold text-slate-700 dark:text-foreground/90">{item.name}</span>
                                     <span className="ml-2 text-slate-400 dark:text-foreground/50">{item.kcal_100g}k/100g</span>
@@ -445,7 +476,10 @@ export default function DietPage() {
                            className="w-12 bg-white dark:bg-white/10 border border-slate-200 dark:border-white/10 rounded-lg py-1.5 text-center text-[11px] dark:text-foreground/80"
                          />
                          <button
-                           onClick={() => handleAddFood(meal.id)}
+                           onClick={() => {
+                             closeFoodDropdown()
+                             handleAddFood(meal.id)
+                           }}
                            className="bg-emerald-500 text-white rounded-lg px-2"
                          >
                            <Plus className="h-3 w-3" />
