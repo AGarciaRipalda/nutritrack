@@ -868,6 +868,6 @@ export interface FoodSearchResult {
 
 export async function searchFood(query: string): Promise<FoodSearchResult[]> {
   if (query.length < 2) return []
-  const d = await get<{ results: FoodSearchResult[] }>(`/food/search?q=${encodeURIComponent(query)}`)
-  return d.results
+  const { searchFoodAction } = await import("@/app/actions/food")
+  return searchFoodAction(query)
 }
