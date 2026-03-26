@@ -76,7 +76,7 @@ export default function DashboardPage() {
       case "weigh-in": return "bg-blue-100 text-blue-600 border-blue-200"
       case "survey": return "bg-amber-100 text-amber-600 border-amber-200"
       case "event": return "bg-emerald-100 text-emerald-600 border-emerald-200"
-      default: return "bg-slate-100 text-slate-600 border-slate-200"
+      default: return "bg-slate-100 text-slate-600 dark:text-slate-300 border-slate-200"
     }
   }
 
@@ -85,12 +85,12 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4 max-h-full">
 
         {/* Header - Compact */}
-        <Card className="relative overflow-hidden bg-white border-emerald-100 rounded-2xl p-4 shadow-sm md:col-span-2 lg:col-span-3">
+        <Card className="relative overflow-hidden bg-white dark:bg-white/10 border-emerald-100 dark:border-white/10 rounded-2xl p-4 shadow-sm md:col-span-2 lg:col-span-3">
           <Activity className="absolute -right-4 -top-4 h-24 w-24 text-emerald-500/5 rotate-12" />
           <div className="flex items-center justify-between gap-2 relative z-10">
             <div>
-              <h2 className="text-2xl font-bold text-slate-800 leading-tight">Panel</h2>
-              <p className="text-slate-500 text-xs">
+              <h2 className="text-2xl font-bold text-slate-800 dark:text-white leading-tight">Panel</h2>
+              <p className="text-slate-500 dark:text-slate-300 text-xs">
                 {typeof window !== "undefined" ? new Date().toLocaleDateString("es-ES", { weekday: "long", month: "short", day: "numeric" }) : ""}
               </p>
             </div>
@@ -102,7 +102,7 @@ export default function DashboardPage() {
                 </div>
               ) : weeklyUsed ? (
                 <div className="px-3 py-1.5 bg-slate-50 border border-slate-100 rounded-lg opacity-60">
-                  <span className="text-slate-400 text-xs">Comodín usado</span>
+                  <span className="text-slate-400 dark:text-slate-400 text-xs">Comodín usado</span>
                 </div>
               ) : (
                 <button
@@ -119,7 +119,7 @@ export default function DashboardPage() {
 
         {/* Gamification card - Indigo */}
         {gamification && (
-          <Card className="relative overflow-hidden bg-white border-indigo-50 rounded-2xl p-4 shadow-sm">
+          <Card className="relative overflow-hidden bg-white dark:bg-white/10 border-indigo-50 dark:border-white/10 rounded-2xl p-4 shadow-sm">
             <Trophy className="absolute -right-3 -bottom-3 h-16 w-16 text-indigo-500/10 -rotate-12" />
             <div className="relative z-10 space-y-3">
               <LevelBadge status={gamification} />
@@ -132,7 +132,7 @@ export default function DashboardPage() {
                 ].map(({ label, value, color, bg }) => (
                   <div key={label} className={`${bg} rounded-lg py-1.5 px-1 text-center`}>
                     <p className={`text-xs font-bold ${color}`}>+{value}</p>
-                    <p className="text-slate-400 text-[9px] uppercase tracking-tighter">{label}</p>
+                    <p className="text-slate-400 dark:text-slate-400 text-[9px] uppercase tracking-tighter">{label}</p>
                   </div>
                 ))}
               </div>
@@ -173,7 +173,7 @@ export default function DashboardPage() {
           const pct = target > 0 ? Math.min(Math.round((consumed / target) * 100), 100) : 0
 
           return (
-            <Card className="relative overflow-hidden bg-white border-blue-50 rounded-2xl p-4 shadow-sm">
+            <Card className="relative overflow-hidden bg-white dark:bg-white/10 border-blue-50 dark:border-white/10 rounded-2xl p-4 shadow-sm">
               <Target className="absolute -right-3 -bottom-3 h-16 w-16 text-blue-500/10" />
               <div className="relative z-10">
                 <div className="flex items-center justify-between mb-2">
@@ -181,13 +181,13 @@ export default function DashboardPage() {
                     <div className={`p-1.5 rounded-lg bg-blue-50 ${goalColors[gb.goal]}`}>
                       <GoalIcon className="h-4 w-4" />
                     </div>
-                    <span className="font-bold text-slate-800 text-sm">{goalLabels[gb.goal]}</span>
+                    <span className="font-bold text-slate-800 dark:text-white text-sm">{goalLabels[gb.goal]}</span>
                   </div>
                   <span className={`text-[11px] font-bold ${statusColor}`}>{statusText}</span>
                 </div>
 
                 <div className="space-y-2">
-                  <div className="flex justify-between text-[11px] text-slate-500">
+                  <div className="flex justify-between text-[11px] text-slate-500 dark:text-slate-300">
                     <span>Ingesta: {consumed} kcal</span>
                     <span>Meta: {target}</span>
                   </div>
@@ -210,14 +210,14 @@ export default function DashboardPage() {
         })()}
 
         {/* Daily Calories - Orange */}
-        <Card className="relative overflow-hidden bg-white border-orange-50 rounded-2xl p-4 shadow-sm">
+        <Card className="relative overflow-hidden bg-white dark:bg-white/10 border-orange-50 dark:border-white/10 rounded-2xl p-4 shadow-sm">
           <Flame className="absolute -right-2 -top-2 h-16 w-16 text-orange-500/10 rotate-12" />
           <div className="relative z-10 flex flex-col justify-between h-full">
             <div>
-              <p className="text-slate-500 text-[10px] uppercase font-bold tracking-wider mb-1">Calorías Hoy</p>
+              <p className="text-slate-500 dark:text-slate-300 text-[10px] uppercase font-bold tracking-wider mb-1">Calorías Hoy</p>
               <div className="flex items-baseline gap-1">
-                <span className="text-2xl font-black text-slate-800">{dashboard.caloriesConsumed.toLocaleString()}</span>
-                <span className="text-slate-400 text-xs">/ {dashboard.dailyCalorieTarget}</span>
+                <span className="text-2xl font-black text-slate-800 dark:text-white">{dashboard.caloriesConsumed.toLocaleString()}</span>
+                <span className="text-slate-400 dark:text-slate-400 text-xs">/ {dashboard.dailyCalorieTarget}</span>
               </div>
             </div>
             <div className="mt-3">
@@ -235,7 +235,7 @@ export default function DashboardPage() {
         </Card>
 
         {/* Macros - Red/Amber/Blue */}
-        <Card className="relative overflow-hidden bg-white border-slate-100 rounded-2xl p-4 shadow-sm md:col-span-1">
+        <Card className="relative overflow-hidden bg-white dark:bg-white/10 border-slate-100 dark:border-white/10 rounded-2xl p-4 shadow-sm md:col-span-1">
           <div className="flex items-center gap-3">
             <div className="w-20 h-20 shrink-0">
               <ResponsiveContainer width="100%" height="100%">
@@ -255,9 +255,9 @@ export default function DashboardPage() {
                 <div key={m.label} className="flex items-center justify-between text-[11px]">
                   <div className="flex items-center gap-1.5">
                     <div className={`w-1.5 h-1.5 rounded-full ${m.color}`} />
-                    <span className="text-slate-600 font-medium">{m.label}</span>
+                    <span className="text-slate-600 dark:text-slate-300 font-medium">{m.label}</span>
                   </div>
-                  <span className="text-slate-800 font-bold">{m.cur}g</span>
+                  <span className="text-slate-800 dark:text-white font-bold">{m.cur}g</span>
                 </div>
               ))}
             </div>
@@ -265,35 +265,35 @@ export default function DashboardPage() {
         </Card>
 
         {/* Activity & Exercise - Emerald */}
-        <Card className="relative overflow-hidden bg-white border-emerald-50 rounded-2xl p-4 shadow-sm md:col-span-1">
+        <Card className="relative overflow-hidden bg-white dark:bg-white/10 border-emerald-50 dark:border-white/10 rounded-2xl p-4 shadow-sm md:col-span-1">
           <Dumbbell className="absolute -right-3 -top-3 h-16 w-16 text-emerald-500/10" />
           <div className="relative z-10">
-            <p className="text-slate-500 text-[10px] uppercase font-bold tracking-wider mb-2">Actividad</p>
+            <p className="text-slate-500 dark:text-slate-300 text-[10px] uppercase font-bold tracking-wider mb-2">Actividad</p>
             <div className="grid grid-cols-3 gap-2">
               <div className="text-center">
                 <Footprints className="h-4 w-4 text-blue-500 mx-auto mb-1" />
-                <p className="text-xs font-bold text-slate-800">{Math.round(dashboard.steps || 0)}</p>
-                <p className="text-[9px] text-slate-400">pasos</p>
+                <p className="text-xs font-bold text-slate-800 dark:text-white">{Math.round(dashboard.steps || 0)}</p>
+                <p className="text-[9px] text-slate-400 dark:text-slate-400">pasos</p>
               </div>
               <div className="text-center">
                 <Heart className="h-4 w-4 text-rose-500 mx-auto mb-1" />
-                <p className="text-xs font-bold text-slate-800">{Math.round(dashboard.heartRateAvg || 0)}</p>
-                <p className="text-[9px] text-slate-400">bpm</p>
+                <p className="text-xs font-bold text-slate-800 dark:text-white">{Math.round(dashboard.heartRateAvg || 0)}</p>
+                <p className="text-[9px] text-slate-400 dark:text-slate-400">bpm</p>
               </div>
               <div className="text-center">
                 <TrendingUp className="h-4 w-4 text-emerald-500 mx-auto mb-1" />
-                <p className="text-xs font-bold text-slate-800">{dashboard.exerciseYesterday?.minutes || 0}'</p>
-                <p className="text-[9px] text-slate-400">ejer.</p>
+                <p className="text-xs font-bold text-slate-800 dark:text-white">{dashboard.exerciseYesterday?.minutes || 0}'</p>
+                <p className="text-[9px] text-slate-400 dark:text-slate-400">ejer.</p>
               </div>
             </div>
           </div>
         </Card>
 
         {/* Alerts - Amber/Compact */}
-        <Card className="relative overflow-hidden bg-white border-slate-100 rounded-2xl p-4 shadow-sm md:col-span-2 lg:col-span-1">
-          <Bell className="absolute -right-3 -bottom-3 h-16 w-16 text-slate-500/10" />
+        <Card className="relative overflow-hidden bg-white dark:bg-white/10 border-slate-100 dark:border-white/10 rounded-2xl p-4 shadow-sm md:col-span-2 lg:col-span-1">
+          <Bell className="absolute -right-3 -bottom-3 h-16 w-16 text-slate-500 dark:text-slate-300/10" />
           <div className="relative z-10">
-            <p className="text-slate-500 text-[10px] uppercase font-bold tracking-wider mb-2 flex items-center gap-1">
+            <p className="text-slate-500 dark:text-slate-300 text-[10px] uppercase font-bold tracking-wider mb-2 flex items-center gap-1">
               <Bell className="h-3 w-3" /> Pendiente
             </p>
             <div className="space-y-2">
@@ -315,24 +315,24 @@ export default function DashboardPage() {
       {/* Comodín Confirmation Modal - Updated for light theme */}
       {showConfirm && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white border border-emerald-100 rounded-3xl p-6 w-full max-w-sm shadow-xl animate-in zoom-in-95 duration-200">
+          <div className="bg-white dark:bg-white/10 border border-emerald-100 dark:border-white/10 rounded-3xl p-6 w-full max-w-sm shadow-xl animate-in zoom-in-95 duration-200">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 <Star className="h-5 w-5 text-amber-500 fill-amber-500" />
-                <h3 className="text-slate-800 font-bold text-lg">Activar Comodín</h3>
+                <h3 className="text-slate-800 dark:text-white font-bold text-lg">Activar Comodín</h3>
               </div>
-              <button onClick={() => setShowConfirm(false)} className="text-slate-400 hover:text-slate-600">
+              <button onClick={() => setShowConfirm(false)} className="text-slate-400 dark:text-slate-400 hover:text-slate-600 dark:text-slate-300">
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <p className="text-slate-600 text-sm mb-4">
+            <p className="text-slate-600 dark:text-slate-300 text-sm mb-4">
               El límite calórico de hoy se vuelve <span className="text-amber-600 font-bold">flexible</span>.
               Ideal para eventos sociales o días de mayor hambre.
             </p>
             <div className="flex gap-3 mt-6">
               <button
                 onClick={() => setShowConfirm(false)}
-                className="flex-1 px-4 py-2.5 border border-slate-200 rounded-xl text-slate-500 text-sm font-semibold hover:bg-slate-50"
+                className="flex-1 px-4 py-2.5 border border-slate-200 rounded-xl text-slate-500 dark:text-slate-300 text-sm font-semibold hover:bg-slate-50"
               >
                 Cancelar
               </button>

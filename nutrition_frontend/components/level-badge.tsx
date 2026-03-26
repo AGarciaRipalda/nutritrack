@@ -43,10 +43,10 @@ export function LevelBadge({ status, collapsed = false }: LevelBadgeProps) {
         </svg>
       </div>
       <div className="min-w-0">
-        <p className="text-sm font-bold text-white truncate">
+        <p className="text-sm font-bold text-slate-800 dark:text-white truncate">
           Nv. {status.level} — {status.name}
         </p>
-        <p className="text-[10px] text-white/50 font-medium">
+        <p className="text-[10px] text-slate-500 dark:text-white/50 font-medium">
           {status.xp_in_level} / {status.xp_next_level} XP
         </p>
       </div>

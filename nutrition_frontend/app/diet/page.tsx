@@ -45,11 +45,11 @@ const mealIdIcons: Record<string, typeof Coffee> = {
 
 // Colors for each meal type
 const mealColors: Record<string, { bg: string, border: string, text: string, iconBg: string, iconText: string }> = {
-  desayuno:     { bg: "bg-amber-50/40",    border: "border-amber-100",    text: "text-amber-900",    iconBg: "bg-amber-100",    iconText: "text-amber-600" },
-  media_manana: { bg: "bg-orange-50/40",   border: "border-orange-100",   text: "text-orange-900",   iconBg: "bg-orange-100",   iconText: "text-orange-600" },
-  almuerzo:     { bg: "bg-emerald-50/40",  border: "border-emerald-100",  text: "text-emerald-900",  iconBg: "bg-emerald-100",  iconText: "text-emerald-600" },
-  merienda:     { bg: "bg-rose-50/40",     border: "border-rose-100",     text: "text-rose-900",     iconBg: "bg-rose-100",     iconText: "text-rose-600" },
-  cena:         { bg: "bg-indigo-50/40",   border: "border-indigo-100",   text: "text-indigo-900",   iconBg: "bg-indigo-100",   iconText: "text-indigo-600" },
+  desayuno:     { bg: "bg-amber-50/40 dark:bg-amber-950/20",    border: "border-amber-100 dark:border-amber-900/30",    text: "text-amber-900 dark:text-amber-100",    iconBg: "bg-amber-100 dark:bg-amber-900/40",    iconText: "text-amber-600 dark:text-amber-400" },
+  media_manana: { bg: "bg-orange-50/40 dark:bg-orange-950/20",   border: "border-orange-100 dark:border-orange-900/30",   text: "text-orange-900 dark:text-orange-100",   iconBg: "bg-orange-100 dark:bg-orange-900/40",   iconText: "text-orange-600 dark:text-orange-400" },
+  almuerzo:     { bg: "bg-emerald-50/40 dark:bg-emerald-950/20",  border: "border-emerald-100 dark:border-emerald-900/30",  text: "text-emerald-900 dark:text-emerald-100",  iconBg: "bg-emerald-100 dark:bg-emerald-900/40",  iconText: "text-emerald-600 dark:text-emerald-400" },
+  merienda:     { bg: "bg-rose-50/40 dark:bg-rose-950/20",     border: "border-rose-100 dark:border-rose-900/30",     text: "text-rose-900 dark:text-rose-100",     iconBg: "bg-rose-100 dark:bg-rose-900/40",     iconText: "text-rose-600 dark:text-rose-400" },
+  cena:         { bg: "bg-indigo-50/40 dark:bg-indigo-950/20",   border: "border-indigo-100 dark:border-indigo-900/30",   text: "text-indigo-900 dark:text-indigo-100",   iconBg: "bg-indigo-100 dark:bg-indigo-900/40",   iconText: "text-indigo-600 dark:text-indigo-400" },
 }
 
 export default function DietPage() {
@@ -224,11 +224,11 @@ export default function DietPage() {
         )}
 
         {/* Header - Compact */}
-        <Card className="bg-white border-emerald-100 rounded-2xl p-4 shadow-sm">
+        <Card className="bg-white dark:bg-white/10 border-emerald-100 dark:border-white/10 rounded-2xl p-4 shadow-sm">
           <div className="flex items-center justify-between gap-3 mb-3">
             <div>
-              <h2 className="text-xl font-bold text-slate-800">Dieta de hoy</h2>
-              <p className="text-slate-500 text-[10px] font-bold uppercase tracking-wider">
+              <h2 className="text-xl font-bold text-slate-800 dark:text-white">Dieta de hoy</h2>
+              <p className="text-slate-500 dark:text-slate-300 text-[10px] font-bold uppercase tracking-wider">
                 {day.dayName} · {new Date(day.date + "T00:00:00").toLocaleDateString("es-ES", { day: "numeric", month: "short" })}
               </p>
             </div>
@@ -241,7 +241,7 @@ export default function DietPage() {
 
           <div className="space-y-1.5">
             <div className="flex items-center justify-between text-[11px]">
-              <span className="text-slate-500 font-medium">Presupuesto calórico</span>
+              <span className="text-slate-500 dark:text-slate-300 font-medium">Presupuesto calórico</span>
               <span className={`font-bold ${showOverLimit ? "text-rose-600" : "text-emerald-600"}`}>
                 {consumedKcal} / {dailyTarget} kcal
               </span>
@@ -255,7 +255,7 @@ export default function DietPage() {
               />
             </div>
             <div className="flex justify-between text-[10px] font-medium">
-              <span className="text-slate-400">
+              <span className="text-slate-400 dark:text-slate-400">
                 {consumedRemaining >= 0 ? `Quedan ${consumedRemaining} kcal` : `Exceso +${excessKcal} kcal`}
               </span>
               {cheatActive && <span className="text-amber-600 flex items-center gap-1"><Star className="h-2.5 w-2.5 fill-amber-500" /> Comodín</span>}
@@ -298,20 +298,20 @@ export default function DietPage() {
               <Card
                 key={meal.id}
                 className={`relative overflow-hidden border transition-all duration-300 rounded-2xl ${
-                  isSkipped ? "bg-slate-50 border-slate-200 opacity-80" : `${colors.bg} ${colors.border}`
+                  isSkipped ? "bg-slate-50 dark:bg-white/5 border-slate-200 opacity-80" : `${colors.bg} ${colors.border}`
                 } shadow-sm`}
               >
                 {/* Visual context icon */}
-                <MealIcon className={`absolute -right-2 -bottom-2 h-16 w-16 opacity-[0.05] ${isSkipped ? 'text-slate-400' : colors.iconText}`} />
+                <MealIcon className={`absolute -right-2 -bottom-2 h-16 w-16 opacity-[0.05] ${isSkipped ? 'text-slate-400 dark:text-slate-400' : colors.iconText}`} />
 
                 <div className="p-4 relative z-10">
                   <div className="flex items-center gap-3 mb-2">
-                    <div className={`p-2 rounded-xl shrink-0 ${isSkipped ? 'bg-slate-200 text-slate-500' : `${colors.iconBg} ${colors.iconText}`}`}>
+                    <div className={`p-2 rounded-xl shrink-0 ${isSkipped ? 'bg-slate-200 text-slate-500 dark:text-slate-300' : `${colors.iconBg} ${colors.iconText}`}`}>
                       <MealIcon className="h-4 w-4" />
                     </div>
                     <div className="flex-1">
-                      <h3 className={`text-sm font-bold ${isSkipped ? 'text-slate-500 line-through' : colors.text}`}>{label}</h3>
-                      <p className={`text-[10px] font-bold ${isSkipped ? 'text-slate-400' : 'text-slate-500'}`}>{effKcal} kcal</p>
+                      <h3 className={`text-sm font-bold ${isSkipped ? 'text-slate-500 dark:text-slate-300 line-through' : colors.text}`}>{label}</h3>
+                      <p className={`text-[10px] font-bold ${isSkipped ? 'text-slate-400 dark:text-slate-400' : 'text-slate-500 dark:text-slate-300'}`}>{effKcal} kcal</p>
                     </div>
                     <Checkbox
                       checked={isChecked && !isSkipped}
@@ -321,7 +321,7 @@ export default function DietPage() {
                     />
                   </div>
 
-                  <p className={`text-xs leading-relaxed mb-3 font-medium ${isSkipped ? 'text-slate-400 italic' : 'text-slate-700'}`}>
+                  <p className={`text-xs leading-relaxed mb-3 font-medium ${isSkipped ? 'text-slate-400 dark:text-slate-400 italic' : 'text-slate-700 dark:text-slate-200'}`}>
                     {meal.description}
                   </p>
 
@@ -332,14 +332,14 @@ export default function DietPage() {
                       {state.favoriteCarbs.length > 0 && meal.fixedKcal != null && (
                         <div className="flex flex-wrap items-center gap-2">
                           <div className="relative flex-1 min-w-[120px]">
-                            <Wheat className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-slate-400" />
+                            <Wheat className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-slate-400 dark:text-slate-400" />
                             <select
                               value={selCarb?.key ?? ""}
                               onChange={(e) => {
                                 const found = state.favoriteCarbs.find((c) => c.key === e.target.value) ?? null
                                 setMealCarb(meal.id, found)
                               }}
-                              className="w-full bg-white/60 border border-slate-200 rounded-lg pl-7 pr-2 py-1.5 text-[11px] font-bold text-slate-700 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                              className="w-full bg-white dark:bg-white/10/60 border border-slate-200 rounded-lg pl-7 pr-2 py-1.5 text-[11px] font-bold text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-emerald-500"
                             >
                               <option value="">Ajustar carbohidratos...</option>
                               {state.favoriteCarbs.map((c) => (
@@ -357,9 +357,9 @@ export default function DietPage() {
                                    const val = parseInt(e.target.value)
                                    setMealGrams(meal.id, isNaN(val) ? null : val)
                                  }}
-                                 className="w-14 bg-white border border-slate-200 rounded-lg py-1.5 text-center text-[11px] font-black text-emerald-600 focus:outline-none"
+                                 className="w-14 bg-white dark:bg-white/10 border border-slate-200 rounded-lg py-1.5 text-center text-[11px] font-black text-emerald-600 focus:outline-none"
                                />
-                               <span className="text-[10px] font-bold text-slate-400 uppercase">Grams</span>
+                               <span className="text-[10px] font-bold text-slate-400 dark:text-slate-400 uppercase">Grams</span>
                              </div>
                           )}
                         </div>
@@ -369,13 +369,13 @@ export default function DietPage() {
                       <div className="flex gap-2">
                         <button
                           onClick={() => handleSwap(meal.id)}
-                          className="flex-1 bg-white/50 hover:bg-white border border-slate-200 rounded-xl py-1.5 text-[10px] font-bold text-slate-600 transition-colors flex items-center justify-center gap-1"
+                          className="flex-1 bg-white dark:bg-white/10/50 hover:bg-white dark:bg-white/10 border border-slate-200 rounded-xl py-1.5 text-[10px] font-bold text-slate-600 transition-colors flex items-center justify-center gap-1"
                         >
                           <Shuffle className={`h-3 w-3 ${swapping === meal.id ? 'animate-spin' : ''}`} /> Cambiar
                         </button>
                         <button
                           onClick={() => handleSkipMeal(meal.id)}
-                          className="px-3 bg-white/50 hover:bg-rose-50 border border-slate-200 hover:border-rose-100 rounded-xl py-1.5 text-[10px] font-bold text-slate-500 hover:text-rose-600 transition-colors"
+                          className="px-3 bg-white dark:bg-white/10/50 hover:bg-rose-50 border border-slate-200 hover:border-rose-100 rounded-xl py-1.5 text-[10px] font-bold text-slate-500 dark:text-slate-300 hover:text-rose-600 transition-colors"
                         >
                           <Ban className="h-3 w-3" />
                         </button>
@@ -388,7 +388,7 @@ export default function DietPage() {
                     <div className="space-y-2">
                        <div className="flex gap-1.5">
                          <div className="relative flex-1">
-                           <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-slate-400" />
+                           <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-slate-400 dark:text-slate-400" />
                            <input
                              type="text"
                              placeholder="¿Qué has comido?"
@@ -398,10 +398,10 @@ export default function DietPage() {
                                setFoodInput(prev => ({ ...prev, [meal.id]: { name: val, grams: prev[meal.id]?.grams ?? "", kcalPer100g: prev[meal.id]?.kcalPer100g ?? null } }))
                                debouncedFoodSearch(meal.id, val)
                              }}
-                             className="w-full bg-white border border-slate-200 rounded-lg pl-7 pr-2 py-1.5 text-[11px] text-slate-700"
+                             className="w-full bg-white dark:bg-white/10 border border-slate-200 rounded-lg pl-7 pr-2 py-1.5 text-[11px] text-slate-700 dark:text-slate-200"
                            />
                            {foodSuggestions[meal.id]?.length > 0 && (
-                              <div className="absolute z-20 left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg overflow-hidden">
+                              <div className="absolute z-20 left-0 right-0 top-full mt-1 bg-white dark:bg-white/10 border border-slate-200 rounded-lg shadow-lg overflow-hidden">
                                 {foodSuggestions[meal.id].map((item, idx) => (
                                   <button
                                     key={idx}
@@ -409,10 +409,10 @@ export default function DietPage() {
                                       setFoodInput(prev => ({ ...prev, [meal.id]: { name: item.name, grams: prev[meal.id]?.grams ?? "", kcalPer100g: item.kcal_100g } }))
                                       setFoodSuggestions(prev => ({ ...prev, [meal.id]: [] }))
                                     }}
-                                    className="w-full text-left px-3 py-2 text-[10px] hover:bg-slate-50 border-b border-slate-100 last:border-0"
+                                    className="w-full text-left px-3 py-2 text-[10px] hover:bg-slate-50 dark:bg-white/5 border-b border-slate-100 last:border-0"
                                   >
-                                    <span className="font-bold text-slate-700">{item.name}</span>
-                                    <span className="ml-2 text-slate-400">{item.kcal_100g}k/100g</span>
+                                    <span className="font-bold text-slate-700 dark:text-slate-200">{item.name}</span>
+                                    <span className="ml-2 text-slate-400 dark:text-slate-400">{item.kcal_100g}k/100g</span>
                                   </button>
                                 ))}
                               </div>
@@ -423,7 +423,7 @@ export default function DietPage() {
                            placeholder="g"
                            value={foodInput[meal.id]?.grams ?? ""}
                            onChange={(e) => setFoodInput(prev => ({ ...prev, [meal.id]: { name: prev[meal.id]?.name ?? "", grams: e.target.value, kcalPer100g: prev[meal.id]?.kcalPer100g ?? null } }))}
-                           className="w-12 bg-white border border-slate-200 rounded-lg py-1.5 text-center text-[11px]"
+                           className="w-12 bg-white dark:bg-white/10 border border-slate-200 rounded-lg py-1.5 text-center text-[11px]"
                          />
                          <button
                            onClick={() => handleAddFood(meal.id)}
@@ -460,13 +460,13 @@ export default function DietPage() {
       {/* Compensation Modal - Light Theme */}
       {showCompModal && cheatRecord && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white border border-emerald-100 rounded-3xl p-6 w-full max-w-sm shadow-xl">
+          <div className="bg-white dark:bg-white/10 border border-emerald-100 dark:border-white/10 rounded-3xl p-6 w-full max-w-sm shadow-xl">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 <Star className="h-5 w-5 text-amber-500 fill-amber-500" />
-                <h3 className="text-slate-800 font-bold text-lg">Compensar Exceso</h3>
+                <h3 className="text-slate-800 dark:text-white font-bold text-lg">Compensar Exceso</h3>
               </div>
-              <button onClick={() => setShowCompModal(false)} className="text-slate-400 hover:text-slate-600">
+              <button onClick={() => setShowCompModal(false)} className="text-slate-400 dark:text-slate-400 hover:text-slate-600">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -477,7 +477,7 @@ export default function DietPage() {
             <div className="flex gap-3">
               <button
                 onClick={() => { declineCompensation(); setShowCompModal(false) }}
-                className="flex-1 px-4 py-2.5 border border-slate-200 rounded-xl text-slate-500 text-sm font-semibold"
+                className="flex-1 px-4 py-2.5 border border-slate-200 rounded-xl text-slate-500 dark:text-slate-300 text-sm font-semibold"
               >
                 No
               </button>
