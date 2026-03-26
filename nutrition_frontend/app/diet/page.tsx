@@ -287,6 +287,10 @@ export default function DietPage() {
             const effKcal     = state.initialized ? effectiveKcalPerMeal[meal.id] ?? (meal.adjustedKcal ?? meal.kcal) : (meal.adjustedKcal ?? meal.kcal)
             const isSkipped   = !!skippedMeals[meal.id]
             const isChecked   = checkedMeals[meal.id]
+            const hasFoodDropdown =
+              !!searchingFood[meal.id] ||
+              (foodSuggestions[meal.id]?.length ?? 0) > 0 ||
+              (!searchingFood[meal.id] && (foodInput[meal.id]?.name?.trim().length ?? 0) >= 2)
 
             const suggestedGrams = selCarb && meal.fixedKcal != null && meal.targetKcal != null
               ? Math.round(Math.max(meal.targetKcal - meal.fixedKcal, 0) / (selCarb.kcal / 100))
@@ -297,7 +301,7 @@ export default function DietPage() {
                 key={meal.id}
                 className={`relative overflow-visible border transition-all duration-300 rounded-2xl ${
                   isSkipped ? "bg-slate-50 dark:bg-white/5 border-slate-200 opacity-80" : "bg-black/5 dark:bg-white/5 border-black/10 dark:border-white/10"
-                } shadow-sm`}
+                } ${hasFoodDropdown ? "z-40" : "z-0"} shadow-sm`}
               >
                 {/* Visual context icon */}
                 <MealIcon className={`absolute -right-2 -bottom-2 h-16 w-16 opacity-[0.05] ${isSkipped ? 'text-slate-400 dark:text-slate-400' : 'text-emerald-400 dark:text-emerald-400'}`} />
@@ -406,12 +410,12 @@ export default function DietPage() {
                              className="w-full bg-white dark:bg-white/10 border border-slate-200 dark:border-white/10 rounded-lg pl-7 pr-2 py-1.5 text-[11px] text-slate-700 dark:text-foreground/80"
                            />
                            {searchingFood[meal.id] && (
-                             <div className="absolute left-0 right-0 top-full mt-1 z-20 rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-[#111111] px-3 py-2 text-[10px] font-medium text-slate-500 dark:text-foreground/60 shadow-lg">
+                             <div className="absolute left-0 right-0 top-full mt-1 z-50 rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-zinc-950 px-3 py-2 text-[10px] font-medium text-slate-500 dark:text-foreground/60 shadow-2xl">
                                Buscando alimentos...
                              </div>
                            )}
                            {foodSuggestions[meal.id]?.length > 0 && (
-                              <div className="absolute z-20 left-0 right-0 top-full mt-1 bg-white dark:bg-[#111111] border border-slate-200 dark:border-white/10 rounded-lg shadow-lg overflow-hidden">
+                              <div className="absolute z-50 left-0 right-0 top-full mt-1 max-h-56 overflow-y-auto overscroll-contain rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-zinc-950 shadow-2xl">
                                 {foodSuggestions[meal.id].map((item, idx) => (
                                   <button
                                     key={idx}
@@ -419,7 +423,7 @@ export default function DietPage() {
                                       setFoodInput(prev => ({ ...prev, [meal.id]: { name: item.name, grams: prev[meal.id]?.grams ?? "", kcalPer100g: item.kcal_100g } }))
                                       setFoodSuggestions(prev => ({ ...prev, [meal.id]: [] }))
                                     }}
-                                    className="w-full text-left px-3 py-2 text-[10px] hover:bg-slate-50 dark:hover:bg-white/5 border-b border-slate-100 dark:border-white/10 last:border-0"
+                                    className="block w-full bg-white dark:bg-zinc-950 text-left px-3 py-2 text-[10px] hover:bg-slate-50 dark:hover:bg-white/5 border-b border-slate-100 dark:border-white/10 last:border-0"
                                   >
                                     <span className="font-bold text-slate-700 dark:text-foreground/90">{item.name}</span>
                                     <span className="ml-2 text-slate-400 dark:text-foreground/50">{item.kcal_100g}k/100g</span>
@@ -428,7 +432,7 @@ export default function DietPage() {
                               </div>
                            )}
                            {!searchingFood[meal.id] && (foodInput[meal.id]?.name?.trim().length ?? 0) >= 2 && (foodSuggestions[meal.id]?.length ?? 0) === 0 && (
-                             <div className="absolute left-0 right-0 top-full mt-1 z-20 rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-[#111111] px-3 py-2 text-[10px] font-medium text-slate-500 dark:text-foreground/60 shadow-lg">
+                             <div className="absolute left-0 right-0 top-full mt-1 z-50 rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-zinc-950 px-3 py-2 text-[10px] font-medium text-slate-500 dark:text-foreground/60 shadow-2xl">
                                Sin resultados en OpenFoodFacts. Puedes añadirlo manualmente.
                              </div>
                            )}
