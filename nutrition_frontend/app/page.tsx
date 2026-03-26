@@ -55,6 +55,9 @@ export default function DashboardPage() {
 
   const dashboard = data
   const calorieProgress = Math.round((dashboard.caloriesConsumed / dashboard.dailyCalorieTarget) * 100)
+  const activeCaloriesToday = dashboard.activeCalories ?? dashboard.goalBalance.activeKcal ?? 0
+  const activeCaloriesReference = Math.max(dashboard.exerciseYesterday?.caloriesBurned ?? 400, 400)
+  const activeCaloriesProgress = Math.min(Math.round((activeCaloriesToday / activeCaloriesReference) * 100), 100)
 
   const macroData = [
     { name: "Proteínas", value: dashboard.macros.protein.current, color: "#ef4444" },
@@ -85,7 +88,7 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4 max-h-full">
 
         {/* Header - Compact */}
-        <Card className="relative overflow-hidden bg-white dark:bg-white/10 border-emerald-100 dark:border-white/10 rounded-2xl p-4 shadow-sm md:col-span-2 lg:col-span-3">
+        <Card className="relative overflow-hidden bg-white dark:bg-white/[0.05] border-emerald-100 dark:border-white/[0.08] rounded-2xl p-4 shadow-sm md:col-span-2 lg:col-span-3">
           <Activity className="absolute -right-4 -top-4 h-24 w-24 text-emerald-500/5 rotate-12" />
           <div className="flex items-center justify-between gap-2 relative z-10">
             <div>
@@ -119,18 +122,18 @@ export default function DashboardPage() {
 
         {/* Gamification card - Indigo */}
         {gamification && (
-          <Card className="relative overflow-hidden bg-white dark:bg-white/10 border-indigo-50 dark:border-white/10 rounded-2xl p-4 shadow-sm">
+          <Card className="relative overflow-hidden bg-white dark:bg-white/[0.05] border-indigo-50 dark:border-white/[0.08] rounded-2xl p-4 shadow-sm">
             <Trophy className="absolute -right-3 -bottom-3 h-16 w-16 text-indigo-500/10 -rotate-12" />
             <div className="relative z-10 space-y-3">
               <LevelBadge status={gamification} />
               <div className="grid grid-cols-4 gap-2">
                 {[
-                  { label: "Entrenos",   value: gamification.breakdown.training,  color: "text-emerald-600", bg: "bg-emerald-50" },
-                  { label: "Dieta",      value: gamification.breakdown.diet,      color: "text-amber-600",   bg: "bg-amber-50"   },
-                  { label: "Combos",     value: gamification.breakdown.combo,     color: "text-violet-600",  bg: "bg-violet-50"  },
-                  { label: "Rachas",     value: gamification.breakdown.streak,    color: "text-rose-600",    bg: "bg-rose-50"     },
+                  { label: "Entrenos",   value: gamification.breakdown.training,  color: "text-emerald-600 dark:text-emerald-300", bg: "bg-emerald-50 dark:bg-emerald-500/10" },
+                  { label: "Dieta",      value: gamification.breakdown.diet,      color: "text-amber-600 dark:text-amber-300",   bg: "bg-amber-50 dark:bg-amber-500/10"   },
+                  { label: "Combos",     value: gamification.breakdown.combo,     color: "text-violet-600 dark:text-violet-300",  bg: "bg-violet-50 dark:bg-violet-500/10"  },
+                  { label: "Rachas",     value: gamification.breakdown.streak,    color: "text-rose-600 dark:text-rose-300",    bg: "bg-rose-50 dark:bg-rose-500/10"     },
                 ].map(({ label, value, color, bg }) => (
-                  <div key={label} className={`${bg} rounded-lg py-1.5 px-1 text-center`}>
+                  <div key={label} className={`${bg} rounded-lg py-1.5 px-1 text-center border border-black/5 dark:border-white/[0.06]`}>
                     <p className={`text-xs font-bold ${color}`}>+{value}</p>
                     <p className="text-slate-400 dark:text-slate-400 text-[9px] uppercase tracking-tighter">{label}</p>
                   </div>
@@ -173,12 +176,12 @@ export default function DashboardPage() {
           const pct = target > 0 ? Math.min(Math.round((consumed / target) * 100), 100) : 0
 
           return (
-            <Card className="relative overflow-hidden bg-white dark:bg-white/10 border-blue-50 dark:border-white/10 rounded-2xl p-4 shadow-sm">
+            <Card className="relative overflow-hidden bg-white dark:bg-white/[0.05] border-blue-50 dark:border-white/[0.08] rounded-2xl p-4 shadow-sm">
               <Target className="absolute -right-3 -bottom-3 h-16 w-16 text-blue-500/10" />
               <div className="relative z-10">
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
-                    <div className={`p-1.5 rounded-lg bg-blue-50 ${goalColors[gb.goal]}`}>
+                    <div className={`p-1.5 rounded-lg bg-blue-50 dark:bg-blue-500/10 ${goalColors[gb.goal]}`}>
                       <GoalIcon className="h-4 w-4" />
                     </div>
                     <span className="font-bold text-slate-800 dark:text-white text-sm">{goalLabels[gb.goal]}</span>
@@ -191,7 +194,7 @@ export default function DashboardPage() {
                     <span>Ingesta: {consumed} kcal</span>
                     <span>Meta: {target}</span>
                   </div>
-                  <div className="w-full bg-slate-100 rounded-full h-2">
+                  <div className="w-full bg-slate-100 dark:bg-white/[0.08] rounded-full h-2">
                     <div
                       className={`h-2 rounded-full transition-all duration-500 ${onTrack ? 'bg-blue-500' : 'bg-rose-500'}`}
                       style={{ width: `${pct}%` }}
@@ -209,33 +212,38 @@ export default function DashboardPage() {
           )
         })()}
 
-        {/* Daily Calories - Orange */}
-        <Card className="relative overflow-hidden bg-white dark:bg-white/10 border-orange-50 dark:border-white/10 rounded-2xl p-4 shadow-sm">
+        {/* Active Calories - Orange */}
+        <Card className="relative overflow-hidden bg-white dark:bg-white/[0.05] border-orange-50 dark:border-white/[0.08] rounded-2xl p-4 shadow-sm">
           <Flame className="absolute -right-2 -top-2 h-16 w-16 text-orange-500/10 rotate-12" />
           <div className="relative z-10 flex flex-col justify-between h-full">
             <div>
-              <p className="text-slate-500 dark:text-slate-300 text-[10px] uppercase font-bold tracking-wider mb-1">Calorías Hoy</p>
+              <p className="text-slate-500 dark:text-slate-300 text-[10px] uppercase font-bold tracking-wider mb-1">Gasto Activo Hoy</p>
               <div className="flex items-baseline gap-1">
-                <span className="text-2xl font-black text-slate-800 dark:text-white">{dashboard.caloriesConsumed.toLocaleString()}</span>
-                <span className="text-slate-400 dark:text-slate-400 text-xs">/ {dashboard.dailyCalorieTarget}</span>
+                <span className="text-2xl font-black text-slate-800 dark:text-white">{Math.round(activeCaloriesToday).toLocaleString()}</span>
+                <span className="text-slate-400 dark:text-slate-400 text-xs">kcal</span>
               </div>
+              <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+                {dashboard.exerciseYesterday
+                  ? `Referencia ayer: ${dashboard.exerciseYesterday.caloriesBurned} kcal`
+                  : "Calorías activas de movimiento y ejercicio"}
+              </p>
             </div>
             <div className="mt-3">
               <div className="flex justify-between items-center mb-1">
-                 <div className="w-full bg-slate-100 rounded-full h-1.5 flex-1 mr-2">
+                 <div className="w-full bg-slate-100 dark:bg-white/[0.08] rounded-full h-1.5 flex-1 mr-2">
                     <div
                       className="bg-orange-500 h-1.5 rounded-full transition-all duration-500"
-                      style={{ width: `${Math.min(calorieProgress, 100)}%` }}
+                      style={{ width: `${activeCaloriesProgress}%` }}
                     />
                   </div>
-                  <span className="text-orange-600 font-bold text-xs">{calorieProgress}%</span>
+                  <span className="text-orange-600 dark:text-orange-300 font-bold text-xs">{activeCaloriesProgress}%</span>
               </div>
             </div>
           </div>
         </Card>
 
         {/* Macros - Red/Amber/Blue */}
-        <Card className="relative overflow-hidden bg-white dark:bg-white/10 border-slate-100 dark:border-white/10 rounded-2xl p-4 shadow-sm md:col-span-1">
+        <Card className="relative overflow-hidden bg-white dark:bg-white/[0.05] border-slate-100 dark:border-white/[0.08] rounded-2xl p-4 shadow-sm md:col-span-1">
           <div className="flex items-center gap-3">
             <div className="w-20 h-20 shrink-0">
               <ResponsiveContainer width="100%" height="100%">
@@ -265,7 +273,7 @@ export default function DashboardPage() {
         </Card>
 
         {/* Activity & Exercise - Emerald */}
-        <Card className="relative overflow-hidden bg-white dark:bg-white/10 border-emerald-50 dark:border-white/10 rounded-2xl p-4 shadow-sm md:col-span-1">
+        <Card className="relative overflow-hidden bg-white dark:bg-white/[0.05] border-emerald-50 dark:border-white/[0.08] rounded-2xl p-4 shadow-sm md:col-span-1">
           <Dumbbell className="absolute -right-3 -top-3 h-16 w-16 text-emerald-500/10" />
           <div className="relative z-10">
             <p className="text-slate-500 dark:text-slate-300 text-[10px] uppercase font-bold tracking-wider mb-2">Actividad</p>
@@ -290,7 +298,7 @@ export default function DashboardPage() {
         </Card>
 
         {/* Alerts - Amber/Compact */}
-        <Card className="relative overflow-hidden bg-white dark:bg-white/10 border-slate-100 dark:border-white/10 rounded-2xl p-4 shadow-sm md:col-span-2 lg:col-span-1">
+        <Card className="relative overflow-hidden bg-white dark:bg-white/[0.05] border-slate-100 dark:border-white/[0.08] rounded-2xl p-4 shadow-sm md:col-span-2 lg:col-span-1">
           <Bell className="absolute -right-3 -bottom-3 h-16 w-16 text-slate-500 dark:text-slate-300/10" />
           <div className="relative z-10">
             <p className="text-slate-500 dark:text-slate-300 text-[10px] uppercase font-bold tracking-wider mb-2 flex items-center gap-1">
