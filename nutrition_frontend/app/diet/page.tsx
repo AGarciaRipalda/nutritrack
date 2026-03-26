@@ -326,7 +326,7 @@ export default function DietPage() {
               <Card
                 key={meal.id}
                 className={`relative overflow-visible border transition-all duration-300 rounded-2xl ${
-                  isSkipped ? "bg-slate-50 dark:bg-white/5 border-slate-200 opacity-80" : "bg-black/5 dark:bg-white/5 border-black/10 dark:border-white/10"
+                  isSkipped ? "bg-slate-50 dark:bg-zinc-950 border-slate-200 dark:border-white/10" : "bg-black/5 dark:bg-white/5 border-black/10 dark:border-white/10"
                 } ${hasFoodDropdown ? "z-40" : "z-0"} shadow-sm`}
               >
                 {/* Visual context icon */}

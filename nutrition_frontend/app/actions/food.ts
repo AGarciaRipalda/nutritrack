@@ -6,6 +6,21 @@ export interface FoodSearchResult {
   image: string | null
 }
 
+function isSpanishSpainProduct(product: any): boolean {
+  const countryTags = Array.isArray(product.countries_tags) ? product.countries_tags : []
+  const languageTags = Array.isArray(product.languages_tags) ? product.languages_tags : []
+
+  const fromSpain = countryTags.includes("en:spain")
+  const inSpanish =
+    product.lc === "es" ||
+    product.lang === "es" ||
+    typeof product.product_name_es === "string" ||
+    typeof product.generic_name_es === "string" ||
+    languageTags.includes("en:spanish")
+
+  return fromSpain && inSpanish
+}
+
 function parseKcalPer100g(product: any): number | null {
   const kcalFields = [
     product.nutriments?.["energy-kcal_100g"],
@@ -53,7 +68,7 @@ export async function searchFoodAction(query: string): Promise<FoodSearchResult[
   if (normalizedQuery.length < 2) return []
   const params = new URLSearchParams({
     q: normalizedQuery,
-    size: "15",
+    size: "40",
   })
   const url = `https://search.openfoodfacts.org/search?${params.toString()}`
 
@@ -76,6 +91,8 @@ export async function searchFoodAction(query: string): Promise<FoodSearchResult[
     const seen = new Set<string>()
 
     for (const product of data.hits || []) {
+      if (!isSpanishSpainProduct(product)) continue
+
       const name = parseProductName(product)
       const kcal = parseKcalPer100g(product)
 
@@ -90,6 +107,8 @@ export async function searchFoodAction(query: string): Promise<FoodSearchResult[
         kcal_100g: kcal,
         image: product.image_front_small_url || product.image_small_url || product.image_url || null,
       })
+
+      if (results.length >= 15) break
     }
 
     return results
