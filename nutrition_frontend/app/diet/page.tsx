@@ -45,11 +45,11 @@ const mealIdIcons: Record<string, typeof Coffee> = {
 
 // Colors for each meal type
 const mealColors: Record<string, { bg: string, border: string, text: string, iconBg: string, iconText: string }> = {
-  desayuno:     { bg: "bg-amber-50/40 dark:bg-amber-950/20",    border: "border-amber-100 dark:border-amber-900/30",    text: "text-amber-900 dark:text-amber-100",    iconBg: "bg-amber-100 dark:bg-amber-900/40",    iconText: "text-amber-600 dark:text-amber-400" },
-  media_manana: { bg: "bg-orange-50/40 dark:bg-orange-950/20",   border: "border-orange-100 dark:border-orange-900/30",   text: "text-orange-900 dark:text-orange-100",   iconBg: "bg-orange-100 dark:bg-orange-900/40",   iconText: "text-orange-600 dark:text-orange-400" },
-  almuerzo:     { bg: "bg-emerald-50/40 dark:bg-emerald-950/20",  border: "border-emerald-100 dark:border-emerald-900/30",  text: "text-emerald-900 dark:text-emerald-100",  iconBg: "bg-emerald-100 dark:bg-emerald-900/40",  iconText: "text-emerald-600 dark:text-emerald-400" },
-  merienda:     { bg: "bg-rose-50/40 dark:bg-rose-950/20",     border: "border-rose-100 dark:border-rose-900/30",     text: "text-rose-900 dark:text-rose-100",     iconBg: "bg-rose-100 dark:bg-rose-900/40",     iconText: "text-rose-600 dark:text-rose-400" },
-  cena:         { bg: "bg-indigo-50/40 dark:bg-indigo-950/20",   border: "border-indigo-100 dark:border-indigo-900/30",   text: "text-indigo-900 dark:text-indigo-100",   iconBg: "bg-indigo-100 dark:bg-indigo-900/40",   iconText: "text-indigo-600 dark:text-indigo-400" },
+  desayuno:     { bg: "backdrop-blur-xl bg-black/5 dark:bg-white/10",    border: "border-black/20 dark:border-white/20",    text: "text-amber-900 dark:text-amber-100",    iconBg: "bg-amber-100 dark:bg-amber-900/40",    iconText: "text-amber-600 dark:text-amber-400" },
+  media_manana: { bg: "backdrop-blur-xl bg-black/5 dark:bg-white/10",   border: "border-black/20 dark:border-white/20",   text: "text-orange-900 dark:text-orange-100",   iconBg: "bg-orange-100 dark:bg-orange-900/40",   iconText: "text-orange-600 dark:text-orange-400" },
+  almuerzo:     { bg: "backdrop-blur-xl bg-black/5 dark:bg-white/10",  border: "border-black/20 dark:border-white/20",  text: "text-emerald-900 dark:text-emerald-100",  iconBg: "bg-emerald-100 dark:bg-emerald-900/40",  iconText: "text-emerald-600 dark:text-emerald-400" },
+  merienda:     { bg: "backdrop-blur-xl bg-black/5 dark:bg-white/10",     border: "border-black/20 dark:border-white/20",     text: "text-rose-900 dark:text-rose-100",     iconBg: "bg-rose-100 dark:bg-rose-900/40",     iconText: "text-rose-600 dark:text-rose-400" },
+  cena:         { bg: "backdrop-blur-xl bg-black/5 dark:bg-white/10",   border: "border-black/20 dark:border-white/20",   text: "text-indigo-900 dark:text-indigo-100",   iconBg: "bg-indigo-100 dark:bg-indigo-900/40",   iconText: "text-indigo-600 dark:text-indigo-400" },
 }
 
 export default function DietPage() {
