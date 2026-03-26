@@ -318,8 +318,9 @@ export default function DietPage() {
               (foodSuggestions[meal.id]?.length ?? 0) > 0 ||
               (!searchingFood[meal.id] && (foodInput[meal.id]?.name?.trim().length ?? 0) >= 2)
 
-            const suggestedGrams = selCarb && meal.fixedKcal != null && meal.targetKcal != null
-              ? Math.round(Math.max(meal.targetKcal - meal.fixedKcal, 0) / (selCarb.kcal / 100))
+            const mealTargetForCarbs = rebalancedTargets[meal.id] ?? meal.targetKcal ?? meal.adjustedKcal ?? meal.kcal
+            const suggestedGrams = selCarb && meal.fixedKcal != null
+              ? Math.round(Math.max(mealTargetForCarbs - meal.fixedKcal, 0) / (selCarb.kcal / 100))
               : null
 
             return (
