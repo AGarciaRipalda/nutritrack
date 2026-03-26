@@ -371,7 +371,7 @@ export default function SettingsPage() {
                     {preferences.favorites.map((tag) => (
                       <Badge
                         key={tag}
-                        className="bg-emerald-500/20 text-emerald-400 border-emerald-400/30 pr-1"
+                        className="bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 border-emerald-400/30 pr-1"
                       >
                         {tag}
                         <button

@@ -167,7 +167,7 @@ function MealCard({
           {mealDisplayName[meal.id] ?? meal.name}
         </span>
         {meal.kcal > 0 && (
-          <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-400/30 text-xs px-1.5 py-0 shrink-0">
+          <Badge className="bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 border-emerald-400/30 text-xs px-1.5 py-0 shrink-0">
             {meal.kcal} kcal
           </Badge>
         )}
@@ -650,7 +650,7 @@ export default function WeeklyPlanPage() {
                             </span>
                           )}
                           {displayKcal > 0 && (
-                            <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-400/30">
+                            <Badge className="bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 border-emerald-400/30">
                               {displayKcal} kcal
                             </Badge>
                           )}

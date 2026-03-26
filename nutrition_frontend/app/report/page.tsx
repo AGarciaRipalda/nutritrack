@@ -270,7 +270,7 @@ export default function ReportPage() {
                 key={index}
                 className="flex items-start gap-3 p-4 bg-black/5 dark:bg-white/5 rounded-xl border border-black/10 dark:border-white/10"
               >
-                <span className="flex-shrink-0 w-6 h-6 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-sm font-medium">
+                <span className="flex-shrink-0 w-6 h-6 rounded-full bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 flex items-center justify-center text-sm font-medium">
                   {index + 1}
                 </span>
                 <p className="text-foreground/80">{recommendation}</p>
