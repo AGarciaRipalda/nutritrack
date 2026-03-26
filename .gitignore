@@ -1,0 +1,11 @@
+.claude/
+node_modules/
+package-lock.json
+
+# Python
+__pycache__/
+*.py[cod]
+
+# Local env and logs
+.DS_Store
+*.log
