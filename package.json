@@ -1,0 +1,13 @@
+{
+  "name": "metabolic",
+  "private": true,
+  "workspaces": [
+    "nutrition_frontend"
+  ],
+  "scripts": {
+    "build": "npm run build --workspace nutrition_frontend",
+    "dev": "npm run dev --workspace nutrition_frontend",
+    "start": "npm run start --workspace nutrition_frontend",
+    "lint": "npm run lint --workspace nutrition_frontend"
+  }
+}
