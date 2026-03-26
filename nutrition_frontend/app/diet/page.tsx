@@ -12,7 +12,8 @@ import {
   Lightbulb, CheckCircle2, Wheat, Scale, Star, X, Ban, Plus, Search,
 } from "lucide-react"
 import type { PlanDay, FoodSearchResult } from "@/lib/api"
-import { fetchTodaysPlan, swapMeal, updateAdherence, fetchFavoriteCarbs, searchFood } from "@/lib/api"
+import { fetchTodaysPlan, swapMeal, updateAdherence, fetchFavoriteCarbs } from "@/lib/api"
+import { searchFoodAction } from "@/app/actions/food"
 import { useDietDay } from "@/context/DietDayContext"
 import { useCheatDay } from "@/context/CheatDayContext"
 
@@ -45,11 +46,11 @@ const mealIdIcons: Record<string, typeof Coffee> = {
 
 // Colors for each meal type
 const mealColors: Record<string, { bg: string, border: string, text: string, iconBg: string, iconText: string }> = {
-  desayuno:     { bg: "backdrop-blur-xl bg-black/5 dark:bg-white/10",    border: "border-black/20 dark:border-white/20",    text: "text-amber-900 dark:text-amber-100",    iconBg: "bg-amber-100 dark:bg-amber-900/40",    iconText: "text-amber-600 dark:text-amber-400" },
-  media_manana: { bg: "backdrop-blur-xl bg-black/5 dark:bg-white/10",   border: "border-black/20 dark:border-white/20",   text: "text-orange-900 dark:text-orange-100",   iconBg: "bg-orange-100 dark:bg-orange-900/40",   iconText: "text-orange-600 dark:text-orange-400" },
-  almuerzo:     { bg: "backdrop-blur-xl bg-black/5 dark:bg-white/10",  border: "border-black/20 dark:border-white/20",  text: "text-emerald-900 dark:text-emerald-100",  iconBg: "bg-emerald-100 dark:bg-emerald-900/40",  iconText: "text-emerald-600 dark:text-emerald-400" },
-  merienda:     { bg: "backdrop-blur-xl bg-black/5 dark:bg-white/10",     border: "border-black/20 dark:border-white/20",     text: "text-rose-900 dark:text-rose-100",     iconBg: "bg-rose-100 dark:bg-rose-900/40",     iconText: "text-rose-600 dark:text-rose-400" },
-  cena:         { bg: "backdrop-blur-xl bg-black/5 dark:bg-white/10",   border: "border-black/20 dark:border-white/20",   text: "text-indigo-900 dark:text-indigo-100",   iconBg: "bg-indigo-100 dark:bg-indigo-900/40",   iconText: "text-indigo-600 dark:text-indigo-400" },
+  desayuno:     { bg: "bg-black/5 dark:bg-white/5",    border: "border-black/10 dark:border-white/10",    text: "text-amber-700 dark:text-amber-400",    iconBg: "bg-amber-500/20",    iconText: "text-amber-700 dark:text-amber-400" },
+  media_manana: { bg: "bg-black/5 dark:bg-white/5",   border: "border-black/10 dark:border-white/10",   text: "text-orange-700 dark:text-orange-400",   iconBg: "bg-orange-500/20",   iconText: "text-orange-700 dark:text-orange-400" },
+  almuerzo:     { bg: "bg-black/5 dark:bg-white/5",  border: "border-black/10 dark:border-white/10",  text: "text-emerald-700 dark:text-emerald-400",  iconBg: "bg-emerald-500/20",  iconText: "text-emerald-700 dark:text-emerald-400" },
+  merienda:     { bg: "bg-black/5 dark:bg-white/5",     border: "border-black/10 dark:border-white/10",     text: "text-rose-700 dark:text-rose-400",     iconBg: "bg-rose-500/20",     iconText: "text-rose-700 dark:text-rose-400" },
+  cena:         { bg: "bg-black/5 dark:bg-white/5",   border: "border-black/10 dark:border-white/10",   text: "text-indigo-700 dark:text-indigo-400",   iconBg: "bg-indigo-500/20",   iconText: "text-indigo-700 dark:text-indigo-400" },
 }
 
 export default function DietPage() {
@@ -77,7 +78,7 @@ export default function DietPage() {
     searchTimers.current[mealId] = setTimeout(async () => {
       setSearchingFood((prev) => ({ ...prev, [mealId]: true }))
       try {
-        const results = await searchFood(query)
+        const results = await searchFoodAction(query)
         setFoodSuggestions((prev) => ({ ...prev, [mealId]: results }))
       } catch {
         setFoodSuggestions((prev) => ({ ...prev, [mealId]: [] }))
