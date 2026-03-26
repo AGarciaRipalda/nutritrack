@@ -50,13 +50,13 @@ function SidebarContent({ collapsed, onToggleCollapse, onClose, showClose }: Sid
 
   return (
     <Card
-      className={`backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl flex flex-col transition-all duration-300 ${
+      className={`backdrop-blur-xl bg-white/10 dark:bg-white/10 border border-gray-200 dark:border-white/20 rounded-3xl flex flex-col transition-all duration-300 ${
         collapsed ? "w-16 p-3" : "w-64 p-5"
       }`}
     >
       {/* Header row */}
       <div
-        className={`pb-4 border-b border-white/10 flex items-center ${
+        className={`pb-4 border-b border-gray-200 dark:border-white/10 flex items-center ${
           collapsed ? "justify-center" : "justify-between"
         }`}
       >
@@ -66,20 +66,20 @@ function SidebarContent({ collapsed, onToggleCollapse, onClose, showClose }: Sid
           <div className="flex items-center gap-2 min-w-0">
             <Apple className="h-7 w-7 text-emerald-400 shrink-0" />
             <div className="min-w-0">
-              <h1 className="text-xl font-bold text-white leading-tight">METABOLIC</h1>
-              <p className="text-white/60 text-xs truncate">Nutrición y Entrenamiento</p>
+              <h1 className="text-xl font-bold text-gray-900 dark:text-white leading-tight">METABOLIC</h1>
+              <p className="text-gray-500 dark:text-white/60 text-xs truncate">Nutrición y Entrenamiento</p>
             </div>
           </div>
         )}
 
         {showClose ? (
-          <button onClick={onClose} className="text-white/60 hover:text-white p-1 ml-2 shrink-0">
+          <button onClick={onClose} className="text-gray-500 dark:text-white/60 hover:text-gray-900 dark:hover:text-white p-1 ml-2 shrink-0">
             <X className="h-5 w-5" />
           </button>
         ) : (
           <button
             onClick={onToggleCollapse}
-            className="text-white/60 hover:text-white p-1 shrink-0 hidden md:block"
+            className="text-gray-500 dark:text-white/60 hover:text-gray-900 dark:hover:text-white p-1 shrink-0 hidden md:block"
             aria-label={collapsed ? "Expandir menú" : "Contraer menú"}
           >
             {collapsed ? (
@@ -106,9 +106,9 @@ function SidebarContent({ collapsed, onToggleCollapse, onClose, showClose }: Sid
             <Button
               key={item.href}
               variant="ghost"
-              className={`w-full text-white/80 hover:bg-white/10 hover:text-white transition-all duration-300 h-11 ${
+              className={`w-full text-gray-700 dark:text-white/80 hover:bg-gray-100 dark:hover:bg-white/10 hover:text-gray-900 dark:hover:text-white transition-all duration-300 h-11 ${
                 collapsed ? "justify-center px-2" : "justify-start"
-              } ${isActive ? "bg-white/20 text-white border border-white/30" : ""}`}
+              } ${isActive ? "bg-gray-200 dark:bg-white/20 text-gray-900 dark:text-white border border-gray-300 dark:border-white/30" : ""}`}
               asChild
               onClick={onClose}
             >
@@ -122,7 +122,7 @@ function SidebarContent({ collapsed, onToggleCollapse, onClose, showClose }: Sid
       </nav>
 
       {/* Theme toggle */}
-      <div className="mt-auto pt-4 border-t border-white/10">
+      <div className="mt-auto pt-4 border-t border-gray-200 dark:border-white/10">
         <ThemeToggle collapsed={collapsed} />
       </div>
     </Card>
