@@ -70,21 +70,28 @@ from training import (
 from gamification import gamification_status
 
 # ── Training 2.0 modules ────────────────────────────────────────────────────
-from exercise_library import (
-    EXERCISE_LIBRARY, search_exercises, get_exercise as lib_get_exercise,
-    list_muscles, list_equipment,
-)
-from workout_store import (
-    list_routines, get_routine, create_routine, update_routine, delete_routine,
-    start_workout, get_active_workout, get_workout,
-    add_exercise_to_workout, remove_exercise_from_workout,
-    update_set, add_set, delete_set,
-    finish_workout, discard_workout, list_workouts, get_workout_history,
-)
-from pr_tracker import (
-    get_exercise_stats, get_muscle_volume, get_weekly_stats,
-    get_calendar, get_recent_prs,
-)
+_TRAINING_V2_AVAILABLE = False
+try:
+    from exercise_library import (
+        EXERCISE_LIBRARY, search_exercises, get_exercise as lib_get_exercise,
+        list_muscles, list_equipment,
+    )
+    from workout_store import (
+        list_routines, get_routine, create_routine, update_routine, delete_routine,
+        start_workout, get_active_workout, get_workout,
+        add_exercise_to_workout, remove_exercise_from_workout,
+        update_set, add_set, delete_set,
+        finish_workout, discard_workout, list_workouts, get_workout_history,
+    )
+    from pr_tracker import (
+        get_exercise_stats, get_muscle_volume, get_weekly_stats,
+        get_calendar, get_recent_prs,
+    )
+    _TRAINING_V2_AVAILABLE = True
+except ImportError as e:
+    import traceback
+    print(f"[WARNING] Training 2.0 modules not available: {e}")
+    traceback.print_exc()
 from pdf_export import export_week_plan_pdf
 
 # ── App ───────────────────────────────────────────────────────────────────────
@@ -1637,36 +1644,7 @@ def search_food(q: str = Query(..., min_length=2, description="Nombre del alimen
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# TRAINING 2.0 — Exercise Library
-# ══════════════════════════════════════════════════════════════════════════════
-
-@app.get("/v2/training/muscles", tags=["Training 2.0"])
-async def v2_list_muscles():
-    return list_muscles()
-
-
-@app.get("/v2/training/equipment", tags=["Training 2.0"])
-async def v2_list_equipment():
-    return list_equipment()
-
-
-@app.get("/v2/training/exercises", tags=["Training 2.0"])
-async def v2_search_exercises(
-    q: str = "", muscle: str = "", equipment: str = "", category: str = "",
-):
-    return search_exercises(query=q, muscle=muscle, equipment=equipment, category=category)
-
-
-@app.get("/v2/training/exercises/{exercise_id}", tags=["Training 2.0"])
-async def v2_get_exercise(exercise_id: str):
-    ex = lib_get_exercise(exercise_id)
-    if not ex:
-        raise HTTPException(404, f"Exercise '{exercise_id}' not found")
-    return ex
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-# TRAINING 2.0 — Routines
+# TRAINING 2.0 — Pydantic models (always available)
 # ══════════════════════════════════════════════════════════════════════════════
 
 class RoutineCreateModel(BaseModel):
@@ -1680,46 +1658,6 @@ class RoutineUpdateModel(BaseModel):
     description: Optional[str] = None
     days: Optional[list] = None
 
-
-@app.get("/v2/training/routines", tags=["Training 2.0"])
-async def v2_list_routines():
-    return list_routines()
-
-
-@app.get("/v2/training/routines/{routine_id}", tags=["Training 2.0"])
-async def v2_get_routine(routine_id: str):
-    try:
-        return get_routine(routine_id)
-    except KeyError as e:
-        raise HTTPException(404, str(e))
-
-
-@app.post("/v2/training/routines", tags=["Training 2.0"])
-async def v2_create_routine(body: RoutineCreateModel):
-    return create_routine(body.model_dump())
-
-
-@app.put("/v2/training/routines/{routine_id}", tags=["Training 2.0"])
-async def v2_update_routine(routine_id: str, body: RoutineUpdateModel):
-    data = {k: v for k, v in body.model_dump().items() if v is not None}
-    try:
-        return update_routine(routine_id, data)
-    except KeyError as e:
-        raise HTTPException(404, str(e))
-
-
-@app.delete("/v2/training/routines/{routine_id}", tags=["Training 2.0"])
-async def v2_delete_routine(routine_id: str):
-    try:
-        delete_routine(routine_id)
-        return {"ok": True}
-    except KeyError as e:
-        raise HTTPException(404, str(e))
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-# TRAINING 2.0 — Workouts (live session)
-# ══════════════════════════════════════════════════════════════════════════════
 
 class WorkoutStartModel(BaseModel):
     routine_id: Optional[str] = None
@@ -1745,138 +1683,189 @@ class WorkoutFinishModel(BaseModel):
     notes: Optional[str] = ""
 
 
-@app.post("/v2/training/workouts", tags=["Training 2.0"])
-async def v2_start_workout(body: WorkoutStartModel):
-    try:
-        return start_workout(
-            routine_id=body.routine_id,
-            routine_day_id=body.routine_day_id,
-            name=body.name,
-            training_block=body.training_block,
-        )
-    except KeyError as e:
-        raise HTTPException(404, str(e))
+if _TRAINING_V2_AVAILABLE:
 
+    # ══════════════════════════════════════════════════════════════════════════
+    # TRAINING 2.0 — Exercise Library
+    # ══════════════════════════════════════════════════════════════════════════
 
-@app.get("/v2/training/workouts/active", tags=["Training 2.0"])
-async def v2_get_active_workout():
-    w = get_active_workout()
-    if not w:
-        raise HTTPException(404, "No active workout")
-    return w
+    @app.get("/v2/training/muscles", tags=["Training 2.0"])
+    async def v2_list_muscles():
+        return list_muscles()
 
+    @app.get("/v2/training/equipment", tags=["Training 2.0"])
+    async def v2_list_equipment():
+        return list_equipment()
 
-@app.get("/v2/training/workouts", tags=["Training 2.0"])
-async def v2_list_workouts(limit: int = 20, offset: int = 0):
-    return list_workouts(limit=limit, offset=offset)
+    @app.get("/v2/training/exercises", tags=["Training 2.0"])
+    async def v2_search_exercises(
+        q: str = "", muscle: str = "", equipment: str = "", category: str = "",
+    ):
+        return search_exercises(query=q, muscle=muscle, equipment=equipment, category=category)
 
+    @app.get("/v2/training/exercises/{exercise_id}", tags=["Training 2.0"])
+    async def v2_get_exercise(exercise_id: str):
+        ex = lib_get_exercise(exercise_id)
+        if not ex:
+            raise HTTPException(404, f"Exercise '{exercise_id}' not found")
+        return ex
 
-@app.get("/v2/training/workouts/{workout_id}", tags=["Training 2.0"])
-async def v2_get_workout(workout_id: str):
-    try:
-        return get_workout(workout_id)
-    except KeyError as e:
-        raise HTTPException(404, str(e))
+    # ══════════════════════════════════════════════════════════════════════════
+    # TRAINING 2.0 — Routines
+    # ══════════════════════════════════════════════════════════════════════════
 
+    @app.get("/v2/training/routines", tags=["Training 2.0"])
+    async def v2_list_routines():
+        return list_routines()
 
-@app.post("/v2/training/workouts/{workout_id}/exercises", tags=["Training 2.0"])
-async def v2_add_exercise(workout_id: str, body: WorkoutAddExerciseModel):
-    try:
-        return add_exercise_to_workout(workout_id, body.exercise_id)
-    except KeyError as e:
-        raise HTTPException(404, str(e))
-    except ValueError as e:
-        raise HTTPException(400, str(e))
+    @app.get("/v2/training/routines/{routine_id}", tags=["Training 2.0"])
+    async def v2_get_routine(routine_id: str):
+        try:
+            return get_routine(routine_id)
+        except KeyError as e:
+            raise HTTPException(404, str(e))
 
+    @app.post("/v2/training/routines", tags=["Training 2.0"])
+    async def v2_create_routine(body: RoutineCreateModel):
+        return create_routine(body.model_dump())
 
-@app.delete("/v2/training/workouts/{workout_id}/exercises/{exercise_entry_id}", tags=["Training 2.0"])
-async def v2_remove_exercise(workout_id: str, exercise_entry_id: str):
-    try:
-        remove_exercise_from_workout(workout_id, exercise_entry_id)
-        return {"ok": True}
-    except KeyError as e:
-        raise HTTPException(404, str(e))
-    except ValueError as e:
-        raise HTTPException(400, str(e))
+    @app.put("/v2/training/routines/{routine_id}", tags=["Training 2.0"])
+    async def v2_update_routine(routine_id: str, body: RoutineUpdateModel):
+        data = {k: v for k, v in body.model_dump().items() if v is not None}
+        try:
+            return update_routine(routine_id, data)
+        except KeyError as e:
+            raise HTTPException(404, str(e))
 
+    @app.delete("/v2/training/routines/{routine_id}", tags=["Training 2.0"])
+    async def v2_delete_routine(routine_id: str):
+        try:
+            delete_routine(routine_id)
+            return {"ok": True}
+        except KeyError as e:
+            raise HTTPException(404, str(e))
 
-@app.post("/v2/training/workouts/{workout_id}/exercises/{exercise_entry_id}/sets", tags=["Training 2.0"])
-async def v2_add_set(workout_id: str, exercise_entry_id: str):
-    try:
-        return add_set(workout_id, exercise_entry_id)
-    except KeyError as e:
-        raise HTTPException(404, str(e))
-    except ValueError as e:
-        raise HTTPException(400, str(e))
+    # ══════════════════════════════════════════════════════════════════════════
+    # TRAINING 2.0 — Workouts (live session)
+    # ══════════════════════════════════════════════════════════════════════════
 
+    @app.post("/v2/training/workouts", tags=["Training 2.0"])
+    async def v2_start_workout(body: WorkoutStartModel):
+        try:
+            return start_workout(
+                routine_id=body.routine_id,
+                routine_day_id=body.routine_day_id,
+                name=body.name,
+                training_block=body.training_block,
+            )
+        except KeyError as e:
+            raise HTTPException(404, str(e))
 
-@app.put("/v2/training/workouts/{workout_id}/exercises/{exercise_entry_id}/sets/{set_id}", tags=["Training 2.0"])
-async def v2_update_set(workout_id: str, exercise_entry_id: str, set_id: str, body: WorkoutUpdateSetModel):
-    data = {k: v for k, v in body.model_dump().items() if v is not None}
-    try:
-        return update_set(workout_id, exercise_entry_id, set_id, data)
-    except KeyError as e:
-        raise HTTPException(404, str(e))
-    except ValueError as e:
-        raise HTTPException(400, str(e))
+    @app.get("/v2/training/workouts/active", tags=["Training 2.0"])
+    async def v2_get_active_workout():
+        w = get_active_workout()
+        if not w:
+            raise HTTPException(404, "No active workout")
+        return w
 
+    @app.get("/v2/training/workouts", tags=["Training 2.0"])
+    async def v2_list_workouts(limit: int = 20, offset: int = 0):
+        return list_workouts(limit=limit, offset=offset)
 
-@app.delete("/v2/training/workouts/{workout_id}/exercises/{exercise_entry_id}/sets/{set_id}", tags=["Training 2.0"])
-async def v2_delete_set(workout_id: str, exercise_entry_id: str, set_id: str):
-    try:
-        delete_set(workout_id, exercise_entry_id, set_id)
-        return {"ok": True}
-    except KeyError as e:
-        raise HTTPException(404, str(e))
-    except ValueError as e:
-        raise HTTPException(400, str(e))
+    @app.get("/v2/training/workouts/{workout_id}", tags=["Training 2.0"])
+    async def v2_get_workout(workout_id: str):
+        try:
+            return get_workout(workout_id)
+        except KeyError as e:
+            raise HTTPException(404, str(e))
 
+    @app.post("/v2/training/workouts/{workout_id}/exercises", tags=["Training 2.0"])
+    async def v2_add_exercise(workout_id: str, body: WorkoutAddExerciseModel):
+        try:
+            return add_exercise_to_workout(workout_id, body.exercise_id)
+        except KeyError as e:
+            raise HTTPException(404, str(e))
+        except ValueError as e:
+            raise HTTPException(400, str(e))
 
-@app.post("/v2/training/workouts/{workout_id}/finish", tags=["Training 2.0"])
-async def v2_finish_workout(workout_id: str, body: WorkoutFinishModel):
-    try:
-        return finish_workout(workout_id, notes=body.notes or "")
-    except KeyError as e:
-        raise HTTPException(404, str(e))
-    except ValueError as e:
-        raise HTTPException(400, str(e))
+    @app.delete("/v2/training/workouts/{workout_id}/exercises/{exercise_entry_id}", tags=["Training 2.0"])
+    async def v2_remove_exercise(workout_id: str, exercise_entry_id: str):
+        try:
+            remove_exercise_from_workout(workout_id, exercise_entry_id)
+            return {"ok": True}
+        except KeyError as e:
+            raise HTTPException(404, str(e))
+        except ValueError as e:
+            raise HTTPException(400, str(e))
 
+    @app.post("/v2/training/workouts/{workout_id}/exercises/{exercise_entry_id}/sets", tags=["Training 2.0"])
+    async def v2_add_set(workout_id: str, exercise_entry_id: str):
+        try:
+            return add_set(workout_id, exercise_entry_id)
+        except KeyError as e:
+            raise HTTPException(404, str(e))
+        except ValueError as e:
+            raise HTTPException(400, str(e))
 
-@app.post("/v2/training/workouts/{workout_id}/discard", tags=["Training 2.0"])
-async def v2_discard_workout(workout_id: str):
-    try:
-        discard_workout(workout_id)
-        return {"ok": True}
-    except KeyError as e:
-        raise HTTPException(404, str(e))
-    except ValueError as e:
-        raise HTTPException(400, str(e))
+    @app.put("/v2/training/workouts/{workout_id}/exercises/{exercise_entry_id}/sets/{set_id}", tags=["Training 2.0"])
+    async def v2_update_set(workout_id: str, exercise_entry_id: str, set_id: str, body: WorkoutUpdateSetModel):
+        data = {k: v for k, v in body.model_dump().items() if v is not None}
+        try:
+            return update_set(workout_id, exercise_entry_id, set_id, data)
+        except KeyError as e:
+            raise HTTPException(404, str(e))
+        except ValueError as e:
+            raise HTTPException(400, str(e))
 
+    @app.delete("/v2/training/workouts/{workout_id}/exercises/{exercise_entry_id}/sets/{set_id}", tags=["Training 2.0"])
+    async def v2_delete_set(workout_id: str, exercise_entry_id: str, set_id: str):
+        try:
+            delete_set(workout_id, exercise_entry_id, set_id)
+            return {"ok": True}
+        except KeyError as e:
+            raise HTTPException(404, str(e))
+        except ValueError as e:
+            raise HTTPException(400, str(e))
 
-# ══════════════════════════════════════════════════════════════════════════════
-# TRAINING 2.0 — Analytics
-# ══════════════════════════════════════════════════════════════════════════════
+    @app.post("/v2/training/workouts/{workout_id}/finish", tags=["Training 2.0"])
+    async def v2_finish_workout(workout_id: str, body: WorkoutFinishModel):
+        try:
+            return finish_workout(workout_id, notes=body.notes or "")
+        except KeyError as e:
+            raise HTTPException(404, str(e))
+        except ValueError as e:
+            raise HTTPException(400, str(e))
 
-@app.get("/v2/training/analytics/exercise/{exercise_id}", tags=["Training 2.0"])
-async def v2_exercise_stats(exercise_id: str):
-    return get_exercise_stats(exercise_id)
+    @app.post("/v2/training/workouts/{workout_id}/discard", tags=["Training 2.0"])
+    async def v2_discard_workout(workout_id: str):
+        try:
+            discard_workout(workout_id)
+            return {"ok": True}
+        except KeyError as e:
+            raise HTTPException(404, str(e))
+        except ValueError as e:
+            raise HTTPException(400, str(e))
 
+    # ══════════════════════════════════════════════════════════════════════════
+    # TRAINING 2.0 — Analytics
+    # ══════════════════════════════════════════════════════════════════════════
 
-@app.get("/v2/training/analytics/muscle-volume", tags=["Training 2.0"])
-async def v2_muscle_volume(days: int = 7):
-    return get_muscle_volume(days=days)
+    @app.get("/v2/training/analytics/exercise/{exercise_id}", tags=["Training 2.0"])
+    async def v2_exercise_stats(exercise_id: str):
+        return get_exercise_stats(exercise_id)
 
+    @app.get("/v2/training/analytics/muscle-volume", tags=["Training 2.0"])
+    async def v2_muscle_volume(days: int = 7):
+        return get_muscle_volume(days=days)
 
-@app.get("/v2/training/analytics/weekly", tags=["Training 2.0"])
-async def v2_weekly_stats(weeks: int = 4):
-    return get_weekly_stats(weeks=weeks)
+    @app.get("/v2/training/analytics/weekly", tags=["Training 2.0"])
+    async def v2_weekly_stats(weeks: int = 4):
+        return get_weekly_stats(weeks=weeks)
 
+    @app.get("/v2/training/analytics/calendar", tags=["Training 2.0"])
+    async def v2_calendar(year: int = 2026, month: int = 3):
+        return get_calendar(year=year, month=month)
 
-@app.get("/v2/training/analytics/calendar", tags=["Training 2.0"])
-async def v2_calendar(year: int = 2026, month: int = 3):
-    return get_calendar(year=year, month=month)
-
-
-@app.get("/v2/training/analytics/prs", tags=["Training 2.0"])
-async def v2_recent_prs(limit: int = 20):
-    return get_recent_prs(limit=limit)
+    @app.get("/v2/training/analytics/prs", tags=["Training 2.0"])
+    async def v2_recent_prs(limit: int = 20):
+        return get_recent_prs(limit=limit)
