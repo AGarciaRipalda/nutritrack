@@ -21,6 +21,22 @@ function isSpanishSpainProduct(product: any): boolean {
   return fromSpain && inSpanish
 }
 
+function isFromSpain(product: any): boolean {
+  const countryTags = Array.isArray(product.countries_tags) ? product.countries_tags : []
+  return countryTags.includes("en:spain")
+}
+
+function isInSpanish(product: any): boolean {
+  const languageTags = Array.isArray(product.languages_tags) ? product.languages_tags : []
+  return (
+    product.lc === "es" ||
+    product.lang === "es" ||
+    typeof product.product_name_es === "string" ||
+    typeof product.generic_name_es === "string" ||
+    languageTags.includes("en:spanish")
+  )
+}
+
 function parseKcalPer100g(product: any): number | null {
   const kcalFields = [
     product.nutriments?.["energy-kcal_100g"],
@@ -89,24 +105,34 @@ export async function searchFoodAction(query: string): Promise<FoodSearchResult[
     const data = await res.json()
     const results: FoodSearchResult[] = []
     const seen = new Set<string>()
+    const priorityGroups = [
+      (product: any) => isSpanishSpainProduct(product),
+      (product: any) => isInSpanish(product),
+      (product: any) => isFromSpain(product),
+      (_product: any) => true,
+    ]
 
-    for (const product of data.hits || []) {
-      if (!isSpanishSpainProduct(product)) continue
+    for (const matchesGroup of priorityGroups) {
+      for (const product of data.hits || []) {
+        if (!matchesGroup(product)) continue
 
-      const name = parseProductName(product)
-      const kcal = parseKcalPer100g(product)
+        const name = parseProductName(product)
+        const kcal = parseKcalPer100g(product)
 
-      if (!name || kcal === null) continue
+        if (!name || kcal === null) continue
 
-      const dedupeKey = `${name.toLowerCase()}-${kcal}`
-      if (seen.has(dedupeKey)) continue
-      seen.add(dedupeKey)
+        const dedupeKey = `${name.toLowerCase()}-${kcal}`
+        if (seen.has(dedupeKey)) continue
+        seen.add(dedupeKey)
 
-      results.push({
-        name,
-        kcal_100g: kcal,
-        image: product.image_front_small_url || product.image_small_url || product.image_url || null,
-      })
+        results.push({
+          name,
+          kcal_100g: kcal,
+          image: product.image_front_small_url || product.image_small_url || product.image_url || null,
+        })
+
+        if (results.length >= 15) break
+      }
 
       if (results.length >= 15) break
     }
