@@ -353,6 +353,9 @@ export default function DietPage() {
             const selCarb     = override?.selectedCarb ?? null
             const customG     = override?.customGrams ?? null
             const effKcal     = state.initialized ? effectiveKcalPerMeal[meal.id] ?? (meal.adjustedKcal ?? meal.kcal) : (meal.adjustedKcal ?? meal.kcal)
+            const baseKcal    = meal.adjustedKcal ?? meal.targetKcal ?? meal.kcal
+            const kcalDelta   = effKcal - baseKcal
+            const hasKcalDelta = Math.abs(kcalDelta) >= 5
             const displayedDescription = renderAdjustedDescription(meal, effKcal, selCarb?.name ?? null, selCarb?.kcal ?? null)
             const isSkipped   = !!skippedMeals[meal.id]
             const isChecked   = checkedMeals[meal.id]
@@ -381,6 +384,15 @@ export default function DietPage() {
                     <MealIcon className={`h-4 w-4 shrink-0 ${isSkipped ? 'text-slate-400 dark:text-slate-400' : 'text-emerald-400 dark:text-emerald-400'}`} />
                     <div className="flex-1">
                       <h3 className={`text-sm font-semibold ${isSkipped ? 'text-slate-500 dark:text-slate-300 line-through' : 'text-foreground dark:text-foreground'}`}>{label}</h3>
+                      {!isSkipped && hasKcalDelta && (
+                        <p className={`mt-0.5 text-[10px] font-bold ${
+                          kcalDelta > 0
+                            ? "text-emerald-600 dark:text-emerald-300"
+                            : "text-amber-600 dark:text-amber-300"
+                        }`}>
+                          {kcalDelta > 0 ? `+${kcalDelta}` : kcalDelta} kcal reajustadas
+                        </p>
+                      )}
                     </div>
                     <Badge className={`${isSkipped ? "bg-slate-200 border-slate-300 text-slate-500 dark:text-slate-300" : "bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 border-emerald-400/30"} text-xs px-1.5 py-0 shrink-0`}>
                       {effKcal} kcal
@@ -396,6 +408,18 @@ export default function DietPage() {
                   <p className={`text-xs leading-snug mb-3 ${isSkipped ? 'text-slate-400 dark:text-slate-400 italic' : 'text-slate-700 dark:text-foreground/80'}`}>
                     {displayedDescription}
                   </p>
+
+                  {!isSkipped && hasKcalDelta && (
+                    <div className={`mb-3 rounded-lg border px-2.5 py-1.5 text-[10px] font-medium ${
+                      kcalDelta > 0
+                        ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-400/20 dark:bg-emerald-500/10 dark:text-emerald-300"
+                        : "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-400/20 dark:bg-amber-500/10 dark:text-amber-300"
+                    }`}>
+                      {kcalDelta > 0
+                        ? "Se han subido los carbohidratos de esta comida para compensar el entreno."
+                        : "Esta comida ha bajado para compensar el ajuste de carbohidratos en otra franja del día."}
+                    </div>
+                  )}
 
                   {meal.note && !isSkipped && (
                     <div className="flex items-start gap-1 mt-0.5 mb-3">
