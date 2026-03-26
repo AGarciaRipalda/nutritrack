@@ -1,14 +1,7 @@
 import type React from "react"
 import type { Metadata } from "next"
-import { Figtree } from "next/font/google"
 import "./globals.css"
 import { Providers } from "./providers"
-
-const figtree = Figtree({
-  subsets: ["latin"],
-  display: "swap",
-  variable: "--font-figtree",
-})
 
 export const metadata: Metadata = {
   title: "METABOLIC - Nutrition & Training Assistant",
@@ -21,7 +14,7 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en" className={`${figtree.variable} antialiased`} suppressHydrationWarning>
+    <html lang="en" className="antialiased" suppressHydrationWarning>
       <body className="font-sans"><Providers>{children}</Providers></body>
     </html>
   )

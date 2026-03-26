@@ -1,0 +1,6 @@
+{
+    "appId": "com.nutritrack.app",
+    "appName": "NutriTrack",
+    "webDir": "out",
+    "server": {}
+}
