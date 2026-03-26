@@ -39,6 +39,25 @@ import {
 import type { TrainingData, ExerciseRoutine, ExerciseImpact, GymHistoryData, TrainingBlock, TodayTrainingData } from "@/lib/api"
 import { fetchTraining, logExerciseForDate, generateRoutine, deleteExerciseByDate, fetchGymHistory, logTodayTraining, saveStoredTodayTraining } from "@/lib/api"
 
+// ── Training 2.0 imports ────────────────────────────────────────────────────
+import type { Routine, Workout, WorkoutSet, LibraryExercise, MuscleVolumeData, PRRecord, TrainingCalendarDay, ExerciseStats } from "@/lib/workout-types"
+import {
+  listRoutines, createRoutine, updateRoutine, deleteRoutine as apiDeleteRoutine,
+  startWorkout, getActiveWorkout, addExerciseToWorkout, removeExerciseFromWorkout,
+  addSet as apiAddSet, updateSet as apiUpdateSet, deleteSet as apiDeleteSet,
+  finishWorkout, discardWorkout, listWorkouts,
+  getMuscleVolume, getRecentPRs, getCalendarData, getExerciseStats,
+} from "@/lib/workout-api"
+import ExercisePicker from "@/components/training/exercise-picker"
+import RoutineEditor from "@/components/training/routine-editor"
+import RoutineCard from "@/components/training/routine-card"
+import LiveWorkout from "@/components/training/live-workout"
+import { RecentPRs } from "@/components/training/pr-display"
+import MuscleVolumeChart from "@/components/training/muscle-volume-chart"
+import TrainingCalendar from "@/components/training/training-calendar"
+import ExerciseHistory from "@/components/training/exercise-history"
+import { Trophy, BarChart3, Play, ListChecks } from "lucide-react"
+
 const mockTrainingData: TrainingData = {
   exerciseTypes: ["Correr", "Ciclismo", "Natación", "Pesas", "HIIT", "Yoga", "Caminar", "Remo"],
   history: [
@@ -161,11 +180,168 @@ export default function TrainingPage() {
   const [gymError, setGymError] = useState<string | null>(null)
   const [expandedSession, setExpandedSession] = useState<string | null>(null)
 
-  // Routine state
+  // Routine state (legacy)
   const [routineType, setRoutineType] = useState<"gym" | "calisthenics">("gym")
   const [daysPerWeek, setDaysPerWeek] = useState([3])
   const [generatedRoutine, setGeneratedRoutine] = useState<ExerciseRoutine[]>([])
   const [generating, setGenerating] = useState(false)
+
+  // ── Training 2.0 state ──────────────────────────────────────────────────────
+  const [activeWorkout, setActiveWorkout] = useState<Workout | null>(null)
+  const [routines, setRoutines] = useState<Routine[]>([])
+  const [showRoutineEditor, setShowRoutineEditor] = useState(false)
+  const [editingRoutine, setEditingRoutine] = useState<Routine | undefined>(undefined)
+  const [exercisePickerOpen, setExercisePickerOpen] = useState(false)
+  const [routinesLoading, setRoutinesLoading] = useState(false)
+
+  // Analytics state
+  const [muscleVolume, setMuscleVolume] = useState<MuscleVolumeData[]>([])
+  const [volumePeriod, setVolumePeriod] = useState(7)
+  const [recentPRs, setRecentPRs] = useState<PRRecord[]>([])
+  const [calendarData, setCalendarData] = useState<TrainingCalendarDay[]>([])
+  const [calendarYear, setCalendarYear] = useState(new Date().getFullYear())
+  const [calendarMonth, setCalendarMonth] = useState(new Date().getMonth() + 1)
+  const [selectedExerciseStats, setSelectedExerciseStats] = useState<ExerciseStats | null>(null)
+
+  // Load Training 2.0 data
+  useEffect(() => {
+    // Check for active workout
+    getActiveWorkout().then(w => { if (w) setActiveWorkout(w) }).catch(() => {})
+    // Load routines
+    setRoutinesLoading(true)
+    listRoutines().then(setRoutines).catch(() => {}).finally(() => setRoutinesLoading(false))
+  }, [])
+
+  // Load analytics when tab changes
+  const loadAnalytics = () => {
+    getMuscleVolume(volumePeriod).then(setMuscleVolume).catch(() => {})
+    getRecentPRs().then(setRecentPRs).catch(() => {})
+    getCalendarData(calendarYear, calendarMonth).then(setCalendarData).catch(() => {})
+  }
+
+  // Workout handlers
+  const handleStartWorkout = async (routine: Routine, dayId: string) => {
+    try {
+      const w = await startWorkout({ routine_id: routine.id, routine_day_id: dayId })
+      setActiveWorkout(w)
+    } catch (e) { console.error("Error starting workout:", e) }
+  }
+
+  const handleStartEmptyWorkout = async () => {
+    try {
+      const w = await startWorkout({ name: `Workout — ${new Date().toLocaleDateString("es-ES")}` })
+      setActiveWorkout(w)
+    } catch (e) { console.error("Error starting workout:", e) }
+  }
+
+  const handleUpdateSet = async (exerciseId: string, setId: string, setData: Partial<WorkoutSet>) => {
+    if (!activeWorkout) return
+    try {
+      await apiUpdateSet(activeWorkout.id, exerciseId, setId, setData)
+      setActiveWorkout(prev => {
+        if (!prev) return null
+        return {
+          ...prev,
+          exercises: prev.exercises.map(ex =>
+            ex.id === exerciseId
+              ? { ...ex, sets: ex.sets.map(s => s.id === setId ? { ...s, ...setData } : s) }
+              : ex
+          ),
+        }
+      })
+    } catch (e) { console.error(e) }
+  }
+
+  const handleAddSet = async (exerciseId: string) => {
+    if (!activeWorkout) return
+    try {
+      const newSet = await apiAddSet(activeWorkout.id, exerciseId)
+      setActiveWorkout(prev => {
+        if (!prev) return null
+        return {
+          ...prev,
+          exercises: prev.exercises.map(ex =>
+            ex.id === exerciseId ? { ...ex, sets: [...ex.sets, newSet] } : ex
+          ),
+        }
+      })
+    } catch (e) { console.error(e) }
+  }
+
+  const handleDeleteSet = async (exerciseId: string, setId: string) => {
+    if (!activeWorkout) return
+    try {
+      await apiDeleteSet(activeWorkout.id, exerciseId, setId)
+      setActiveWorkout(prev => {
+        if (!prev) return null
+        return {
+          ...prev,
+          exercises: prev.exercises.map(ex =>
+            ex.id === exerciseId
+              ? { ...ex, sets: ex.sets.filter(s => s.id !== setId).map((s, i) => ({ ...s, set_number: i + 1 })) }
+              : ex
+          ),
+        }
+      })
+    } catch (e) { console.error(e) }
+  }
+
+  const handleAddExerciseToWorkout = async (exercise: LibraryExercise) => {
+    if (!activeWorkout) return
+    try {
+      const newEx = await addExerciseToWorkout(activeWorkout.id, exercise.id)
+      setActiveWorkout(prev => prev ? { ...prev, exercises: [...prev.exercises, newEx] } : null)
+    } catch (e) { console.error(e) }
+  }
+
+  const handleRemoveExercise = async (exerciseId: string) => {
+    if (!activeWorkout) return
+    try {
+      await removeExerciseFromWorkout(activeWorkout.id, exerciseId)
+      setActiveWorkout(prev => prev ? { ...prev, exercises: prev.exercises.filter(e => e.id !== exerciseId) } : null)
+    } catch (e) { console.error(e) }
+  }
+
+  const handleFinishWorkout = async (notes: string) => {
+    if (!activeWorkout) return
+    try {
+      await finishWorkout(activeWorkout.id, notes)
+      setActiveWorkout(null)
+      localStorage.removeItem("metabolic_active_workout")
+      // Refresh data
+      fetchTraining().then(setData).catch(() => {})
+    } catch (e) { console.error(e) }
+  }
+
+  const handleDiscardWorkout = async () => {
+    if (!activeWorkout) return
+    try {
+      await discardWorkout(activeWorkout.id)
+      setActiveWorkout(null)
+      localStorage.removeItem("metabolic_active_workout")
+    } catch (e) { console.error(e) }
+  }
+
+  const handleSaveRoutine = async (routineData: { name: string; description: string; days: any[] }) => {
+    try {
+      if (editingRoutine) {
+        const updated = await updateRoutine(editingRoutine.id, routineData)
+        setRoutines(prev => prev.map(r => r.id === updated.id ? updated : r))
+      } else {
+        const created = await createRoutine(routineData)
+        setRoutines(prev => [created, ...prev])
+      }
+      setShowRoutineEditor(false)
+      setEditingRoutine(undefined)
+    } catch (e) { console.error(e) }
+  }
+
+  const handleDeleteRoutine = async (routine: Routine) => {
+    try {
+      await apiDeleteRoutine(routine.id)
+      setRoutines(prev => prev.filter(r => r.id !== routine.id))
+    } catch (e) { console.error(e) }
+  }
 
   useEffect(() => {
     fetchTraining()
@@ -396,13 +572,25 @@ export default function TrainingPage() {
         </Card>
 
         {/* Tabs */}
-        <Tabs defaultValue="log" className="space-y-6">
-          <TabsList className="bg-black/5 dark:bg-white/10 border border-black/10 dark:border-white/20">
+        <Tabs defaultValue={activeWorkout ? "workout" : "workout"} className="space-y-6">
+          <TabsList className="bg-black/5 dark:bg-white/10 border border-black/10 dark:border-white/20 flex-wrap h-auto gap-1 p-1">
+            <TabsTrigger value="workout" className="data-[state=active]:bg-emerald-500/20 dark:data-[state=active]:bg-emerald-500/20 data-[state=active]:text-emerald-400 text-foreground/70">
+              <Play className="mr-1.5 h-3.5 w-3.5" />
+              {activeWorkout ? "Workout activo" : "Workout"}
+            </TabsTrigger>
+            <TabsTrigger value="routines" className="data-[state=active]:bg-black/10 dark:data-[state=active]:bg-white/20 data-[state=active]:text-foreground text-foreground/70">
+              <ListChecks className="mr-1.5 h-3.5 w-3.5" />
+              Mis Rutinas
+            </TabsTrigger>
+            <TabsTrigger value="analytics" className="data-[state=active]:bg-black/10 dark:data-[state=active]:bg-white/20 data-[state=active]:text-foreground text-foreground/70" onClick={loadAnalytics}>
+              <BarChart3 className="mr-1.5 h-3.5 w-3.5" />
+              Analytics
+            </TabsTrigger>
             <TabsTrigger value="log" className="data-[state=active]:bg-black/10 dark:data-[state=active]:bg-white/20 data-[state=active]:text-foreground text-foreground/70">
-              Registrar ejercicio
+              Registrar
             </TabsTrigger>
             <TabsTrigger value="history" className="data-[state=active]:bg-black/10 dark:data-[state=active]:bg-white/20 data-[state=active]:text-foreground text-foreground/70">
-              Historial 7 días
+              Historial
             </TabsTrigger>
             <TabsTrigger
               value="gym"
@@ -410,14 +598,176 @@ export default function TrainingPage() {
               onClick={() => { if (!gymLoading) loadGymHistory() }}
             >
               <Sheet className="mr-1.5 h-3.5 w-3.5" />
-              Gym (Sheets)
-            </TabsTrigger>
-            <TabsTrigger value="routine" className="data-[state=active]:bg-black/10 dark:data-[state=active]:bg-white/20 data-[state=active]:text-foreground text-foreground/70">
-              Generador de rutinas
+              Gym
             </TabsTrigger>
           </TabsList>
 
-          {/* ── Log Exercise Tab ── */}
+          {/* ═══════════════════════════════════════════════════════════════════
+               TRAINING 2.0 — WORKOUT TAB
+               ═══════════════════════════════════════════════════════════════════ */}
+          <TabsContent value="workout">
+            {activeWorkout ? (
+              <Card className="backdrop-blur-xl bg-black/5 dark:bg-white/5 border-black/20 dark:border-white/20 rounded-3xl overflow-hidden" style={{ height: "75vh" }}>
+                <LiveWorkout
+                  workout={activeWorkout}
+                  onUpdateSet={handleUpdateSet}
+                  onAddSet={handleAddSet}
+                  onDeleteSet={handleDeleteSet}
+                  onAddExercise={() => setExercisePickerOpen(true)}
+                  onRemoveExercise={handleRemoveExercise}
+                  onFinish={handleFinishWorkout}
+                  onDiscard={handleDiscardWorkout}
+                />
+                <ExercisePicker
+                  open={exercisePickerOpen}
+                  onOpenChange={setExercisePickerOpen}
+                  onSelect={handleAddExerciseToWorkout}
+                />
+              </Card>
+            ) : (
+              <div className="space-y-4">
+                {/* Start empty workout */}
+                <Card className="backdrop-blur-xl bg-black/5 dark:bg-white/5 border-black/20 dark:border-white/20 rounded-3xl p-6">
+                  <div className="text-center space-y-3">
+                    <div className="h-16 w-16 rounded-2xl bg-emerald-500/10 flex items-center justify-center mx-auto">
+                      <Dumbbell className="h-8 w-8 text-emerald-400" />
+                    </div>
+                    <h3 className="text-lg font-bold text-foreground">Iniciar Workout</h3>
+                    <p className="text-sm text-foreground/50">
+                      Empieza un entrenamiento vacío o selecciona una rutina
+                    </p>
+                    <Button
+                      onClick={handleStartEmptyWorkout}
+                      className="bg-emerald-500 hover:bg-emerald-600 text-white"
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Workout vacío
+                    </Button>
+                  </div>
+                </Card>
+
+                {/* Quick start from routines */}
+                {routines.length > 0 && (
+                  <Card className="backdrop-blur-xl bg-black/5 dark:bg-white/5 border-black/20 dark:border-white/20 rounded-3xl p-4 space-y-3">
+                    <h3 className="text-sm font-bold text-foreground/80 uppercase tracking-wider">Inicio rápido</h3>
+                    <div className="grid gap-2">
+                      {routines.slice(0, 3).map(r => (
+                        <div key={r.id} className="flex gap-2 overflow-x-auto">
+                          <span className="text-sm text-foreground/60 shrink-0 py-1.5">{r.name}:</span>
+                          {r.days.map(d => (
+                            <Button
+                              key={d.id}
+                              size="sm"
+                              onClick={() => handleStartWorkout(r, d.id)}
+                              className="shrink-0 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 text-xs"
+                            >
+                              <Play className="h-3 w-3 mr-1" /> {d.label || "Día"}
+                            </Button>
+                          ))}
+                        </div>
+                      ))}
+                    </div>
+                  </Card>
+                )}
+              </div>
+            )}
+          </TabsContent>
+
+          {/* ═══════════════════════════════════════════════════════════════════
+               TRAINING 2.0 — ROUTINES TAB
+               ═══════════════════════════════════════════════════════════════════ */}
+          <TabsContent value="routines">
+            {showRoutineEditor ? (
+              <Card className="backdrop-blur-xl bg-black/5 dark:bg-white/5 border-black/20 dark:border-white/20 rounded-3xl overflow-hidden" style={{ height: "80vh" }}>
+                <RoutineEditor
+                  routine={editingRoutine}
+                  onSave={handleSaveRoutine}
+                  onCancel={() => { setShowRoutineEditor(false); setEditingRoutine(undefined) }}
+                />
+              </Card>
+            ) : (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-bold text-foreground">Mis Rutinas</h3>
+                  <Button
+                    onClick={() => { setEditingRoutine(undefined); setShowRoutineEditor(true) }}
+                    className="bg-emerald-500 hover:bg-emerald-600 text-white"
+                    size="sm"
+                  >
+                    <Plus className="h-4 w-4 mr-1" /> Nueva rutina
+                  </Button>
+                </div>
+
+                {routinesLoading ? (
+                  <p className="text-center text-foreground/30 py-8">Cargando rutinas...</p>
+                ) : routines.length === 0 ? (
+                  <Card className="backdrop-blur-xl bg-black/5 dark:bg-white/5 border-black/20 dark:border-white/20 rounded-3xl p-8 text-center">
+                    <ListChecks className="h-10 w-10 mx-auto mb-3 text-foreground/20" />
+                    <p className="text-foreground/40">No tienes rutinas guardadas</p>
+                    <p className="text-xs text-foreground/20 mt-1">Crea tu primera rutina para organizar tus entrenamientos</p>
+                  </Card>
+                ) : (
+                  <div className="space-y-3">
+                    {routines.map(r => (
+                      <RoutineCard
+                        key={r.id}
+                        routine={r}
+                        onStartWorkout={handleStartWorkout}
+                        onEdit={(routine) => { setEditingRoutine(routine); setShowRoutineEditor(true) }}
+                        onDelete={handleDeleteRoutine}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </TabsContent>
+
+          {/* ═══════════════════════════════════════════════════════════════════
+               TRAINING 2.0 — ANALYTICS TAB
+               ═══════════════════════════════════════════════════════════════════ */}
+          <TabsContent value="analytics">
+            <div className="space-y-4">
+              {/* PRs */}
+              <Card className="backdrop-blur-xl bg-black/5 dark:bg-white/5 border-black/20 dark:border-white/20 rounded-3xl p-4">
+                <h3 className="text-sm font-bold text-foreground/80 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                  <Trophy className="h-4 w-4 text-amber-400" />
+                  Records personales
+                </h3>
+                <RecentPRs prs={recentPRs} />
+              </Card>
+
+              {/* Muscle Volume */}
+              <MuscleVolumeChart
+                data={muscleVolume}
+                totalSets={muscleVolume.reduce((s, d) => s + d.sets, 0)}
+                totalVolume={muscleVolume.reduce((s, d) => s + d.volume_kg, 0)}
+                period={volumePeriod}
+                onPeriodChange={(d) => { setVolumePeriod(d); getMuscleVolume(d).then(setMuscleVolume).catch(() => {}) }}
+              />
+
+              {/* Calendar */}
+              <TrainingCalendar
+                data={calendarData}
+                year={calendarYear}
+                month={calendarMonth}
+                onMonthChange={(y, m) => {
+                  setCalendarYear(y)
+                  setCalendarMonth(m)
+                  getCalendarData(y, m).then(setCalendarData).catch(() => {})
+                }}
+              />
+
+              {/* Exercise detail (if selected) */}
+              {selectedExerciseStats && (
+                <Card className="backdrop-blur-xl bg-black/5 dark:bg-white/5 border-black/20 dark:border-white/20 rounded-3xl p-4">
+                  <ExerciseHistory stats={selectedExerciseStats} exerciseName={selectedExerciseStats.exercise_name} />
+                </Card>
+              )}
+            </div>
+          </TabsContent>
+
+          {/* ── Log Exercise Tab (legacy) ── */}
           <TabsContent value="log">
             <div className="space-y-4">
               <Card className="backdrop-blur-xl bg-black/5 dark:bg-white/10 border border-black/20 dark:border-white/20 rounded-3xl p-6">
