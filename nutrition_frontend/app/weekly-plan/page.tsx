@@ -177,8 +177,8 @@ function MealCard({
       {/* Note */}
       {meal.note && (
         <div className="flex items-start gap-1 mt-0.5">
-          <Lightbulb className="h-3 w-3 text-amber-400 shrink-0 mt-0.5" />
-          <span className="text-amber-400/80 text-xs leading-snug">{meal.note}</span>
+          <Lightbulb className="h-3 w-3 text-amber-700 dark:text-amber-400 shrink-0 mt-0.5" />
+          <span className="text-amber-700 dark:text-amber-400/80 text-xs leading-snug">{meal.note}</span>
         </div>
       )}
       {/* Swap button */}

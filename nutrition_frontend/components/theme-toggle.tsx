@@ -29,7 +29,7 @@ export function ThemeToggle({ collapsed = false }: { collapsed?: boolean }) {
 
   if (!mounted) {
     return (
-      <button className="w-full flex items-center justify-center p-2 rounded-lg text-white/60">
+      <button className="w-full flex items-center justify-center p-2 rounded-lg text-gray-500 dark:text-white/60">
         <Monitor className="h-4 w-4" />
       </button>
     )
@@ -47,7 +47,7 @@ export function ThemeToggle({ collapsed = false }: { collapsed?: boolean }) {
     <button
       onClick={cycle}
       title={`Tema: ${themeLabel(current)}`}
-      className={`w-full flex items-center gap-2 rounded-lg p-2 text-white/60 hover:bg-white/10 hover:text-white transition-colors ${
+      className={`w-full flex items-center gap-2 rounded-lg p-2 text-gray-500 dark:text-white/60 hover:bg-gray-100 dark:hover:bg-white/10 hover:text-gray-900 dark:hover:text-white transition-colors ${
         collapsed ? 'justify-center' : 'justify-start'
       }`}
     >
