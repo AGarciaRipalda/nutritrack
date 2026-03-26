@@ -30,17 +30,36 @@ export default function DashboardPage() {
   const weeklyUsed   = isWeeklyLimitReached(todayISO) && !cheatActive
 
   useEffect(() => {
+    let isActive = true
     const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), 8000)
+    const timeout = setTimeout(() => controller.abort("dashboard-timeout"), 15000)
 
     fetchDashboard(controller.signal)
-      .then(setData)
-      .catch((err) => console.error("Dashboard fetch failed:", err instanceof Error ? err.message : String(err)))
-      .finally(() => { clearTimeout(timeout); setLoading(false) })
+      .then((result) => {
+        if (!isActive) return
+        setData(result)
+      })
+      .catch((err) => {
+        if (!isActive) return
+        const message = err instanceof Error ? err.message : String(err)
+        if (message.toLowerCase().includes("aborted")) {
+          console.warn("Dashboard fetch timed out after 15s")
+          return
+        }
+        console.error("Dashboard fetch failed:", message)
+      })
+      .finally(() => {
+        clearTimeout(timeout)
+        if (isActive) setLoading(false)
+      })
 
     fetchGamification().then(setGamification).catch(() => null)
 
-    return () => { clearTimeout(timeout); controller.abort() }
+    return () => {
+      isActive = false
+      clearTimeout(timeout)
+      controller.abort("dashboard-unmount")
+    }
   }, [])
 
   if (loading || !data) {
