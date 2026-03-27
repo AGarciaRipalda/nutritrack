@@ -1824,8 +1824,11 @@ struct ProgresoView: View {
             .sheet(isPresented: $viewModel.showLogSheet) {
                 LogWeightSheet(viewModel: viewModel)
             }
-            .alert("Error", isPresented: .constant(viewModel.logError != nil)) {
-                Button("OK") { viewModel.logError = nil }
+            .alert("Error", isPresented: Binding(
+                get: { viewModel.logError != nil },
+                set: { if !$0 { viewModel.logError = nil } }
+            )) {
+                Button("OK", role: .cancel) {}
             } message: {
                 Text(viewModel.logError ?? "")
             }
@@ -2157,13 +2160,19 @@ struct AjustesView: View {
             .navigationTitle("Ajustes")
             .navigationSubtitle("Perfil y preferencias")
             .preferredColorScheme(colorScheme)
-            .alert("Error al cargar", isPresented: .constant(viewModel.loadError != nil)) {
-                Button("OK") { viewModel.loadError = nil }
+            .alert("Error al cargar", isPresented: Binding(
+                get: { viewModel.loadError != nil },
+                set: { if !$0 { viewModel.loadError = nil } }
+            )) {
+                Button("OK", role: .cancel) {}
             } message: {
                 Text(viewModel.loadError ?? "")
             }
-            .alert("Error al guardar", isPresented: .constant(viewModel.saveError != nil)) {
-                Button("OK") { viewModel.saveError = nil }
+            .alert("Error al guardar", isPresented: Binding(
+                get: { viewModel.saveError != nil },
+                set: { if !$0 { viewModel.saveError = nil } }
+            )) {
+                Button("OK", role: .cancel) {}
             } message: {
                 Text(viewModel.saveError ?? "")
             }
@@ -2235,47 +2244,7 @@ private struct TagChip: View {
     }
 }
 
-// IMPORTANT: FlowLayout must stay in AjustesView.swift — it is declared private and cannot be moved to Shared/Components/
-// (see also: Shared/Components/FlowLayout.swift created in Task 11 as a shared copy with internal access)
-struct FlowLayout: Layout {
-    var spacing: CGFloat = 4
-
-    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        let maxWidth = proposal.width ?? .infinity
-        var height: CGFloat = 0
-        var rowWidth: CGFloat = 0
-        var rowHeight: CGFloat = 0
-        for subview in subviews {
-            let size = subview.sizeThatFits(.unspecified)
-            if rowWidth + size.width > maxWidth, rowWidth > 0 {
-                height += rowHeight + spacing
-                rowWidth = 0
-                rowHeight = 0
-            }
-            rowWidth += size.width + spacing
-            rowHeight = max(rowHeight, size.height)
-        }
-        height += rowHeight
-        return CGSize(width: maxWidth, height: height)
-    }
-
-    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        var x = bounds.minX
-        var y = bounds.minY
-        var rowHeight: CGFloat = 0
-        for subview in subviews {
-            let size = subview.sizeThatFits(.unspecified)
-            if x + size.width > bounds.maxX, x > bounds.minX {
-                y += rowHeight + spacing
-                x = bounds.minX
-                rowHeight = 0
-            }
-            subview.place(at: CGPoint(x: x, y: y), proposal: ProposedViewSize(size))
-            x += size.width + spacing
-            rowHeight = max(rowHeight, size.height)
-        }
-    }
-}
+// FlowLayout is defined in Shared/Components/FlowLayout.swift — reference it directly.
 ```
 
 **`nutrition_frontend/ios-native/Metabolic/Shared/Components/FlowLayout.swift`**
@@ -2284,8 +2253,6 @@ struct FlowLayout: Layout {
 import SwiftUI
 
 // Shared FlowLayout with internal access — usable across the app.
-// Note: AjustesView.swift also contains a local copy (struct FlowLayout)
-// that was declared in-file before this shared version was extracted.
 struct FlowLayout: Layout {
     var spacing: CGFloat = 4
 
