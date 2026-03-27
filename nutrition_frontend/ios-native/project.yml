@@ -1,0 +1,43 @@
+name: Metabolic
+options:
+  bundleIdPrefix: com.metabolic.app
+  deploymentTarget:
+    iOS: "26.0"
+  xcodeVersion: "26.0"
+  generateEmptyDirectories: true
+
+settings:
+  base:
+    SWIFT_VERSION: 6.0
+
+targets:
+  Metabolic:
+    type: application
+    platform: iOS
+    sources:
+      - Metabolic
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.metabolic.app.native
+        INFOPLIST_FILE: Metabolic/Info.plist
+        DEVELOPMENT_TEAM: ""
+    info:
+      path: Metabolic/Info.plist
+      properties:
+        CFBundleDisplayName: Metabolic
+        UILaunchScreen:
+          UIColorName: ""
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+
+  MetabolicTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - MetabolicTests
+    dependencies:
+      - target: Metabolic
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.metabolic.app.native.tests
+        GENERATE_INFOPLIST_FILE: YES
