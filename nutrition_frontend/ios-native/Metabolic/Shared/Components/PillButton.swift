@@ -24,7 +24,6 @@ struct PillButton: View {
             .foregroundStyle(Color.brand)
             .frame(height: DS.PillButton.height)
             .padding(.horizontal, DS.Spacing.md)
-            .background(.regularMaterial)
             .glassEffect(.regular.tint(Color.brandGlass), in: Capsule())
         }
         .buttonStyle(.plain)
