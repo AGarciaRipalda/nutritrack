@@ -1767,10 +1767,7 @@ if _TRAINING_V2_AVAILABLE:
 
     @app.get("/v2/training/workouts/active", tags=["Training 2.0"])
     async def v2_get_active_workout():
-        w = get_active_workout()
-        if not w:
-            raise HTTPException(404, "No active workout")
-        return w
+        return get_active_workout()
 
     @app.get("/v2/training/workouts", tags=["Training 2.0"])
     async def v2_list_workouts(limit: int = 20, offset: int = 0):
