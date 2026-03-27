@@ -187,6 +187,7 @@ class ProfileModel(BaseModel):
     activity_level: int   # 1-4
     goal: str             # "lose" | "maintain" | "gain"
     week_start_day: int = 0  # 0=Monday … 6=Sunday
+    meal_count: int = 5      # 3, 4, or 5 meals per day
 
 
 class ExerciseEntryModel(BaseModel):
@@ -327,7 +328,7 @@ def get_today_diet(x_user_timezone: Optional[str] = Header(None)):
         excluded  = load_excluded()
         favorites = load_favorites()
         history   = session.get("weekly_history", []) or load_weekly_history()
-        plan = generate_week_plan(excluded, favorites, _get_daily_target(), history=history or None)
+        plan = generate_week_plan(excluded, favorites, _get_daily_target(), history=history or None, meal_count=_get_meal_count())
         save_session(week_plan=plan)
 
     stale         = _is_stale(plan, tz)
@@ -374,7 +375,7 @@ def regenerate_today_diet(x_user_timezone: Optional[str] = Header(None)):
     excluded  = load_excluded()
     favorites = load_favorites()
     history   = load_weekly_history()
-    plan = generate_week_plan(excluded, favorites, _get_daily_target(), history=history or None)
+    plan = generate_week_plan(excluded, favorites, _get_daily_target(), history=history or None, meal_count=_get_meal_count())
     save_session(week_plan=plan)
     today        = _get_today_for_tz(x_user_timezone)
     exercise_adj = session.get("exercise_adj", {})
@@ -409,7 +410,7 @@ def swap_meal_new(data: SwapMealModel, x_user_timezone: Optional[str] = Header(N
 
     # Use existing regenerate_meal logic
     flat_day = {"daily_target": daily_target, "meals": updated_day_meals}
-    flat_day = regenerate_meal(flat_day, meal_type, excluded, favorites)
+    flat_day = regenerate_meal(flat_day, meal_type, excluded, favorites, meal_count=_get_meal_count())
     new_meals_dict = flat_day["meals"]
 
     # Rebuild meals list preserving order
@@ -452,6 +453,13 @@ def _get_daily_target() -> int:
                                   activity_level=profile.get("activity_level", 1))
 
 
+def _get_meal_count() -> int:
+    """Return the user's preferred meal count (3, 4, or 5). Defaults to 5."""
+    profile = load_profile()
+    mc = profile.get("meal_count", 5)
+    return mc if mc in (3, 4, 5) else 5
+
+
 @app.get("/diet/carbs", tags=["Dieta"])
 def get_favorite_carbs():
     """Returns the list of swappable carb sources for the UI selector."""
@@ -467,7 +475,7 @@ def get_weekly_plan(x_user_timezone: Optional[str] = Header(None)):
         excluded  = load_excluded()
         favorites = load_favorites()
         history   = load_weekly_history()
-        plan = generate_week_plan(excluded, favorites, _get_daily_target(), history=history or None)
+        plan = generate_week_plan(excluded, favorites, _get_daily_target(), history=history or None, meal_count=_get_meal_count())
         save_session(week_plan=plan)
 
     stale        = _is_stale(plan, x_user_timezone)
@@ -508,7 +516,7 @@ def swap_weekly_meal(data: SwapWeeklyMealModel, x_user_timezone: Optional[str] =
 
     # Reutiliza la lógica ya existente de regenerate_meal
     flat_day  = {"daily_target": daily_target, "meals": {m["id"]: m for m in today_day["meals"]}}
-    flat_day  = regenerate_meal(flat_day, data.meal_id, excluded, favorites)
+    flat_day  = regenerate_meal(flat_day, data.meal_id, excluded, favorites, meal_count=_get_meal_count())
     new_meals = flat_day["meals"]
 
     new_meals_list = [
@@ -538,7 +546,7 @@ def regenerate_weekly_plan(
     favorites = load_favorites()
     history   = load_weekly_history()
 
-    new_plan = generate_week_plan(excluded, favorites, _get_daily_target(), history=history or None)
+    new_plan = generate_week_plan(excluded, favorites, _get_daily_target(), history=history or None, meal_count=_get_meal_count())
 
     today = _get_today_for_tz(x_user_timezone)
     apply_from = data.apply_from  # "today" or "tomorrow"
@@ -591,7 +599,7 @@ def get_shopping_list():
     if not plan:
         excluded  = load_excluded()
         favorites = load_favorites()
-        plan = generate_week_plan(excluded, favorites)
+        plan = generate_week_plan(excluded, favorites, meal_count=_get_meal_count())
         save_session(week_plan=plan)
     shopping = build_shopping_list(plan)
     # Convertir sets a listas para JSON

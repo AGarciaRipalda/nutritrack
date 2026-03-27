@@ -44,6 +44,19 @@ SNACK_TARGET_KCAL = 175
 MAIN_MEAL_SPLIT   = {"desayuno": 0.28, "almuerzo": 0.45, "cena": 0.27}
 DAY_NAMES_ES      = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
 MEAL_ID_ORDER     = ["desayuno", "media_manana", "almuerzo", "merienda", "cena"]
+
+# ─── Distribuciones de comidas configurables (3, 4 o 5 comidas/día) ──────────
+MEAL_PLANS = {
+    5: ["desayuno", "media_manana", "almuerzo", "merienda", "cena"],
+    4: ["desayuno", "almuerzo", "merienda", "cena"],
+    3: ["desayuno", "almuerzo", "cena"],
+}
+MEAL_SPLITS = {
+    5: {"desayuno": 0.28, "almuerzo": 0.45, "cena": 0.27},
+    4: {"desayuno": 0.28, "almuerzo": 0.42, "cena": 0.30},  # merienda = snack fijo
+    3: {"desayuno": 0.30, "almuerzo": 0.45, "cena": 0.25},
+}
+SNACK_MEALS = {"media_manana", "merienda"}
 MEAL_NAMES_ES = {
     "desayuno":     "Desayuno",
     "media_manana": "Media mañana",
@@ -765,7 +778,7 @@ def _scale_meal(template_data: dict, target_kcal: float, meal_key: str) -> dict:
 
 def generate_adaptive_day(profile: dict, exercise_data: dict,
                            excluded: list, today_training: dict,
-                           favorites: list) -> dict:
+                           favorites: list, meal_count: int = 5) -> dict:
     """Genera la dieta del día con gramajes exactos adaptados al objetivo calórico."""
     bmr          = calculate_bmr(profile["gender"], profile["age"],
                                  profile["height_cm"], profile["weight_kg"])
@@ -773,36 +786,50 @@ def generate_adaptive_day(profile: dict, exercise_data: dict,
     daily_target = calculate_daily_target(bmr, profile["goal"], exercise_adj)
     macros       = calculate_macros(profile["weight_kg"], daily_target)
 
-    # Snacks fijos
-    snack_kcal_total = 2 * SNACK_TARGET_KCAL
+    meal_count = meal_count if meal_count in MEAL_PLANS else 5
+    meal_ids   = MEAL_PLANS[meal_count]
+    splits     = MEAL_SPLITS[meal_count]
+
+    # Snacks fijos: solo los que no tienen split propio
+    num_snacks       = sum(1 for m in meal_ids if m in SNACK_MEALS and m not in splits)
+    snack_kcal_total = num_snacks * SNACK_TARGET_KCAL
     main_budget      = daily_target - snack_kcal_total
+
+    pools = {
+        "desayuno":     DESAYUNOS,
+        "media_manana": MEDIA_MANANA,
+        "almuerzo":     ALMUERZOS,
+        "merienda":     MERIENDAS,
+        "cena":         CENAS,
+    }
 
     def pick(pool):
         return random.choice(pool) if pool else random.choice(DESAYUNOS)
 
-    desayuno  = _scale_meal(pick(DESAYUNOS),     main_budget * MAIN_MEAL_SPLIT["desayuno"], "desayuno")
-    almuerzo  = _scale_meal(pick(ALMUERZOS),     main_budget * MAIN_MEAL_SPLIT["almuerzo"], "almuerzo")
-    cena      = _scale_meal(pick(CENAS),         main_budget * MAIN_MEAL_SPLIT["cena"],     "cena")
-    media_m   = _scale_meal(pick(MEDIA_MANANA),  SNACK_TARGET_KCAL,                         "media_manana")
-    merienda  = _scale_meal(pick(MERIENDAS),     SNACK_TARGET_KCAL,                         "merienda")
+    meals = {}
+    for meal_id in meal_ids:
+        pool = pools[meal_id]
+        if meal_id in SNACK_MEALS and meal_id not in splits:
+            target_kcal = SNACK_TARGET_KCAL
+        elif meal_id in SNACK_MEALS and meal_id in splits:
+            # merienda en plan de 4 comidas: usa split del budget principal
+            target_kcal = main_budget * splits[meal_id]
+        else:
+            target_kcal = main_budget * splits[meal_id]
+        meals[meal_id] = _scale_meal(pick(pool), target_kcal, meal_id)
 
     return {
         "daily_target": daily_target,
         "macros":       macros,
-        "meals": {
-            "desayuno":     desayuno,
-            "media_manana": media_m,
-            "almuerzo":     almuerzo,
-            "merienda":     merienda,
-            "cena":         cena,
-        },
-        "bonus_kcal":  exercise_data.get("adjustment_kcal", 0),
-        "event_msg":   "",
+        "meals":        meals,
+        "bonus_kcal":   exercise_data.get("adjustment_kcal", 0),
+        "event_msg":    "",
     }
 
 
 def regenerate_meal(day: dict, meal_key: str,
-                    excluded: list, favorites: list) -> dict:
+                    excluded: list, favorites: list,
+                    meal_count: int = 5) -> dict:
     """Sustituye un plato concreto por otro de la misma categoría."""
     pools = {
         "desayuno":     DESAYUNOS,
@@ -816,14 +843,18 @@ def regenerate_meal(day: dict, meal_key: str,
     current_text = (day.get("meals") or day).get(meal_key, {}).get("text", "")
     candidates = [m for m in pool if m["template"] != current_text] or pool
 
+    meal_count   = meal_count if meal_count in MEAL_PLANS else 5
+    splits       = MEAL_SPLITS[meal_count]
+    meal_ids     = MEAL_PLANS[meal_count]
     daily_target = day.get("daily_target", 2000)
+    num_snacks   = sum(1 for m in meal_ids if m in SNACK_MEALS and m not in splits)
     snack_budget = SNACK_TARGET_KCAL
-    main_budget  = (daily_target - 2 * snack_budget)
+    main_budget  = daily_target - num_snacks * snack_budget
 
-    if meal_key in ("media_manana", "merienda"):
+    if meal_key in SNACK_MEALS and meal_key not in splits:
         target_kcal = snack_budget
     else:
-        target_kcal = main_budget * MAIN_MEAL_SPLIT.get(meal_key, 0.33)
+        target_kcal = main_budget * splits.get(meal_key, 0.33)
 
     new_meal = _scale_meal(random.choice(candidates), target_kcal, meal_key)
 
@@ -838,6 +869,7 @@ def generate_week_plan(
     daily_target: int = 1800,
     history: list | None = None,
     reference_date: date | None = None,
+    meal_count: int = 5,
 ) -> dict:
     """
     Generates a full weekly plan keyed by ISO date.
@@ -882,20 +914,28 @@ def generate_week_plan(
         adjusted_target = max(adjusted_target, 1200)  # hard floor
 
     # ── 3. Generate each day ──────────────────────────────────────────────
+    meal_count = meal_count if meal_count in MEAL_PLANS else 5
+    meal_ids   = MEAL_PLANS[meal_count]
+    splits     = MEAL_SPLITS[meal_count]
+    pools_map  = {
+        "desayuno": DESAYUNOS, "media_manana": MEDIA_MANANA,
+        "almuerzo": ALMUERZOS, "merienda": MERIENDAS, "cena": CENAS,
+    }
+    num_snacks   = sum(1 for m in meal_ids if m in SNACK_MEALS and m not in splits)
     snack_budget = SNACK_TARGET_KCAL
-    main_budget  = adjusted_target - 2 * snack_budget
+    main_budget  = adjusted_target - num_snacks * snack_budget
     days = []
     for i in range(7):
         day_date = monday + timedelta(days=i)
         day_iso  = day_date.isoformat()
         day_name = DAY_NAMES_ES[i]
-        meals_raw = {
-            "desayuno":     _scale_meal(random.choice(DESAYUNOS),    main_budget * MAIN_MEAL_SPLIT["desayuno"], "desayuno"),
-            "media_manana": _scale_meal(random.choice(MEDIA_MANANA), snack_budget,                              "media_manana"),
-            "almuerzo":     _scale_meal(random.choice(ALMUERZOS),    main_budget * MAIN_MEAL_SPLIT["almuerzo"], "almuerzo"),
-            "merienda":     _scale_meal(random.choice(MERIENDAS),    snack_budget,                              "merienda"),
-            "cena":         _scale_meal(random.choice(CENAS),        main_budget * MAIN_MEAL_SPLIT["cena"],     "cena"),
-        }
+        meals_raw = {}
+        for mid in meal_ids:
+            if mid in SNACK_MEALS and mid not in splits:
+                target = snack_budget
+            else:
+                target = main_budget * splits[mid]
+            meals_raw[mid] = _scale_meal(random.choice(pools_map[mid]), target, mid)
         meals_list = [
             {**v, "id": k, "name": MEAL_NAMES_ES.get(k, k), "type": MEAL_TYPES_EN.get(k, k)}
             for k, v in meals_raw.items()

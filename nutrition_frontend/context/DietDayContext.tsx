@@ -125,14 +125,16 @@ function getMealOverrideTarget(meal: Meal, override: MealOverride | undefined): 
   return meal.fixedKcal + roundKcal((override.selectedCarb.kcal / 100) * grams)
 }
 
-function getTrainingMealAllocation(block: TrainingBlock): { preMealId: string | null; postMealId: string | null } {
+function getTrainingMealAllocation(block: TrainingBlock, mealIds?: string[]): { preMealId: string | null; postMealId: string | null } {
+  const has = (id: string) => !mealIds || mealIds.includes(id)
+
   switch (block) {
     case "morning":
-      return { preMealId: "desayuno", postMealId: "media_manana" }
+      return { preMealId: "desayuno", postMealId: has("media_manana") ? "media_manana" : "almuerzo" }
     case "midday":
-      return { preMealId: "almuerzo", postMealId: "merienda" }
+      return { preMealId: "almuerzo", postMealId: has("merienda") ? "merienda" : "cena" }
     case "afternoon":
-      return { preMealId: "merienda", postMealId: "cena" }
+      return { preMealId: has("merienda") ? "merienda" : "almuerzo", postMealId: "cena" }
     case "evening":
       return { preMealId: "cena", postMealId: null }
     default:
@@ -149,7 +151,8 @@ function buildAutoTrainingTargets(
   }
 
   const byId = new Map(meals.map((meal) => [meal.id, meal]))
-  const { preMealId, postMealId } = getTrainingMealAllocation(todayTraining.training_block)
+  const mealIds = meals.map((m) => m.id)
+  const { preMealId, postMealId } = getTrainingMealAllocation(todayTraining.training_block, mealIds)
   const preMeal = preMealId ? byId.get(preMealId) : null
   const postMeal = postMealId ? byId.get(postMealId) : null
   const preShare = todayTraining.training_block === "evening"

@@ -252,7 +252,8 @@ export interface UserProfile {
   weight: number
   activityLevel: number
   goal: "lose" | "maintain" | "gain"
-  weekStartDay: number  // 0=Monday â€¦ 6=Sunday
+  weekStartDay: number  // 0=Monday … 6=Sunday
+  mealCount: number     // 3, 4, or 5 meals per day
 }
 
 export interface FoodPreferences {
@@ -864,6 +865,7 @@ export async function fetchSettings(): Promise<SettingsData> {
       activityLevel: profileRaw.activity_level,
       goal:          profileRaw.goal,
       weekStartDay:  profileRaw.week_start_day ?? 0,
+      mealCount:     profileRaw.meal_count ?? 5,
     },
     foodPreferences: {
       excluded:  prefsRaw.excluded  ?? [],
@@ -892,8 +894,9 @@ export async function updateProfile(profile: UserProfile): Promise<UserProfile> 
     activity_level:  profile.activityLevel,
     goal:            profile.goal,
     week_start_day:  profile.weekStartDay,
+    meal_count:      profile.mealCount,
   })
-  // Backend returns { ok, profile } â€” map back to frontend shape
+  // Backend returns { ok, profile } — map back to frontend shape
   const p = res.profile
   return {
     name:          p.name,
@@ -904,6 +907,7 @@ export async function updateProfile(profile: UserProfile): Promise<UserProfile> 
     activityLevel: p.activity_level,
     goal:          p.goal,
     weekStartDay:  p.week_start_day ?? 0,
+    mealCount:     p.meal_count ?? 5,
   }
 }
 

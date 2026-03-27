@@ -52,6 +52,7 @@ const mockSettingsData: SettingsData = {
     activityLevel: 3,
     goal: "lose",
     weekStartDay: 0,
+    mealCount: 5,
   },
   foodPreferences: {
     excluded: ["shellfish", "peanuts"],
@@ -311,6 +312,23 @@ export default function SettingsPage() {
                     </SelectContent>
                   </Select>
                   <p className="text-foreground/40 text-xs">{SETTINGS_TEXT.weeklyHint}</p>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-foreground/80">Comidas al d{"í"}a</Label>
+                  <Select
+                    value={String(profile.mealCount ?? 5)}
+                    onValueChange={(v) => setProfile({ ...profile, mealCount: parseInt(v) })}
+                  >
+                    <SelectTrigger className="bg-black/5 dark:bg-white/5 border-black/20 dark:border-white/20 text-foreground">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="3">3 comidas (desayuno, almuerzo, cena)</SelectItem>
+                      <SelectItem value="4">4 comidas (+ merienda)</SelectItem>
+                      <SelectItem value="5">5 comidas (+ media ma{"ñ"}ana y merienda)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-foreground/40 text-xs">Al cambiar, regenera el plan semanal para aplicar la nueva distribuci{"ó"}n.</p>
                 </div>
               </div>
               <div className="mt-6 flex items-center gap-4">
