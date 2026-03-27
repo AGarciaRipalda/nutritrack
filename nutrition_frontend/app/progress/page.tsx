@@ -121,45 +121,47 @@ export default function ProgressPage() {
 
   return (
     <AppLayout>
-      <div className="space-y-6">
+      <div className="space-y-8">
         {/* Header */}
-        <Card className="backdrop-blur-xl bg-black/5 dark:bg-white/10 border border-black/20 dark:border-white/20 rounded-3xl p-6">
-          <div className="flex items-center gap-3">
-            <TrendingUp className="h-7 w-7 text-emerald-400" />
+        <Card className="backdrop-blur-xl bg-black/5 dark:bg-white/10 border border-black/20 dark:border-white/20 rounded-3xl p-7 md:p-8">
+          <div className="flex items-center gap-4">
+            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-500/12">
+              <TrendingUp className="h-7 w-7 text-emerald-400" />
+            </div>
             <div>
-              <h2 className="text-3xl font-bold text-foreground">Seguimiento</h2>
-              <p className="text-muted-foreground">Controla tu peso y adherencia a lo largo del tiempo</p>
+              <h2 className="text-3xl font-bold tracking-tight text-foreground md:text-4xl">Seguimiento</h2>
+              <p className="mt-1 text-sm text-muted-foreground md:text-base">Controla peso, tendencia y adherencia con paneles más legibles y mejor uso del ancho.</p>
             </div>
           </div>
         </Card>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 md:gap-6">
-          <Card className="backdrop-blur-xl bg-black/5 dark:bg-white/10 border border-black/20 dark:border-white/20 rounded-3xl p-6">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3 md:gap-6">
+          <Card className="backdrop-blur-xl bg-black/5 dark:bg-white/10 border border-black/20 dark:border-white/20 rounded-3xl p-6 md:p-7">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-muted-foreground text-sm">Peso actual</p>
-                <p className="text-3xl font-bold text-foreground">{currentWeight} kg</p>
+                <p className="mt-1 text-4xl font-bold tracking-tight text-foreground">{currentWeight} kg</p>
               </div>
               <Scale className="h-8 w-8 text-blue-400" />
             </div>
           </Card>
-          <Card className="backdrop-blur-xl bg-black/5 dark:bg-white/10 border border-black/20 dark:border-white/20 rounded-3xl p-6">
+          <Card className="backdrop-blur-xl bg-black/5 dark:bg-white/10 border border-black/20 dark:border-white/20 rounded-3xl p-6 md:p-7">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-muted-foreground text-sm">Cambio total</p>
-                <p className={`text-3xl font-bold ${weightChange <= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                <p className={`mt-1 text-4xl font-bold tracking-tight ${weightChange <= 0 ? "text-emerald-400" : "text-red-400"}`}>
                   {weightChange > 0 ? "+" : ""}{weightChange.toFixed(1)} kg
                 </p>
               </div>
               <TrendingUp className={`h-8 w-8 ${weightChange <= 0 ? "text-emerald-400" : "text-red-400"}`} />
             </div>
           </Card>
-          <Card className="backdrop-blur-xl bg-black/5 dark:bg-white/10 border border-black/20 dark:border-white/20 rounded-3xl p-6">
+          <Card className="backdrop-blur-xl bg-black/5 dark:bg-white/10 border border-black/20 dark:border-white/20 rounded-3xl p-6 md:p-7">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-muted-foreground text-sm">Adherencia media</p>
-                <p className="text-3xl font-bold text-foreground">
+                <p className="mt-1 text-4xl font-bold tracking-tight text-foreground">
                   {progress.adherenceByWeek.length > 0
                     ? Math.round(progress.adherenceByWeek.reduce((sum, w) => sum + w.adherence, 0) / progress.adherenceByWeek.length)
                     : 0}%
@@ -171,10 +173,14 @@ export default function ProgressPage() {
         </div>
 
         {/* Weight Registration Form */}
-        <Card className="backdrop-blur-xl bg-black/5 dark:bg-white/10 border border-black/20 dark:border-white/20 rounded-3xl p-6">
-          <h3 className="text-xl font-semibold text-foreground mb-4">Registrar peso de hoy</h3>
-          <div className="flex gap-4 items-end">
-            <div className="flex-1 max-w-xs space-y-2">
+        <Card className="backdrop-blur-xl bg-black/5 dark:bg-white/10 border border-black/20 dark:border-white/20 rounded-3xl p-7">
+          <div className="grid gap-5 lg:grid-cols-[1.1fr_0.9fr] lg:items-end">
+            <div className="space-y-2">
+              <h3 className="text-2xl font-semibold tracking-tight text-foreground">Registrar peso de hoy</h3>
+              <p className="max-w-2xl text-sm leading-6 text-muted-foreground">Añade la medición diaria para mantener la curva actualizada y comparar el progreso real con la tendencia.</p>
+            </div>
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-end">
+              <div className="flex-1 sm:max-w-xs space-y-2">
               <Label className="text-foreground/80">Peso (kg)</Label>
               <div className="relative">
                 <Scale className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-foreground/40" />
@@ -187,22 +193,23 @@ export default function ProgressPage() {
                   className="pl-10 bg-black/5 dark:bg-white/5 border-black/20 dark:border-white/20 text-foreground placeholder:text-foreground/40"
                 />
               </div>
+              </div>
+              <Button
+                onClick={handleLogWeight}
+                disabled={!weight || logging}
+                className="min-h-[44px] bg-emerald-500 text-white hover:bg-emerald-600"
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                {logging ? "Registrando..." : "Registrar peso"}
+              </Button>
             </div>
-            <Button
-              onClick={handleLogWeight}
-              disabled={!weight || logging}
-              className="bg-emerald-500 hover:bg-emerald-600 text-white"
-            >
-              <Plus className="mr-2 h-4 w-4" />
-              {logging ? "Registrando..." : "Registrar peso"}
-            </Button>
           </div>
         </Card>
 
         {/* Weight Chart */}
-        <Card className="backdrop-blur-xl bg-black/5 dark:bg-white/10 border border-black/20 dark:border-white/20 rounded-3xl p-6">
-          <h3 className="text-xl font-semibold text-foreground mb-6">Progreso de peso</h3>
-          <div className="h-80">
+        <Card className="backdrop-blur-xl bg-black/5 dark:bg-white/10 border border-black/20 dark:border-white/20 rounded-3xl p-7">
+          <h3 className="mb-6 text-2xl font-semibold tracking-tight text-foreground">Progreso de peso</h3>
+          <div className="h-[22rem]">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={weightChartData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(128,128,128,0.2)" />
@@ -244,9 +251,9 @@ export default function ProgressPage() {
         </Card>
 
         {/* Adherence Chart */}
-        <Card className="backdrop-blur-xl bg-black/5 dark:bg-white/10 border border-black/20 dark:border-white/20 rounded-3xl p-6">
-          <h3 className="text-xl font-semibold text-foreground mb-6">Adherencia semanal</h3>
-          <div className="h-64">
+        <Card className="backdrop-blur-xl bg-black/5 dark:bg-white/10 border border-black/20 dark:border-white/20 rounded-3xl p-7">
+          <h3 className="mb-6 text-2xl font-semibold tracking-tight text-foreground">Adherencia semanal</h3>
+          <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={progress.adherenceByWeek}>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(128,128,128,0.2)" />

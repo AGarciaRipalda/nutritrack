@@ -292,40 +292,39 @@ export default function DietPage() {
 
   return (
     <AppLayout>
-      <div className="space-y-3 pb-6">
+      <div className="space-y-6 pb-8">
 
         {/* Stale banner */}
         {stale && (
-          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3 flex items-center justify-between shadow-sm">
-            <span className="text-amber-800 text-xs font-medium">Plan desactualizado</span>
-            <Link href="/weekly-plan" className="text-amber-600 text-xs font-bold hover:underline">Regenerar →</Link>
+          <div className="flex items-center justify-between rounded-3xl border border-amber-200 bg-amber-50 p-4 shadow-sm">
+            <span className="text-sm font-medium text-amber-800">Plan desactualizado</span>
+            <Link href="/weekly-plan" className="text-sm font-bold text-amber-600 hover:underline">Regenerar →</Link>
           </div>
         )}
 
-        {/* Header - Compact */}
-        <Card className="bg-white dark:bg-white/10 border-emerald-100 dark:border-white/10 rounded-2xl p-4 shadow-sm">
-          <div className="flex items-center justify-between gap-3 mb-3">
-            <div>
-              <h2 className="text-xl font-bold text-slate-800 dark:text-white">Dieta de hoy</h2>
-              <p className="text-slate-500 dark:text-slate-300 text-[10px] font-bold uppercase tracking-wider">
+        <Card className="rounded-3xl border-emerald-100 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-white/10 md:p-7">
+          <div className="mb-5 flex items-start justify-between gap-4">
+            <div className="space-y-2">
+              <h2 className="text-3xl font-bold tracking-tight text-slate-800 dark:text-white md:text-4xl">Dieta de hoy</h2>
+              <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-300">
                 {day.dayName} · {new Date(day.date + "T00:00:00").toLocaleDateString("es-ES", { day: "numeric", month: "short" })}
               </p>
             </div>
             {day.exerciseAdj && day.exerciseAdj.extraKcal > 0 && (
-              <Badge className="bg-emerald-50 text-emerald-600 border-emerald-100 text-[10px] font-bold">
+              <Badge className="border-emerald-100 bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-600">
                 ⚡ +{day.exerciseAdj.extraKcal} kcal
               </Badge>
             )}
           </div>
 
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between text-[11px]">
-              <span className="text-slate-500 dark:text-slate-300 font-medium">Presupuesto calórico</span>
+          <div className="space-y-3">
+            <div className="flex items-center justify-between text-sm">
+              <span className="font-medium text-slate-500 dark:text-slate-300">Presupuesto calórico</span>
               <span className={`font-bold ${showOverLimit ? "text-rose-600" : "text-emerald-600"}`}>
                 {consumedKcal} / {dailyTarget} kcal
               </span>
             </div>
-            <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+            <div className="h-2.5 overflow-hidden rounded-full bg-slate-100">
               <div
                 className={`h-full rounded-full transition-all duration-300 ${
                   showOverLimit ? "bg-rose-500" : consumedExceeded ? "bg-amber-500" : "bg-emerald-500"
@@ -333,26 +332,26 @@ export default function DietPage() {
                 style={{ width: `${consumedPct}%` }}
               />
             </div>
-            <div className="flex justify-between text-[10px] font-medium">
+            <div className="flex justify-between text-xs font-medium">
               <span className="text-slate-400 dark:text-slate-400">
                 {consumedRemaining >= 0 ? `Quedan ${consumedRemaining} kcal` : `Exceso +${excessKcal} kcal`}
               </span>
-              {cheatActive && <span className="text-amber-600 flex items-center gap-1"><Star className="h-2.5 w-2.5 fill-amber-500" /> Comodín</span>}
+              {cheatActive && <span className="flex items-center gap-1 text-amber-600"><Star className="h-3 w-3 fill-amber-500" /> Comodín</span>}
             </div>
           </div>
         </Card>
 
         {trainingAutoAllocation && (
-          <Card className="bg-emerald-50 border-emerald-100 dark:bg-emerald-500/10 dark:border-emerald-400/20 rounded-2xl p-4 shadow-sm">
+          <Card className="rounded-3xl border-emerald-100 bg-emerald-50 p-5 shadow-sm dark:border-emerald-400/20 dark:bg-emerald-500/10">
             <div className="flex items-start gap-3">
-              <div className="rounded-xl bg-emerald-500/15 p-2">
-                <Zap className="h-4 w-4 text-emerald-600 dark:text-emerald-300" />
+              <div className="rounded-2xl bg-emerald-500/15 p-2.5">
+                <Zap className="h-5 w-5 text-emerald-600 dark:text-emerald-300" />
               </div>
               <div className="space-y-1">
-                <p className="text-sm font-semibold text-emerald-800 dark:text-emerald-200">
+                <p className="text-base font-semibold text-emerald-800 dark:text-emerald-200">
                   Ajuste automático por entreno {trainingBlockLabels[trainingAutoAllocation.trainingBlock]}
                 </p>
-                <p className="text-xs text-emerald-700 dark:text-emerald-300/90">
+                <p className="text-sm leading-6 text-emerald-700 dark:text-emerald-300/90">
                   +{trainingAutoAllocation.bonusKcal} kcal repartidas en
                   {trainingAutoAllocation.preMealId ? ` ${mealIdLabels[trainingAutoAllocation.preMealId]}` : ""}
                   {trainingAutoAllocation.preMealId ? ` (+${trainingAutoAllocation.preExtraKcal})` : ""}
@@ -370,18 +369,17 @@ export default function DietPage() {
         {cheatActive && excessKcal > 0 && !cheatRecord?.compensating && (
           <button
             onClick={() => { finalizeExcess(excessKcal); setShowCompModal(true) }}
-            className="w-full bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 flex items-center justify-between gap-2 shadow-sm animate-pulse"
+            className="flex w-full items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 shadow-sm animate-pulse"
           >
             <div className="flex items-center gap-2">
-              <Star className="h-3.5 w-3.5 text-amber-500 fill-amber-500" />
-              <span className="text-amber-800 text-[11px] font-bold">¿Compensar exceso de hoy?</span>
+              <Star className="h-4 w-4 fill-amber-500 text-amber-500" />
+              <span className="text-sm font-bold text-amber-800">¿Compensar exceso de hoy?</span>
             </div>
-            <span className="text-amber-600 text-[10px] font-black uppercase">Click aquí</span>
+            <span className="text-xs font-black uppercase text-amber-600">Click aquí</span>
           </button>
         )}
 
-        {/* Meal Cards - Tighter spacing, color-coded, background icons */}
-        <div className="grid grid-cols-1 gap-3">
+        <div className="grid grid-cols-1 gap-4">
           {day.meals.map((meal) => {
             const MealIcon    = mealIdIcons[meal.id] ?? mealIcons[meal.type] ?? Utensils
             const label       = mealLabels[meal.type] ?? mealIdLabels[meal.id]
@@ -422,23 +420,25 @@ export default function DietPage() {
                 key={meal.id}
                 className={`relative overflow-visible border transition-all duration-300 rounded-2xl ${
                   isSkipped ? "bg-slate-50 dark:bg-zinc-950 border-slate-200 dark:border-white/10" : "bg-black/5 dark:bg-white/5 border-black/10 dark:border-white/10"
-                } ${hasFoodDropdown ? "z-40" : "z-0"} shadow-sm`}
+                } ${hasFoodDropdown ? "z-40" : "z-0"} shadow-sm md:rounded-3xl`}
               >
                 {/* Visual context icon */}
-                <MealIcon className={`absolute -right-2 -bottom-2 h-16 w-16 opacity-[0.05] ${isSkipped ? 'text-slate-400 dark:text-slate-400' : 'text-emerald-400 dark:text-emerald-400'}`} />
+                <MealIcon className={`absolute -bottom-3 -right-3 h-20 w-20 opacity-[0.05] ${isSkipped ? 'text-slate-400 dark:text-slate-400' : 'text-emerald-400 dark:text-emerald-400'}`} />
 
-                <div className="p-4 relative z-10">
-                  <div className="flex items-center gap-2 border-b border-black/10 dark:border-white/10 pb-2 mb-2">
-                    <MealIcon className={`h-4 w-4 shrink-0 ${isSkipped ? 'text-slate-400 dark:text-slate-400' : 'text-emerald-400 dark:text-emerald-400'}`} />
+                <div className="relative z-10 p-5 md:p-6">
+                  <div className="mb-4 flex items-start gap-3 border-b border-black/10 pb-3 dark:border-white/10">
+                    <div className={`mt-0.5 rounded-xl p-2 ${isSkipped ? "bg-slate-200 dark:bg-white/10" : "bg-emerald-500/10"}`}>
+                      <MealIcon className={`h-4 w-4 shrink-0 ${isSkipped ? 'text-slate-400 dark:text-slate-400' : 'text-emerald-400 dark:text-emerald-400'}`} />
+                    </div>
                     <div className="flex-1">
-                      <h3 className={`text-sm font-semibold ${isSkipped ? 'text-slate-500 dark:text-slate-300 line-through' : 'text-foreground dark:text-foreground'}`}>{label}</h3>
+                      <h3 className={`text-lg font-semibold ${isSkipped ? 'text-slate-500 dark:text-slate-300 line-through' : 'text-foreground dark:text-foreground'}`}>{label}</h3>
                       {!isSkipped && trainingRole && trainingRoleKcal > 0 && (
-                        <p className="mt-0.5 text-[10px] font-bold text-sky-700 dark:text-sky-300">
+                        <p className="mt-1 text-xs font-bold text-sky-700 dark:text-sky-300">
                           {trainingRole === "pre" ? "Pre-entreno" : "Post-entreno"} +{trainingRoleKcal} kcal
                         </p>
                       )}
                       {!isSkipped && hasKcalDelta && (
-                        <p className={`mt-0.5 text-[10px] font-bold ${
+                        <p className={`mt-1 text-xs font-bold ${
                           kcalDelta > 0
                             ? "text-emerald-600 dark:text-emerald-300"
                             : "text-amber-600 dark:text-amber-300"
@@ -447,7 +447,7 @@ export default function DietPage() {
                         </p>
                       )}
                     </div>
-                    <Badge className={`${isSkipped ? "bg-slate-200 border-slate-300 text-slate-500 dark:text-slate-300" : "bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 border-emerald-400/30"} text-xs px-1.5 py-0 shrink-0`}>
+                    <Badge className={`${isSkipped ? "bg-slate-200 border-slate-300 text-slate-500 dark:text-slate-300" : "bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 border-emerald-400/30"} shrink-0 px-2 py-0.5 text-sm`}>
                       {effKcal} kcal
                     </Badge>
                     <Checkbox
@@ -458,12 +458,12 @@ export default function DietPage() {
                     />
                   </div>
 
-                  <p className={`text-xs leading-snug mb-3 ${isSkipped ? 'text-slate-400 dark:text-slate-400 italic' : 'text-slate-700 dark:text-foreground/80'}`}>
+                  <p className={`mb-4 text-sm leading-6 ${isSkipped ? 'text-slate-400 dark:text-slate-400 italic' : 'text-slate-700 dark:text-foreground/80'}`}>
                     {displayedDescription}
                   </p>
 
                   {!isSkipped && hasKcalDelta && (
-                    <div className={`mb-3 rounded-lg border px-2.5 py-1.5 text-[10px] font-medium ${
+                    <div className={`mb-4 rounded-xl border px-3 py-2 text-xs font-medium ${
                       kcalDelta > 0
                         ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-400/20 dark:bg-emerald-500/10 dark:text-emerald-300"
                         : "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-400/20 dark:bg-amber-500/10 dark:text-amber-300"
@@ -475,19 +475,17 @@ export default function DietPage() {
                   )}
 
                   {meal.note && !isSkipped && (
-                    <div className="flex items-start gap-1 mt-0.5 mb-3">
-                      <Lightbulb className="h-3 w-3 text-amber-700 dark:text-amber-400 shrink-0 mt-0.5" />
-                      <span className="text-amber-700 dark:text-amber-400/80 text-xs leading-snug">{meal.note}</span>
+                    <div className="mb-4 mt-0.5 flex items-start gap-2">
+                      <Lightbulb className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-700 dark:text-amber-400" />
+                      <span className="text-xs leading-5 text-amber-700 dark:text-amber-400/80">{meal.note}</span>
                     </div>
                   )}
 
-                  {/* Dynamic Controls - Compact */}
                   {!isSkipped && (
-                    <div className="space-y-3">
-                      {/* Carb selector */}
+                    <div className="space-y-4">
                       {state.favoriteCarbs.length > 0 && meal.fixedKcal != null && (
-                        <div className="flex flex-wrap items-center gap-2">
-                          <div className="relative flex-1 min-w-[120px]">
+                        <div className="flex flex-wrap items-center gap-3">
+                          <div className="relative min-w-[170px] flex-1">
                             <Wheat className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-slate-400 dark:text-slate-400" />
                             <select
                               value={selCarb?.key ?? ""}
@@ -495,7 +493,7 @@ export default function DietPage() {
                                 const found = state.favoriteCarbs.find((c) => c.key === e.target.value) ?? null
                                 setMealCarb(meal.id, found)
                               }}
-                              className="w-full bg-white dark:bg-white/10 border border-slate-200 dark:border-white/10 rounded-lg pl-7 pr-2 py-1.5 text-[11px] font-bold text-slate-700 dark:text-foreground/80 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                              className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-7 pr-2 text-xs font-bold text-slate-700 focus:outline-none focus:ring-1 focus:ring-emerald-500 dark:border-white/10 dark:bg-white/10 dark:text-foreground/80"
                             >
                               <option value="">Ajustar carbohidratos...</option>
                               {state.favoriteCarbs.map((c) => (
@@ -504,7 +502,7 @@ export default function DietPage() {
                             </select>
                           </div>
                           {selCarb && (
-                             <div className="flex items-center gap-1.5">
+                             <div className="flex items-center gap-2">
                                <input
                                  type="number"
                                  placeholder={suggestedGrams ? String(suggestedGrams) : "g"}
@@ -513,25 +511,24 @@ export default function DietPage() {
                                    const val = parseInt(e.target.value)
                                    setMealGrams(meal.id, isNaN(val) ? null : val)
                                  }}
-                                 className="w-14 bg-white dark:bg-white/10 border border-slate-200 dark:border-white/10 rounded-lg py-1.5 text-center text-[11px] font-black text-emerald-600 dark:text-emerald-400 focus:outline-none"
+                                 className="w-16 rounded-xl border border-slate-200 bg-white py-2 text-center text-xs font-black text-emerald-600 focus:outline-none dark:border-white/10 dark:bg-white/10 dark:text-emerald-400"
                                />
-                               <span className="text-[10px] font-bold text-slate-400 dark:text-slate-400 uppercase">Grams</span>
+                               <span className="text-[11px] font-bold uppercase text-slate-400 dark:text-slate-400">Grams</span>
                              </div>
                           )}
                         </div>
                       )}
 
-                      {/* Bottom actions */}
                       <div className="flex gap-2">
                         <button
                           onClick={() => handleSwap(meal.id)}
-                          className="flex-1 bg-white dark:bg-white/10 hover:bg-white dark:hover:bg-white/10 border border-slate-200 dark:border-white/10 rounded-xl py-1.5 text-[10px] font-bold text-slate-600 dark:text-foreground/60 dark:hover:text-foreground transition-colors flex items-center justify-center gap-1"
+                          className="flex flex-1 items-center justify-center gap-1.5 rounded-2xl border border-slate-200 bg-white py-2.5 text-xs font-bold text-slate-600 transition-colors hover:bg-white dark:border-white/10 dark:bg-white/10 dark:text-foreground/60 dark:hover:bg-white/10 dark:hover:text-foreground"
                         >
                           <Shuffle className={`h-3 w-3 ${swapping === meal.id ? 'animate-spin' : ''}`} /> Cambiar
                         </button>
                         <button
                           onClick={() => handleSkipMeal(meal.id)}
-                          className="px-3 bg-white dark:bg-white/10 hover:bg-rose-50 dark:hover:bg-rose-500/10 border border-slate-200 dark:border-white/10 hover:border-rose-100 dark:hover:border-rose-400/20 rounded-xl py-1.5 text-[10px] font-bold text-slate-500 dark:text-foreground/60 hover:text-rose-600 transition-colors"
+                          className="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold text-slate-500 transition-colors hover:border-rose-100 hover:bg-rose-50 hover:text-rose-600 dark:border-white/10 dark:bg-white/10 dark:text-foreground/60 dark:hover:border-rose-400/20 dark:hover:bg-rose-500/10"
                         >
                           <Ban className="h-3 w-3" />
                         </button>
@@ -541,8 +538,8 @@ export default function DietPage() {
 
                   {/* Skipped Meal UI */}
                   {isSkipped && (
-                    <div className="space-y-2">
-                       <div className="flex gap-1.5">
+                    <div className="space-y-3">
+                       <div className="flex gap-2">
                          <div
                            ref={activeFoodMealId === meal.id ? activeFoodContainerRef : undefined}
                            className="relative flex-1"
@@ -558,7 +555,7 @@ export default function DietPage() {
                                setFoodInput(prev => ({ ...prev, [meal.id]: { name: val, grams: prev[meal.id]?.grams ?? "", kcalPer100g: prev[meal.id]?.kcalPer100g ?? null } }))
                                debouncedFoodSearch(meal.id, val)
                              }}
-                             className="w-full bg-white dark:bg-white/10 border border-slate-200 dark:border-white/10 rounded-lg pl-7 pr-2 py-1.5 text-[11px] text-slate-700 dark:text-foreground/80"
+                             className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-7 pr-2 text-xs text-slate-700 dark:border-white/10 dark:bg-white/10 dark:text-foreground/80"
                            />
                            {searchingFood[meal.id] && (
                              <div className="absolute left-0 right-0 top-full mt-1 z-50 rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-zinc-950 px-3 py-2 text-[10px] font-medium text-slate-500 dark:text-foreground/60 shadow-2xl">
@@ -594,23 +591,23 @@ export default function DietPage() {
                            placeholder="g"
                            value={foodInput[meal.id]?.grams ?? ""}
                            onChange={(e) => setFoodInput(prev => ({ ...prev, [meal.id]: { name: prev[meal.id]?.name ?? "", grams: e.target.value, kcalPer100g: prev[meal.id]?.kcalPer100g ?? null } }))}
-                           className="w-12 bg-white dark:bg-white/10 border border-slate-200 dark:border-white/10 rounded-lg py-1.5 text-center text-[11px] dark:text-foreground/80"
+                           className="w-14 rounded-xl border border-slate-200 bg-white py-2 text-center text-xs dark:border-white/10 dark:bg-white/10 dark:text-foreground/80"
                          />
                          <button
                            onClick={() => {
                              closeFoodDropdown()
                              handleAddFood(meal.id)
                            }}
-                           className="bg-emerald-500 text-white rounded-lg px-2"
+                           className="rounded-xl bg-emerald-500 px-3 text-white"
                          >
                            <Plus className="h-3 w-3" />
                          </button>
                        </div>
 
-                       <div className="flex flex-wrap gap-1">
+                       <div className="flex flex-wrap gap-2">
                          {(skippedMeals[meal.id]?.foods ?? []).map((food, i) => (
-                           <div key={i} className="bg-emerald-50 border border-emerald-100 rounded-lg px-2 py-1 flex items-center gap-1.5">
-                             <span className="text-[10px] font-bold text-emerald-800">{food.name} ({food.kcal}k)</span>
+                           <div key={i} className="flex items-center gap-1.5 rounded-xl border border-emerald-100 bg-emerald-50 px-2.5 py-1.5">
+                             <span className="text-xs font-bold text-emerald-800">{food.name} ({food.kcal}k)</span>
                              <button onClick={() => handleRemoveFood(meal.id, i)}><X className="h-2.5 w-2.5 text-emerald-400" /></button>
                            </div>
                          ))}
@@ -618,7 +615,7 @@ export default function DietPage() {
 
                        <button
                          onClick={() => handleSkipMeal(meal.id)}
-                         className="w-full py-1 text-[10px] font-bold text-emerald-600 hover:underline"
+                         className="w-full py-1 text-xs font-bold text-emerald-600 hover:underline"
                        >
                          Restaurar comida original
                        </button>
