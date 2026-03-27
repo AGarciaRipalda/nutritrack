@@ -3,7 +3,7 @@ import SwiftUI
 struct AjustesView: View {
     @State private var viewModel = AjustesViewModel()
     @Environment(\.colorScheme) private var colorScheme
-    @State private var prefersDarkMode = false
+    @AppStorage("prefersDarkMode") private var prefersDarkMode: Bool = false
 
     // Add fields
     @State private var newExcluded = ""
@@ -67,12 +67,12 @@ struct AjustesView: View {
 
                 // MARK: — Macros
                 Section {
-                    Stepper("Calorías/día: \(viewModel.caloriesPerDay)", value: $viewModel.caloriesPerDay, in: 1000...5000, step: 50)
-                    Stepper("Proteína: \(viewModel.proteinG) g", value: $viewModel.proteinG, in: 50...400, step: 5)
-                    Stepper("Carbos: \(viewModel.carbsG) g", value: $viewModel.carbsG, in: 50...600, step: 5)
-                    Stepper("Grasas: \(viewModel.fatG) g", value: $viewModel.fatG, in: 20...200, step: 5)
+                    LabeledContent("Calorías/día", value: "\(viewModel.caloriesPerDay) kcal")
+                    LabeledContent("Proteína", value: "\(viewModel.proteinG) g")
+                    LabeledContent("Carbos", value: "\(viewModel.carbsG) g")
+                    LabeledContent("Grasas", value: "\(viewModel.fatG) g")
                 } header: {
-                    Text("Macronutrientes")
+                    Text("Macronutrientes (calculado por el servidor)")
                 }
 
                 // MARK: — Preferencias alimentarias
@@ -143,6 +143,7 @@ struct AjustesView: View {
                 Text(viewModel.saveError ?? "")
             }
         }
+        .preferredColorScheme(prefersDarkMode ? .dark : .light)
     }
 
     // MARK: — Tags Subsection

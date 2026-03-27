@@ -46,4 +46,11 @@ final class AjustesViewModelTests: XCTestCase {
         XCTAssertNil(vm.loadError)
         XCTAssertNil(vm.saveError)
     }
+
+    func testAddToListTrimsWhitespace() {
+        let vm = AjustesViewModel()
+        vm.addToList(\.favorites, value: "  salmón  ")
+        XCTAssertTrue(vm.favorites.contains("salmón"))
+        XCTAssertFalse(vm.favorites.contains("  salmón  "))
+    }
 }

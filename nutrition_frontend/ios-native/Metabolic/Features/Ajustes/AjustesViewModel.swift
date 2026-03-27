@@ -56,28 +56,18 @@ final class AjustesViewModel {
         isSaving = true
         defer { isSaving = false }
         do {
-            struct ProfilePayload: Encodable {
-                let name: String
-                let gender: String
-                let age: Int
-                let height_cm: Int
-                let weight_kg: Double
-                let activity_level: String
-                let goal: String
-            }
-            struct PrefsPayload: Encodable {
-                let excluded: [String]
-                let favorites: [String]
-                let disliked: [String]
-            }
-            async let _: UserProfile = APIClient.shared.put(.profile, body: ProfilePayload(
+            let profilePayload = ProfilePayload(
                 name: name, gender: gender, age: age,
                 height_cm: heightCm, weight_kg: weightKg,
                 activity_level: activityLevel, goal: goal
-            ))
-            async let _: UserPreferences = APIClient.shared.put(.preferences, body: PrefsPayload(
+            )
+            let prefsPayload = PrefsPayload(
                 excluded: excluded, favorites: favorites, disliked: disliked
-            ))
+            )
+            async let profileSave: UserProfile = APIClient.shared.put(.profile, body: profilePayload)
+            async let prefsSave: UserPreferences = APIClient.shared.put(.preferences, body: prefsPayload)
+            // Await both in parallel — if either throws, the other is cancelled
+            _ = try await (profileSave, prefsSave)
         } catch {
             saveError = error.localizedDescription
         }
@@ -92,4 +82,20 @@ final class AjustesViewModel {
     func removeFromList(_ list: WritableKeyPath<AjustesViewModel, [String]>, value: String) {
         self[keyPath: list].removeAll { $0 == value }
     }
+}
+
+private struct ProfilePayload: Encodable {
+    let name: String
+    let gender: String
+    let age: Int
+    let height_cm: Int
+    let weight_kg: Double
+    let activity_level: String
+    let goal: String
+}
+
+private struct PrefsPayload: Encodable {
+    let excluded: [String]
+    let favorites: [String]
+    let disliked: [String]
 }
