@@ -11,15 +11,12 @@ final class DietaViewModel {
 
     enum PlanMode: Equatable { case daily, weekly }
 
+    // Stored target from the last loaded daily plan (sum of planned meal kcals)
+    var plannedKcal: Int = 0
+
     var totalConsumedKcal: Int {
         guard case .loaded(let data) = dailyState else { return 0 }
         return data.meals.reduce(0) { $0 + $1.kcal }
-    }
-
-    var dailyTarget: Int {
-        // Target comes from profile; use sum of meals as proxy when loaded
-        guard case .loaded(let data) = dailyState else { return 0 }
-        return data.meals.isEmpty ? 0 : data.meals.reduce(0) { $0 + $1.kcal }
     }
 
     func load() async {
@@ -30,6 +27,7 @@ final class DietaViewModel {
         dailyState = .loading
         do {
             let response: DietTodayResponse = try await APIClient.shared.get(.dietToday)
+            plannedKcal = response.meals.reduce(0) { $0 + $1.kcal }
             dailyState = .loaded(response)
         } catch {
             dailyState = .error(error.localizedDescription)
