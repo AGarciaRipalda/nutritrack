@@ -38,10 +38,14 @@ final class EntrenoViewModelTests: XCTestCase {
         XCTAssertEqual(vm.todayCount, 1)
     }
 
-    func testSubtitlePluralization() {
-        // todayCount == 0 → "0 sesiones hoy"
+    func testTodayCountPluralWithTwoWorkouts() {
         let vm = EntrenoViewModel()
-        // We can't test the view subtitle directly, but we can verify todayCount returns 0 for empty
-        XCTAssertEqual(vm.todayCount, 0)
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
+        let todayStr = formatter.string(from: Date())
+        let w1 = Workout(id: "w1", name: "Push", status: "completed", startedAt: todayStr, finishedAt: todayStr, durationSeconds: 3600, totalVolumeKg: 1500, totalSets: 20, trainingBlock: nil)
+        let w2 = Workout(id: "w2", name: "Pull", status: "completed", startedAt: todayStr, finishedAt: todayStr, durationSeconds: 3000, totalVolumeKg: 1200, totalSets: 18, trainingBlock: nil)
+        vm.workoutsState = .loaded([w1, w2])
+        XCTAssertEqual(vm.todayCount, 2)
     }
 }
