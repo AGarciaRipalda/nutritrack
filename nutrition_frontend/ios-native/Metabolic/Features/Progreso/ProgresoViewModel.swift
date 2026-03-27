@@ -11,6 +11,11 @@ final class ProgresoViewModel {
     var isLogging = false
     var logError: String? = nil
 
+    private struct WeightPayload: Encodable {
+        let weight_kg: Double
+        let date: String
+    }
+
     var currentEntry: WeightEntry? {
         guard case .loaded(let data) = state else { return nil }
         return data.entries.first
@@ -31,14 +36,15 @@ final class ProgresoViewModel {
         }
     }
 
+    func prepareForLogging() {
+        logWeight = currentEntry?.weightKg ?? 80.0
+        logDate = Date()
+    }
+
     func logWeightEntry() async {
         isLogging = true
         defer { isLogging = false }
         do {
-            struct WeightPayload: Encodable {
-                let weight_kg: Double
-                let date: String
-            }
             let formatter = DateFormatter()
             formatter.dateFormat = "yyyy-MM-dd"
             let payload = WeightPayload(weight_kg: logWeight, date: formatter.string(from: logDate))

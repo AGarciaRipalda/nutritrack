@@ -4,6 +4,26 @@ import Charts
 struct ProgresoView: View {
     @State private var viewModel = ProgresoViewModel()
 
+    private static let entryDateFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd"
+        return f
+    }()
+
+    private static let longDateFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "d 'de' MMMM"
+        f.locale = Locale(identifier: "es_ES")
+        return f
+    }()
+
+    private static let shortDateFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "d MMM"
+        f.locale = Locale(identifier: "es_ES")
+        return f
+    }()
+
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -21,6 +41,7 @@ struct ProgresoView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     PillButton("Registrar", icon: "plus") {
+                        viewModel.prepareForLogging()
                         viewModel.showLogSheet = true
                     }
                 }
@@ -77,13 +98,8 @@ struct ProgresoView: View {
     }
 
     private func formattedDate(_ dateStr: String) -> String {
-        let parser = DateFormatter()
-        parser.dateFormat = "yyyy-MM-dd"
-        guard let date = parser.date(from: dateStr) else { return dateStr }
-        let formatter = DateFormatter()
-        formatter.dateFormat = "d 'de' MMMM"
-        formatter.locale = Locale(identifier: "es_ES")
-        return formatter.string(from: date)
+        guard let date = ProgresoView.entryDateFormatter.date(from: dateStr) else { return dateStr }
+        return ProgresoView.longDateFormatter.string(from: date)
     }
 
     // MARK: — Evolution Chart
@@ -124,6 +140,10 @@ struct ProgresoView: View {
     }
 
     // MARK: — History Section
+    private var historialEntries: [WeightEntry] {
+        viewModel.chartEntries.reversed() // newest first for history list
+    }
+
     @ViewBuilder
     private var historialSection: some View {
         if !viewModel.chartEntries.isEmpty {
@@ -132,7 +152,7 @@ struct ProgresoView: View {
                     Text("Historial")
                         .font(.headline)
 
-                    ForEach(viewModel.chartEntries.reversed()) { entry in
+                    ForEach(historialEntries) { entry in
                         HStack {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(String(format: "%.1f kg", entry.weightKg))
@@ -148,7 +168,7 @@ struct ProgresoView: View {
                         }
                         .padding(.vertical, 2)
 
-                        if entry.id != viewModel.chartEntries.reversed().last?.id {
+                        if entry.id != historialEntries.last?.id {
                             Divider()
                         }
                     }
@@ -158,13 +178,8 @@ struct ProgresoView: View {
     }
 
     private func shortDate(_ dateStr: String) -> String {
-        let parser = DateFormatter()
-        parser.dateFormat = "yyyy-MM-dd"
-        guard let date = parser.date(from: dateStr) else { return dateStr }
-        let formatter = DateFormatter()
-        formatter.dateFormat = "d MMM"
-        formatter.locale = Locale(identifier: "es_ES")
-        return formatter.string(from: date)
+        guard let date = ProgresoView.entryDateFormatter.date(from: dateStr) else { return dateStr }
+        return ProgresoView.shortDateFormatter.string(from: date)
     }
 
     // MARK: — Log Weight Sheet
