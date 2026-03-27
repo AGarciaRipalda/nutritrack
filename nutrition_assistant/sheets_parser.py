@@ -85,12 +85,6 @@ def _load_google_sheets_sessions(days: int) -> list[dict[str, Any]]:
         os.getenv("GOOGLE_SHEETS_SPREADSHEET_NAME")
         or config.get("spreadsheet_name")
     )
-    worksheet_name = (
-        os.getenv("GOOGLE_SHEETS_WORKSHEET")
-        or config.get("worksheet")
-        or "Entrenamientos"
-    )
-
     if not spreadsheet_id and not spreadsheet_name:
         return []
 
@@ -105,8 +99,14 @@ def _load_google_sheets_sessions(days: int) -> list[dict[str, Any]]:
     else:
         spreadsheet = client.open(spreadsheet_name)
 
-    worksheet = spreadsheet.worksheet(worksheet_name)
-    rows = worksheet.get_all_records(default_blank="")
+    rows: list[dict[str, Any]] = []
+    for worksheet_name in _get_google_worksheet_candidates(config):
+        try:
+            worksheet = spreadsheet.worksheet(worksheet_name)
+        except Exception:
+            continue
+        rows.extend(worksheet.get_all_records(default_blank=""))
+
     return _build_sessions(rows, days)
 
 
@@ -117,24 +117,21 @@ def _load_excel_sessions(days: int) -> list[dict[str, Any]]:
         return []
 
     config = _load_config()
-    worksheet_name = (
-        os.getenv("LOCAL_GYM_WORKSHEET")
-        or config.get("local_worksheet")
-        or config.get("worksheet")
-    )
-
     workbook = load_workbook(_LOCAL_XLSX_PATH, data_only=True, read_only=True)
-    sheet = workbook[worksheet_name] if worksheet_name and worksheet_name in workbook.sheetnames else workbook.active
-    rows = list(sheet.iter_rows(values_only=True))
-    if not rows:
-        return []
-
-    headers = [str(cell).strip() if cell is not None else "" for cell in rows[0]]
     payload: list[dict[str, Any]] = []
-    for row in rows[1:]:
-        if not any(cell not in (None, "") for cell in row):
+    candidate_names = _get_excel_worksheet_candidates(config, workbook.sheetnames)
+    for worksheet_name in candidate_names:
+        if worksheet_name not in workbook.sheetnames:
             continue
-        payload.append({headers[idx]: row[idx] for idx in range(min(len(headers), len(row)))})
+        sheet = workbook[worksheet_name]
+        rows = list(sheet.iter_rows(values_only=True))
+        if not rows:
+            continue
+        headers = [str(cell).strip() if cell is not None else "" for cell in rows[0]]
+        for row in rows[1:]:
+            if not any(cell not in (None, "") for cell in row):
+                continue
+            payload.append({headers[idx]: row[idx] for idx in range(min(len(headers), len(row)))})
     return _build_sessions(payload, days)
 
 
@@ -271,6 +268,66 @@ def _load_config() -> dict[str, Any]:
     return raw if isinstance(raw, dict) else {}
 
 
+def _get_google_worksheet_candidates(config: dict[str, Any]) -> list[str]:
+    explicit = os.getenv("GOOGLE_SHEETS_WORKSHEET") or config.get("worksheet")
+    if explicit:
+        return _unique_names([explicit])
+    return _worksheet_candidates_from_date_window()
+
+
+def _get_excel_worksheet_candidates(config: dict[str, Any], sheetnames: list[str]) -> list[str]:
+    explicit = os.getenv("LOCAL_GYM_WORKSHEET") or config.get("local_worksheet") or config.get("worksheet")
+    if explicit:
+        return _unique_names([explicit])
+
+    candidates = _worksheet_candidates_from_date_window()
+    matches = [name for name in sheetnames if _normalize_key(name) in {_normalize_key(c) for c in candidates}]
+    return _unique_names(matches or candidates or [sheetnames[0]])
+
+
+def _worksheet_candidates_from_date_window() -> list[str]:
+    today = date.today()
+    previous = (today.replace(day=1) - timedelta(days=1))
+    candidates: list[str] = []
+    for current in (today, previous):
+        year = current.year
+        month_num = current.month
+        month_num_2 = f"{month_num:02d}"
+        month_es = _MONTH_NAMES_ES[month_num - 1]
+        month_cap = month_es.capitalize()
+
+        candidates.extend([
+            month_es,
+            month_cap,
+            f"{month_num}",
+            month_num_2,
+            f"{year}-{month_num_2}",
+            f"{month_num_2}-{year}",
+            f"{year}_{month_num_2}",
+            f"{month_num_2}_{year}",
+            f"{month_es}_{year}",
+            f"{month_cap}_{year}",
+            f"{month_es} {year}",
+            f"{month_cap} {year}",
+            f"{month_num_2}_{month_es}",
+            f"{month_num_2}_{month_cap}",
+        ])
+
+    return _unique_names(candidates + ["Entrenamientos"])
+
+
+def _unique_names(values: list[str]) -> list[str]:
+    seen: set[str] = set()
+    result: list[str] = []
+    for value in values:
+        normalized = _normalize_key(value)
+        if not normalized or normalized in seen:
+            continue
+        seen.add(normalized)
+        result.append(value)
+    return result
+
+
 def _extract_first(row: dict[str, Any], aliases: set[str]) -> Any:
     for key in aliases:
         if key in row and row[key] not in (None, ""):
@@ -344,3 +401,18 @@ _KG_S2_KEYS = {
 _REPS_S2_KEYS = {
     "reps_s2", "rep_s2", "serie2_reps", "s2_reps", "set2_reps", "reps2",
 }
+
+_MONTH_NAMES_ES = [
+    "enero",
+    "febrero",
+    "marzo",
+    "abril",
+    "mayo",
+    "junio",
+    "julio",
+    "agosto",
+    "septiembre",
+    "octubre",
+    "noviembre",
+    "diciembre",
+]
