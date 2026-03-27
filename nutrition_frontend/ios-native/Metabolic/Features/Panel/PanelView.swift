@@ -114,9 +114,7 @@ struct PanelView: View {
     }
 
     private var restantesValue: String {
-        guard case .loaded(let data) = viewModel.state,
-              let nutrition = data.nutritionData else { return "0" }
-        return "\(nutrition.targetKcal - nutrition.consumedKcal)"
+        "\(viewModel.restantes)"
     }
 
     private var consumedLabel: String {

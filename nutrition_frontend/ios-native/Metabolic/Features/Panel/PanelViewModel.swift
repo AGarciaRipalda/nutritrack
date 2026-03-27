@@ -18,11 +18,15 @@ final class PanelViewModel {
         return balance.intake - balance.target + balance.activeExpenditure
     }
 
-    var todayDateString: String {
+    private let dateFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.dateFormat = "EEEE, d MMM"
         formatter.locale = Locale(identifier: "es_ES")
-        return formatter.string(from: Date()).capitalized
+        return formatter
+    }()
+
+    var todayDateString: String {
+        dateFormatter.string(from: Date()).capitalized
     }
 
     func load() async {
