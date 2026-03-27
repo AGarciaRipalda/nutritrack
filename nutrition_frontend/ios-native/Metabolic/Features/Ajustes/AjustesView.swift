@@ -55,11 +55,11 @@ struct AjustesView: View {
                         Text("Ganar músculo").tag("gain")
                     }
                     Picker("Actividad", selection: $viewModel.activityLevel) {
-                        Text("Sedentario").tag("sedentary")
-                        Text("Ligeramente activo").tag("light")
-                        Text("Moderadamente activo").tag("moderate")
-                        Text("Muy activo").tag("active")
-                        Text("Extremadamente activo").tag("very_active")
+                        Text("Sedentario").tag(1)
+                        Text("Ligeramente activo").tag(2)
+                        Text("Moderadamente activo").tag(3)
+                        Text("Muy activo").tag(4)
+                        Text("Extremadamente activo").tag(5)
                     }
                 } header: {
                     Text("Objetivos")

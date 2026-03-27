@@ -1,70 +1,84 @@
 import Foundation
 
+// MARK: — Dashboard
+
 struct DashboardResponse: Codable, Sendable {
     let nutritionData: NutritionData?
     let exerciseData: ExerciseData?
-    let weightData: WeightData?
     let goalBalance: GoalBalance?
 
     enum CodingKeys: String, CodingKey {
-        case nutritionData = "nutrition_data"
+        case nutritionData = "nutrition"         // API key is "nutrition", not "nutrition_data"
         case exerciseData = "exercise_data"
-        case weightData = "weight_data"
         case goalBalance = "goal_balance"
     }
 }
 
+// Maps to dashboard "nutrition" object: {"bmr":…,"daily_target":…,"macros":{…}}
 struct NutritionData: Codable, Sendable {
+    let dailyTarget: Int
+    let macros: MacroData
+
+    enum CodingKeys: String, CodingKey {
+        case dailyTarget = "daily_target"
+        case macros
+    }
+
+    // Convenience computed vars — keep view code unchanged
+    var targetKcal: Int    { macros.targetKcal }
+    var proteinG: Double   { macros.proteinG }
+    var carbsG: Double     { macros.carbG }   // API field is "carb_g", view uses carbsG
+    var fatG: Double       { macros.fatG }
+}
+
+struct MacroData: Codable, Sendable {
     let targetKcal: Int
-    let consumedKcal: Int
     let proteinG: Double
-    let carbsG: Double
+    let carbG: Double
     let fatG: Double
 
     enum CodingKeys: String, CodingKey {
         case targetKcal = "target_kcal"
-        case consumedKcal = "consumed_kcal"
-        case proteinG = "protein_g"
-        case carbsG = "carbs_g"
-        case fatG = "fat_g"
+        case proteinG   = "protein_g"
+        case carbG      = "carb_g"
+        case fatG       = "fat_g"
     }
 }
 
+// Maps to dashboard "exercise_data": {"burned_kcal":0,"adjustment_kcal":0,"exercises":[]}
+// steps/activeMinutes/bpm are NOT returned by the backend yet — kept Optional for future Apple Health sync
 struct ExerciseData: Codable, Sendable {
     let burnedKcal: Int
-    let steps: Int
-    let activeMinutes: Int
+    let adjustmentKcal: Int
+    let steps: Int?
+    let activeMinutes: Int?
     let bpm: Int?
 
     enum CodingKeys: String, CodingKey {
-        case burnedKcal = "burned_kcal"
+        case burnedKcal      = "burned_kcal"
+        case adjustmentKcal  = "adjustment_kcal"
         case steps
-        case activeMinutes = "active_minutes"
+        case activeMinutes   = "active_minutes"
         case bpm
     }
 }
 
-struct WeightData: Codable, Sendable {
-    let currentKg: Double
-    let changeKg: Double?
-
-    enum CodingKeys: String, CodingKey {
-        case currentKg = "current_kg"
-        case changeKg = "change_kg"
-    }
-}
-
+// Maps to dashboard "goal_balance": {"consumed_kcal":0,"active_kcal":438,"net_balance":-438,"target_net":1587,…}
 struct GoalBalance: Codable, Sendable {
-    let intake: Int
-    let target: Int
-    let activeExpenditure: Int
-    let difference: Int
+    let consumedKcal: Int
+    let activeKcal: Int
+    let netBalance: Int
+    let targetNet: Int
 
     enum CodingKeys: String, CodingKey {
-        case intake, target, difference
-        case activeExpenditure = "active_expenditure"
+        case consumedKcal = "consumed_kcal"
+        case activeKcal   = "active_kcal"
+        case netBalance   = "net_balance"
+        case targetNet    = "target_net"
     }
 }
+
+// MARK: — Diet
 
 struct Meal: Codable, Identifiable, Sendable {
     let id: String
@@ -79,8 +93,8 @@ struct Meal: Codable, Identifiable, Sendable {
         case id, name, kcal
         case mealType = "meal_type"
         case proteinG = "protein_g"
-        case carbsG = "carbs_g"
-        case fatG = "fat_g"
+        case carbsG   = "carbs_g"
+        case fatG     = "fat_g"
     }
 }
 

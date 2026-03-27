@@ -8,14 +8,14 @@ final class PanelViewModel {
 
     var restantes: Int {
         guard case .loaded(let data) = state,
-              let nutrition = data.nutritionData else { return 0 }
-        return nutrition.targetKcal - nutrition.consumedKcal
+              let balance = data.goalBalance else { return 0 }
+        return balance.targetNet - balance.consumedKcal
     }
 
     var diferencia: Int {
         guard case .loaded(let data) = state,
               let balance = data.goalBalance else { return 0 }
-        return balance.intake - balance.target + balance.activeExpenditure
+        return balance.netBalance
     }
 
     private let dateFormatter: DateFormatter = {

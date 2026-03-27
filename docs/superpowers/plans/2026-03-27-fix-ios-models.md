@@ -50,7 +50,7 @@
 4. `GoalBalance` fields (`intake`, `target`, `activeExpenditure`, `difference`) → none exist in API → `keyNotFound` crash
 5. `WeightData` is mapped in `DashboardResponse` but never returned by dashboard endpoint
 
-- [ ] **Step 1: Replace NutritionModels.swift entirely**
+- [x] **Step 1: Replace NutritionModels.swift entirely**
 
 ```swift
 import Foundation
@@ -175,7 +175,7 @@ struct DietWeeklyResponse: Codable, Sendable {
 }
 ```
 
-- [ ] **Step 2: Verify file saved correctly**
+- [x] **Step 2: Verify file saved correctly**
 
 Open `NutritionModels.swift` and confirm:
 - `DashboardResponse` has 3 fields (not 4)
@@ -184,7 +184,7 @@ Open `NutritionModels.swift` and confirm:
 - `GoalBalance` has `consumedKcal`, `activeKcal`, `netBalance`, `targetNet`
 - `WeightData` struct is GONE
 
-- [ ] **Step 3: Build project to check for compile errors**
+- [x] **Step 3: Build project to check for compile errors**
 
 In Xcode: Cmd+B or run `xcodebuild -scheme Metabolic -sdk iphonesimulator build 2>&1 | grep -E "error:|warning:" | head -30`
 
@@ -205,7 +205,7 @@ New mapping:
 - `restantes` = `balance.targetNet - balance.consumedKcal` (remaining calories to reach adjusted daily target)
 - `diferencia` = `balance.netBalance` (already computed by backend)
 
-- [ ] **Step 1: Replace PanelViewModel.swift**
+- [x] **Step 1: Replace PanelViewModel.swift**
 
 ```swift
 import Foundation
@@ -251,7 +251,7 @@ final class PanelViewModel {
 }
 ```
 
-- [ ] **Step 2: Build to check compile errors in PanelViewModel**
+- [x] **Step 2: Build to check compile errors in PanelViewModel**
 
 Expected: PanelViewModel compiles cleanly. Remaining errors are in PanelView.swift.
 
@@ -273,7 +273,7 @@ Expected: PanelViewModel compiles cleanly. Remaining errors are in PanelView.swi
 
 Only these 7 computed vars change. The rest of the view is untouched.
 
-- [ ] **Step 1: Fix `calorieProgress`**
+- [x] **Step 1: Fix `calorieProgress`**
 
 Old (lines 109–114):
 ```swift
@@ -296,7 +296,7 @@ private var calorieProgress: Double {
 }
 ```
 
-- [ ] **Step 2: Fix `consumedLabel`**
+- [x] **Step 2: Fix `consumedLabel`**
 
 Old (lines 120–124):
 ```swift
@@ -317,7 +317,7 @@ private var consumedLabel: String {
 }
 ```
 
-- [ ] **Step 3: Fix `stepsValue`**
+- [x] **Step 3: Fix `stepsValue`**
 
 Old (lines 193–197):
 ```swift
@@ -337,7 +337,7 @@ private var stepsValue: String {
 }
 ```
 
-- [ ] **Step 4: Fix `activeMinValue`**
+- [x] **Step 4: Fix `activeMinValue`**
 
 Old (lines 199–203):
 ```swift
@@ -357,7 +357,7 @@ private var activeMinValue: String {
 }
 ```
 
-- [ ] **Step 5: Fix `ingestaValue`**
+- [x] **Step 5: Fix `ingestaValue`**
 
 Old (lines 253–257):
 ```swift
@@ -377,7 +377,7 @@ private var ingestaValue: String {
 }
 ```
 
-- [ ] **Step 6: Fix `metaValue`**
+- [x] **Step 6: Fix `metaValue`**
 
 Old (lines 259–263):
 ```swift
@@ -397,7 +397,7 @@ private var metaValue: String {
 }
 ```
 
-- [ ] **Step 7: Fix `gastoValue`**
+- [x] **Step 7: Fix `gastoValue`**
 
 Old (lines 265–269):
 ```swift
@@ -417,7 +417,7 @@ private var gastoValue: String {
 }
 ```
 
-- [ ] **Step 8: Build — Panel should now compile clean**
+- [x] **Step 8: Build — Panel should now compile clean**
 
 Expected: No errors in Panel files.
 
@@ -431,7 +431,7 @@ Expected: No errors in Panel files.
 ### Root cause:
 `activityLevel: String` but API returns `"activity_level": 1` (Int) → `typeMismatch` error when decoding `/profile` → Ajustes screen shows "Error al cargar".
 
-- [ ] **Step 1: Change `activityLevel` type to `Int`**
+- [x] **Step 1: Change `activityLevel` type to `Int`**
 
 Old:
 ```swift
@@ -495,7 +495,7 @@ Activity level mapping (standard Harris-Benedict):
 | 4   | Muy activo |
 | 5   | Extremadamente activo |
 
-- [ ] **Step 1: Replace AjustesViewModel.swift**
+- [x] **Step 1: Replace AjustesViewModel.swift**
 
 ```swift
 import Foundation
@@ -600,7 +600,7 @@ private struct PrefsPayload: Encodable {
 }
 ```
 
-- [ ] **Step 2: Update Picker in AjustesView.swift — lines 57–63**
+- [x] **Step 2: Update Picker in AjustesView.swift — lines 57–63**
 
 Old:
 ```swift
@@ -624,13 +624,13 @@ Picker("Actividad", selection: $viewModel.activityLevel) {
 }
 ```
 
-- [ ] **Step 3: Build — full project should compile clean**
+- [x] **Step 3: Build — full project should compile clean**
 
 Run: `xcodebuild -scheme Metabolic -sdk iphonesimulator build 2>&1 | grep "error:" | head -20`
 
 Expected: 0 errors.
 
-- [ ] **Step 4: Commit**
+- [ ] **Step 4: Commit** (pending user request)
 
 ```bash
 cd /Users/practica/Desktop/Metabolic

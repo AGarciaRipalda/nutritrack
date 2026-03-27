@@ -6,7 +6,7 @@ struct UserProfile: Codable, Sendable {
     let age: Int
     let heightCm: Int
     let weightKg: Double
-    let activityLevel: String
+    let activityLevel: Int    // API returns integer: 1=sedentary … 5=very active
     let goal: String
 
     enum CodingKeys: String, CodingKey {

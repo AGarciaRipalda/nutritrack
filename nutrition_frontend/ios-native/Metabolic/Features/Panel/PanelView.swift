@@ -109,8 +109,9 @@ struct PanelView: View {
     private var calorieProgress: Double {
         guard case .loaded(let data) = viewModel.state,
               let nutrition = data.nutritionData,
+              let balance = data.goalBalance,
               nutrition.targetKcal > 0 else { return 0 }
-        return min(Double(nutrition.consumedKcal) / Double(nutrition.targetKcal), 1.0)
+        return min(Double(balance.consumedKcal) / Double(nutrition.targetKcal), 1.0)
     }
 
     private var restantesValue: String {
@@ -119,8 +120,9 @@ struct PanelView: View {
 
     private var consumedLabel: String {
         guard case .loaded(let data) = viewModel.state,
-              let nutrition = data.nutritionData else { return "0 / 0" }
-        return "\(nutrition.consumedKcal) / \(nutrition.targetKcal)"
+              let nutrition = data.nutritionData,
+              let balance = data.goalBalance else { return "0 / 0" }
+        return "\(balance.consumedKcal) / \(nutrition.targetKcal)"
     }
 
     private var proteinValue: String {
@@ -193,13 +195,13 @@ struct PanelView: View {
     private var stepsValue: String {
         guard case .loaded(let data) = viewModel.state,
               let exercise = data.exerciseData else { return "0" }
-        return "\(exercise.steps)"
+        return "\(exercise.steps ?? 0)"
     }
 
     private var activeMinValue: String {
         guard case .loaded(let data) = viewModel.state,
               let exercise = data.exerciseData else { return "0" }
-        return "\(exercise.activeMinutes)"
+        return "\(exercise.activeMinutes ?? 0)"
     }
 
     private var bpmValue: String {
@@ -253,19 +255,19 @@ struct PanelView: View {
     private var ingestaValue: String {
         guard case .loaded(let data) = viewModel.state,
               let b = data.goalBalance else { return "0 kcal" }
-        return "\(b.intake) kcal"
+        return "\(b.consumedKcal) kcal"
     }
 
     private var metaValue: String {
         guard case .loaded(let data) = viewModel.state,
               let b = data.goalBalance else { return "0 kcal" }
-        return "\(b.target) kcal"
+        return "\(b.targetNet) kcal"
     }
 
     private var gastoValue: String {
         guard case .loaded(let data) = viewModel.state,
               let b = data.goalBalance else { return "+0 kcal" }
-        return "+\(b.activeExpenditure) kcal"
+        return "+\(b.activeKcal) kcal"
     }
 
     private var diferenciaValue: String {

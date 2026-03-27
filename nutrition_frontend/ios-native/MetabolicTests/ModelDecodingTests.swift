@@ -11,7 +11,7 @@ final class ModelDecodingTests: XCTestCase {
             "age": 28,
             "height_cm": 178,
             "weight_kg": 80.0,
-            "activity_level": "moderate",
+            "activity_level": 3,
             "goal": "lose"
         }
         """.data(using: .utf8)!
@@ -88,14 +88,14 @@ final class ModelDecodingTests: XCTestCase {
     func testGoalBalanceDecodes() throws {
         let json = """
         {
-            "intake": 1500,
-            "target": 2100,
-            "active_expenditure": 300,
-            "difference": -300
+            "consumed_kcal": 1500,
+            "active_kcal": 300,
+            "net_balance": -200,
+            "target_net": 2100
         }
         """.data(using: .utf8)!
         let balance = try JSONDecoder().decode(GoalBalance.self, from: json)
-        XCTAssertEqual(balance.intake, 1500)
-        XCTAssertEqual(balance.activeExpenditure, 300)
+        XCTAssertEqual(balance.consumedKcal, 1500)
+        XCTAssertEqual(balance.activeKcal, 300)
     }
 }

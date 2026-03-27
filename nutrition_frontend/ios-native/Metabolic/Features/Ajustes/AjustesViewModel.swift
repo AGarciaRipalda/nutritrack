@@ -11,7 +11,7 @@ final class AjustesViewModel {
     var age: Int = 25
     var heightCm: Int = 175
     var weightKg: Double = 75.0
-    var activityLevel: String = "moderate"
+    var activityLevel: Int = 1    // 1=sedentary … 5=very active
     var goal: String = "lose"
 
     // Macros (display only — backend computes from profile)
@@ -90,7 +90,7 @@ private struct ProfilePayload: Encodable {
     let age: Int
     let height_cm: Int
     let weight_kg: Double
-    let activity_level: String
+    let activity_level: Int    // Int — matches API schema
     let goal: String
 }
 
