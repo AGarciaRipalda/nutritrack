@@ -503,7 +503,7 @@ export default function WeeklyPlanPage() {
   const [loading, setLoading] = useState(true)
   const [stale, setStale] = useState(false)
   const [showRegenModal, setShowRegenModal] = useState(false)
-  const [regenApplyFrom, setRegenApplyFrom] = useState<"today" | "tomorrow">("tomorrow")
+  const [regenApplyFrom, setRegenApplyFrom] = useState<"today" | "tomorrow" | "all">("tomorrow")
   const [regenerating, setRegenerating] = useState(false)
   const [regenError, setRegenError] = useState<string | null>(null)
   const [shoppingList, setShoppingList] = useState<{ category: string; items: string[] }[]>([])
@@ -862,6 +862,17 @@ export default function WeeklyPlanPage() {
                     className="accent-emerald-400"
                   />
                   <span className="text-foreground text-sm">Desde mañana (mantiene el menú de hoy)</span>
+                </label>
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="applyFrom"
+                    value="all"
+                    checked={regenApplyFrom === "all"}
+                    onChange={() => setRegenApplyFrom("all")}
+                    className="accent-emerald-400"
+                  />
+                  <span className="text-foreground text-sm">Toda la semana (regenera todos los días)</span>
                 </label>
               </div>
 

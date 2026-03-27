@@ -525,7 +525,7 @@ export async function fetchShoppingList(): Promise<{ category: string; items: st
 }
 
 export async function regenerateWeeklyPlan(
-  applyFrom: "today" | "tomorrow" = "tomorrow"
+  applyFrom: "today" | "tomorrow" | "all" = "tomorrow"
 ): Promise<WeeklyPlanResponse> {
   const d = await post<any>("/diet/weekly/regenerate", { apply_from: applyFrom })
   const days: PlanDay[] = (d.days ?? []).map(transformPlanDay)

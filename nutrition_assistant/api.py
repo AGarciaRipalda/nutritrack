@@ -261,7 +261,7 @@ class EventModel(BaseModel):
 
 
 class RegenerateWeeklyModel(BaseModel):
-    apply_from: str = "tomorrow"   # "today" | "tomorrow"
+    apply_from: str = "tomorrow"   # "today" | "tomorrow" | "all"
 
 
 class SwapMealModel(BaseModel):
@@ -552,7 +552,9 @@ def regenerate_weekly_plan(
     apply_from = data.apply_from  # "today" or "tomorrow"
 
     existing_plan = session.get("week_plan")
-    if existing_plan and apply_from in ("today", "tomorrow"):
+    if apply_from == "all":
+        merged_days = new_plan["days"]
+    elif existing_plan and apply_from in ("today", "tomorrow"):
         from datetime import date as _date, timedelta
         cutoff = _date.fromisoformat(today)
         if apply_from == "tomorrow":
@@ -568,16 +570,18 @@ def regenerate_weekly_plan(
                 merged_days.append(old_days_by_date[d["date"]])
             else:
                 merged_days.append(d)
+    else:
+        merged_days = new_plan["days"]
 
-        # Discard FUTURE exercise_adj if apply_from == "today".
-        # Use `k <= today` (not `k < today`) so that today's adjustment is preserved
-        # per the spec: "exercise_adj[today] is preserved when apply_from == 'today'".
-        exercise_adj = session.get("exercise_adj", {})
-        if apply_from == "today":
-            exercise_adj = {k: v for k, v in exercise_adj.items() if k <= today}
-            save_session(exercise_adj=exercise_adj)
+    # Discard FUTURE exercise_adj if apply_from == "today".
+    # Use `k <= today` (not `k < today`) so that today's adjustment is preserved
+    # per the spec: "exercise_adj[today] is preserved when apply_from == 'today'".
+    exercise_adj = session.get("exercise_adj", {})
+    if apply_from == "today":
+        exercise_adj = {k: v for k, v in exercise_adj.items() if k <= today}
+        save_session(exercise_adj=exercise_adj)
 
-        new_plan["days"] = merged_days
+    new_plan["days"] = merged_days
 
     save_session(week_plan=new_plan)
 
