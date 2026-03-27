@@ -79,7 +79,7 @@ export default function DashboardPage() {
   const activeCaloriesProgress = Math.min(Math.round((activeCaloriesToday / activeCaloriesReference) * 100), 100)
 
   const macroSummary = [
-    { label: "Pro", name: "Prote?nas", current: dashboard.macros.protein.current, target: dashboard.macros.protein.target, color: "bg-red-500", chartColor: "#ef4444" },
+    { label: "Pro", name: "Proteínas", current: dashboard.macros.protein.current, target: dashboard.macros.protein.target, color: "bg-red-500", chartColor: "#ef4444" },
     { label: "Car", name: "Carbohidratos", current: dashboard.macros.carbs.current, target: dashboard.macros.carbs.target, color: "bg-amber-500", chartColor: "#f59e0b" },
     { label: "Fat", name: "Grasas", current: dashboard.macros.fat.current, target: dashboard.macros.fat.target, color: "bg-blue-500", chartColor: "#3b82f6" },
   ]

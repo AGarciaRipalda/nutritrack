@@ -26,15 +26,6 @@ export function AppLayout({ children }: { children: ReactNode }) {
         />
       )}
 
-      {/* Mobile hamburger button */}
-      <button
-        className="fixed top-3 left-4 z-30 md:hidden p-2 bg-card/80 border border-border rounded-xl text-primary shadow-sm backdrop-blur-md print:hidden"
-        onClick={() => setMobileOpen(true)}
-        aria-label="Abrir menú"
-      >
-        <Menu className="h-5 w-5" />
-      </button>
-
       {/* Layout */}
       <div className="relative flex gap-4 p-3 md:p-6 min-h-screen print:block print:p-0">
         <div className="print:hidden">
@@ -45,7 +36,17 @@ export function AppLayout({ children }: { children: ReactNode }) {
             onToggleCollapse={() => setCollapsed(!collapsed)}
           />
         </div>
-        <main className="flex-1 pt-10 md:pt-0 min-w-0 print:pt-0">
+        <main className="flex-1 min-w-0 print:pt-0">
+          {/* Mobile hamburger button — inside content flow, aligned with cards */}
+          <div className="md:hidden mb-2 print:hidden">
+            <button
+              className="p-2 bg-card/80 border border-border rounded-xl text-primary shadow-sm backdrop-blur-md"
+              onClick={() => setMobileOpen(true)}
+              aria-label="Abrir menú"
+            >
+              <Menu className="h-5 w-5" />
+            </button>
+          </div>
           <div className="max-w-[1680px] mx-auto h-full">
             {children}
           </div>
