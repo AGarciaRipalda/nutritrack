@@ -360,7 +360,12 @@ export default function TrainingPage() {
     setGymLoading(true)
     setGymError(null)
     fetchGymHistory(7)
-      .then(setGymHistory)
+      .then((history) => {
+        setGymHistory(history)
+        return fetchTraining()
+          .then(setData)
+          .catch(() => {})
+      })
       .catch(() => setGymError("No se pudo cargar el historial de gym. Verifica que el backend está activo y las credenciales configuradas."))
       .finally(() => setGymLoading(false))
   }
