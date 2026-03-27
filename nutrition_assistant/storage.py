@@ -22,7 +22,8 @@ DEFAULT_PROFILE = {
     "weight_kg": 80.0,
     "activity_level": 1,
     "goal": "maintain",
-    "week_start_day": 0
+    "week_start_day": 0,
+    "meal_count": 5
 }
 
 
@@ -63,6 +64,7 @@ def load_profile() -> dict:
                 "activity_level": row["activity_level"],
                 "goal": row["goal"],
                 "week_start_day": row["week_start_day"],
+                "meal_count": row.get("meal_count", 5),
             }
 
     # Fallback: JSON
@@ -82,15 +84,16 @@ def save_profile(profile: dict) -> None:
                     name=%(name)s, gender=%(gender)s, age=%(age)s,
                     height_cm=%(height_cm)s, weight_kg=%(weight_kg)s,
                     activity_level=%(activity_level)s, goal=%(goal)s,
-                    week_start_day=%(week_start_day)s, updated_at=NOW()
+                    week_start_day=%(week_start_day)s, meal_count=%(meal_count)s,
+                    updated_at=NOW()
                 WHERE id=%(id)s
             """, {**profile, "id": row["id"]})
         else:
             execute("""
                 INSERT INTO user_profiles (name, gender, age, height_cm, weight_kg,
-                                           activity_level, goal, week_start_day)
+                                           activity_level, goal, week_start_day, meal_count)
                 VALUES (%(name)s, %(gender)s, %(age)s, %(height_cm)s, %(weight_kg)s,
-                        %(activity_level)s, %(goal)s, %(week_start_day)s)
+                        %(activity_level)s, %(goal)s, %(week_start_day)s, %(meal_count)s)
             """, profile)
     else:
         with open(PROFILE_FILE, "w", encoding="utf-8") as f:
