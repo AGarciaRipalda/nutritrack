@@ -564,45 +564,47 @@ export default function TrainingPage() {
 
   return (
     <AppLayout>
-      <div className="space-y-6">
+      <div className="space-y-8">
         {/* Header */}
-        <Card className="backdrop-blur-xl bg-black/5 dark:bg-white/10 border border-black/20 dark:border-white/20 rounded-3xl p-6">
-          <div className="flex items-center gap-3">
-            <Dumbbell className="h-7 w-7 text-emerald-400" />
+        <Card className="backdrop-blur-xl bg-black/5 dark:bg-white/10 border border-black/20 dark:border-white/20 rounded-3xl p-7 md:p-8">
+          <div className="flex items-center gap-4">
+            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-500/12">
+              <Dumbbell className="h-7 w-7 text-emerald-400" />
+            </div>
             <div>
-              <h2 className="text-3xl font-bold text-foreground">Entrenamiento</h2>
-              <p className="text-muted-foreground">Registra ejercicios, consulta el historial y genera rutinas</p>
+              <h2 className="text-3xl font-bold tracking-tight text-foreground md:text-4xl">Entrenamiento</h2>
+              <p className="mt-1 text-sm text-muted-foreground md:text-base">Registra ejercicios, consulta el historial y genera rutinas con más contexto visual y menos densidad.</p>
             </div>
           </div>
         </Card>
 
         {/* Tabs */}
-        <Tabs defaultValue={activeWorkout ? "workout" : "workout"} className="space-y-6">
-          <TabsList className="bg-black/5 dark:bg-white/10 border border-black/10 dark:border-white/20 flex-wrap h-auto gap-1 p-1">
-            <TabsTrigger value="workout" className="data-[state=active]:bg-emerald-500/20 dark:data-[state=active]:bg-emerald-500/20 data-[state=active]:text-emerald-400 text-foreground/70">
-              <Play className="mr-1.5 h-3.5 w-3.5" />
+        <Tabs defaultValue={activeWorkout ? "workout" : "workout"} className="space-y-8">
+          <TabsList className="flex h-auto flex-wrap gap-2 rounded-3xl border border-black/10 bg-black/5 p-2 dark:border-white/20 dark:bg-white/10">
+            <TabsTrigger value="workout" className="min-h-[48px] rounded-2xl px-4 text-sm font-medium data-[state=active]:bg-emerald-500/20 data-[state=active]:text-emerald-400 dark:data-[state=active]:bg-emerald-500/20 text-foreground/70">
+              <Play className="mr-2 h-4 w-4" />
               {activeWorkout ? "Workout activo" : "Workout"}
             </TabsTrigger>
-            <TabsTrigger value="routines" className="data-[state=active]:bg-black/10 dark:data-[state=active]:bg-white/20 data-[state=active]:text-foreground text-foreground/70">
-              <ListChecks className="mr-1.5 h-3.5 w-3.5" />
+            <TabsTrigger value="routines" className="min-h-[48px] rounded-2xl px-4 text-sm font-medium data-[state=active]:bg-black/10 data-[state=active]:text-foreground dark:data-[state=active]:bg-white/20 text-foreground/70">
+              <ListChecks className="mr-2 h-4 w-4" />
               Mis Rutinas
             </TabsTrigger>
-            <TabsTrigger value="analytics" className="data-[state=active]:bg-black/10 dark:data-[state=active]:bg-white/20 data-[state=active]:text-foreground text-foreground/70" onClick={loadAnalytics}>
-              <BarChart3 className="mr-1.5 h-3.5 w-3.5" />
+            <TabsTrigger value="analytics" className="min-h-[48px] rounded-2xl px-4 text-sm font-medium data-[state=active]:bg-black/10 data-[state=active]:text-foreground dark:data-[state=active]:bg-white/20 text-foreground/70" onClick={loadAnalytics}>
+              <BarChart3 className="mr-2 h-4 w-4" />
               Analytics
             </TabsTrigger>
-            <TabsTrigger value="log" className="data-[state=active]:bg-black/10 dark:data-[state=active]:bg-white/20 data-[state=active]:text-foreground text-foreground/70">
+            <TabsTrigger value="log" className="min-h-[48px] rounded-2xl px-4 text-sm font-medium data-[state=active]:bg-black/10 data-[state=active]:text-foreground dark:data-[state=active]:bg-white/20 text-foreground/70">
               Registrar
             </TabsTrigger>
-            <TabsTrigger value="history" className="data-[state=active]:bg-black/10 dark:data-[state=active]:bg-white/20 data-[state=active]:text-foreground text-foreground/70">
+            <TabsTrigger value="history" className="min-h-[48px] rounded-2xl px-4 text-sm font-medium data-[state=active]:bg-black/10 data-[state=active]:text-foreground dark:data-[state=active]:bg-white/20 text-foreground/70">
               Historial
             </TabsTrigger>
             <TabsTrigger
               value="gym"
-              className="data-[state=active]:bg-black/10 dark:data-[state=active]:bg-white/20 data-[state=active]:text-foreground text-foreground/70"
+              className="min-h-[48px] rounded-2xl px-4 text-sm font-medium data-[state=active]:bg-black/10 data-[state=active]:text-foreground dark:data-[state=active]:bg-white/20 text-foreground/70"
               onClick={() => { if (!gymLoading) loadGymHistory() }}
             >
-              <Sheet className="mr-1.5 h-3.5 w-3.5" />
+              <Sheet className="mr-2 h-4 w-4" />
               Gym
             </TabsTrigger>
           </TabsList>
@@ -630,45 +632,59 @@ export default function TrainingPage() {
                 />
               </Card>
             ) : (
-              <div className="space-y-4">
+              <div className="space-y-6">
                 {/* Start empty workout */}
-                <Card className="backdrop-blur-xl bg-black/5 dark:bg-white/5 border-black/20 dark:border-white/20 rounded-3xl p-6">
-                  <div className="text-center space-y-3">
-                    <div className="h-16 w-16 rounded-2xl bg-emerald-500/10 flex items-center justify-center mx-auto">
-                      <Dumbbell className="h-8 w-8 text-emerald-400" />
+                <Card className="backdrop-blur-xl bg-black/5 dark:bg-white/5 border-black/20 dark:border-white/20 rounded-3xl p-7 md:p-8">
+                  <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr] lg:items-center">
+                    <div className="space-y-4">
+                      <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-emerald-500/10">
+                        <Dumbbell className="h-8 w-8 text-emerald-400" />
+                      </div>
+                      <div className="space-y-2">
+                        <h3 className="text-2xl font-bold tracking-tight text-foreground">Iniciar Workout</h3>
+                        <p className="max-w-2xl text-sm leading-6 text-foreground/60 md:text-base">
+                          Empieza una sesión vacía para registrar sobre la marcha o usa una rutina ya estructurada para entrar directo al bloque del día.
+                        </p>
+                      </div>
                     </div>
-                    <h3 className="text-lg font-bold text-foreground">Iniciar Workout</h3>
-                    <p className="text-sm text-foreground/50">
-                      Empieza un entrenamiento vacío o selecciona una rutina
-                    </p>
-                    <Button
-                      onClick={handleStartEmptyWorkout}
-                      className="bg-emerald-500 hover:bg-emerald-600 text-white"
-                    >
-                      <Plus className="h-4 w-4 mr-2" />
-                      Workout vacío
-                    </Button>
+                    <div className="flex lg:justify-end">
+                      <Button
+                        onClick={handleStartEmptyWorkout}
+                        className="min-h-[50px] rounded-2xl bg-emerald-500 px-5 text-white hover:bg-emerald-600"
+                      >
+                        <Plus className="mr-2 h-4 w-4" />
+                        Workout vacío
+                      </Button>
+                    </div>
                   </div>
                 </Card>
 
                 {/* Quick start from routines */}
                 {routines.length > 0 && (
-                  <Card className="backdrop-blur-xl bg-black/5 dark:bg-white/5 border-black/20 dark:border-white/20 rounded-3xl p-4 space-y-3">
-                    <h3 className="text-sm font-bold text-foreground/80 uppercase tracking-wider">Inicio rápido</h3>
-                    <div className="grid gap-2">
+                  <Card className="backdrop-blur-xl bg-black/5 dark:bg-white/5 border-black/20 dark:border-white/20 rounded-3xl p-6 md:p-7 space-y-5">
+                    <div className="space-y-1">
+                      <h3 className="text-base font-bold uppercase tracking-[0.18em] text-foreground/70">Inicio rápido</h3>
+                      <p className="text-sm text-foreground/55">Arranca desde tus rutinas más usadas sin entrar en cada tarjeta.</p>
+                    </div>
+                    <div className="grid gap-4">
                       {routines.slice(0, 3).map(r => (
-                        <div key={r.id} className="flex gap-2 overflow-x-auto">
-                          <span className="text-sm text-foreground/60 shrink-0 py-1.5">{r.name}:</span>
-                          {r.days.map(d => (
-                            <Button
-                              key={d.id}
-                              size="sm"
-                              onClick={() => handleStartWorkout(r, d.id)}
-                              className="shrink-0 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 text-xs"
-                            >
-                              <Play className="h-3 w-3 mr-1" /> {d.label || "Día"}
-                            </Button>
-                          ))}
+                        <div key={r.id} className="rounded-2xl border border-black/10 bg-background/70 p-4 dark:border-white/10 dark:bg-white/[0.03]">
+                          <div className="mb-3 flex items-center justify-between gap-3">
+                            <span className="text-base font-semibold text-foreground">{r.name}</span>
+                            <span className="text-xs uppercase tracking-[0.18em] text-foreground/45">{r.days.length} bloques</span>
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            {r.days.map(d => (
+                              <Button
+                                key={d.id}
+                                size="sm"
+                                onClick={() => handleStartWorkout(r, d.id)}
+                                className="min-h-[40px] rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-3 text-xs text-emerald-400 hover:bg-emerald-500/20"
+                              >
+                                <Play className="mr-1.5 h-3.5 w-3.5" /> {d.label || "Día"}
+                              </Button>
+                            ))}
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -732,10 +748,10 @@ export default function TrainingPage() {
                TRAINING 2.0 — ANALYTICS TAB
                ═══════════════════════════════════════════════════════════════════ */}
           <TabsContent value="analytics">
-            <div className="space-y-4">
+            <div className="space-y-6">
               {/* PRs */}
-              <Card className="backdrop-blur-xl bg-black/5 dark:bg-white/5 border-black/20 dark:border-white/20 rounded-3xl p-4">
-                <h3 className="text-sm font-bold text-foreground/80 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+              <Card className="backdrop-blur-xl bg-black/5 dark:bg-white/5 border-black/20 dark:border-white/20 rounded-3xl p-6">
+                <h3 className="mb-4 flex items-center gap-2 text-base font-bold uppercase tracking-[0.18em] text-foreground/75">
                   <Trophy className="h-4 w-4 text-amber-400" />
                   Records personales
                 </h3>

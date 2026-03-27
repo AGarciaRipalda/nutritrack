@@ -193,28 +193,28 @@ function MealCard({
   const MealIcon = mealIdIcons[meal.id] ?? mealTypeIcons[meal.type] ?? Utensils
   const tone = mealCardTone[meal.type] ?? mealCardTone.lunch
   return (
-    <div className={`p-3 rounded-xl border flex flex-col gap-2 shadow-sm ${tone.card}`}>
+    <div className={`flex h-full min-h-[220px] flex-col gap-3 rounded-2xl border p-4 shadow-sm md:min-h-[240px] md:p-5 ${tone.card}`}>
       {/* Title row: icon + meal name + kcal */}
-      <div className="flex items-center gap-2 border-b border-black/5 dark:border-white/10 pb-2">
-        <div className={`shrink-0 rounded-lg p-1.5 ${tone.icon}`}>
-          <MealIcon className={`h-4 w-4 ${tone.iconText}`} />
+      <div className="flex items-center gap-3 border-b border-black/5 pb-3 dark:border-white/10">
+        <div className={`shrink-0 rounded-xl p-2 ${tone.icon}`}>
+          <MealIcon className={`h-4 w-4 md:h-5 md:w-5 ${tone.iconText}`} />
         </div>
-        <span className="text-foreground text-sm font-semibold flex-1">
+        <span className="flex-1 text-base font-semibold text-foreground">
           {mealDisplayName[meal.id] ?? meal.name}
         </span>
         {meal.kcal > 0 && (
-          <Badge className={`text-xs px-1.5 py-0 shrink-0 ${tone.badge}`}>
+          <Badge className={`shrink-0 px-2 py-0.5 text-xs md:text-[13px] ${tone.badge}`}>
             {meal.kcal} kcal
           </Badge>
         )}
       </div>
       {/* Description */}
-      <p className="text-foreground/80 text-xs leading-snug flex-1">{meal.description}</p>
+      <p className="flex-1 text-sm leading-6 text-foreground/80 md:text-[15px]">{meal.description}</p>
       {/* Note */}
       {meal.note && (
-        <div className="flex items-start gap-1 mt-0.5">
-          <Lightbulb className="h-3 w-3 text-amber-700 dark:text-amber-400 shrink-0 mt-0.5" />
-          <span className="text-amber-700 dark:text-amber-400/80 text-xs leading-snug">{meal.note}</span>
+        <div className="mt-1 flex items-start gap-2">
+          <Lightbulb className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-700 dark:text-amber-400" />
+          <span className="text-xs leading-5 text-amber-700 dark:text-amber-400/80 md:text-[13px]">{meal.note}</span>
         </div>
       )}
       {/* Swap button */}
@@ -222,9 +222,9 @@ function MealCard({
         <button
           onClick={onSwap}
           disabled={swapping}
-          className="mt-1 w-full flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-medium text-foreground/50 hover:text-foreground hover:bg-black/10 dark:hover:bg-white/10 border border-black/10 dark:border-white/10 hover:border-black/20 dark:hover:border-white/20 transition-colors disabled:opacity-40"
+          className="mt-2 flex min-h-[42px] w-full items-center justify-center gap-1.5 rounded-xl border border-black/10 py-2 text-sm font-medium text-foreground/55 transition-colors hover:border-black/20 hover:bg-black/10 hover:text-foreground disabled:opacity-40 dark:border-white/10 dark:hover:border-white/20 dark:hover:bg-white/10"
         >
-          <Shuffle className={`h-3 w-3 ${swapping ? "animate-spin" : ""}`} />
+          <Shuffle className={`h-3.5 w-3.5 ${swapping ? "animate-spin" : ""}`} />
           {swapping ? "Cambiando..." : "Cambiar plato"}
         </button>
       )}
@@ -575,7 +575,7 @@ export default function WeeklyPlanPage() {
         }
       `}</style>
 
-      <div className="space-y-6">
+      <div className="space-y-8">
 
         {/* ── Stale banner ── */}
         {stale && (
@@ -594,8 +594,8 @@ export default function WeeklyPlanPage() {
 
         {/* ── Adaptive summary card ── */}
         {data?.summary && (
-          <div className="backdrop-blur-xl bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-2xl p-4 mb-4">
-            <p className="text-muted-foreground text-sm">
+          <div className="mb-4 rounded-3xl border border-black/10 bg-black/5 p-5 backdrop-blur-xl dark:border-white/10 dark:bg-white/5 md:p-6">
+            <p className="text-sm leading-6 text-muted-foreground md:text-base">
               Plan ajustado por:{" "}
               {data.summary.weight_delta !== null && (
                 <span className="text-foreground font-medium">
@@ -616,13 +616,13 @@ export default function WeeklyPlanPage() {
         )}
 
         {/* ── Screen header ── */}
-        <Card className="backdrop-blur-xl bg-black/5 dark:bg-white/10 border border-black/10 dark:border-white/20 rounded-3xl p-6 print:hidden">
+        <Card className="backdrop-blur-xl bg-black/5 dark:bg-white/10 border border-black/10 dark:border-white/20 rounded-3xl p-7 md:p-8 print:hidden">
           <div className="flex items-center justify-between flex-wrap gap-3">
             <div className="flex items-center gap-3">
               <CalendarDays className="h-7 w-7 text-emerald-400" />
               <div>
-                <h2 className="text-3xl font-bold text-foreground">Plan semanal</h2>
-                <p className="text-muted-foreground">Tus comidas planificadas para toda la semana</p>
+                <h2 className="text-3xl font-bold tracking-tight text-foreground md:text-4xl">Plan semanal</h2>
+                <p className="mt-1 text-sm text-muted-foreground md:text-base">Tus comidas planificadas para toda la semana con más espacio entre bloques y mejor lectura de cada plato.</p>
               </div>
             </div>
             <div className="flex items-center gap-3 flex-wrap">
@@ -639,8 +639,8 @@ export default function WeeklyPlanPage() {
 
         {/* ── Screen accordion view ── */}
         <div className="print:hidden">
-          <Card className="backdrop-blur-xl bg-black/5 dark:bg-white/10 border border-black/10 dark:border-white/20 rounded-3xl p-6">
-            <Accordion type="single" collapsible className="space-y-2">
+          <Card className="backdrop-blur-xl bg-black/5 dark:bg-white/10 border border-black/10 dark:border-white/20 rounded-3xl p-5 md:p-7">
+            <Accordion type="single" collapsible className="space-y-4">
               {weeklyPlan.days.map((dayPlan) => {
                 const isToday      = dayPlan.date === todayISO
                 const displayKcal  = dayPlan.exerciseAdj?.adjustedTotal ?? dayPlan.totalKcal
@@ -651,50 +651,50 @@ export default function WeeklyPlanPage() {
                   <AccordionItem
                     key={dayPlan.date}
                     value={dayPlan.date}
-                    className={`bg-background rounded-xl border px-4 shadow-sm ${
+                    className={`rounded-2xl border bg-background px-5 shadow-sm ${
                       isToday       ? "border-emerald-400/50"
                       : cheatDay    ? "border-amber-400/30"
                       : nonCompliant ? "border-red-400/30"
                       : "border-black/10 dark:border-white/10"
                     }`}
                   >
-                    <AccordionTrigger className="hover:no-underline py-4">
-                      <div className="flex items-center justify-between w-full pr-4">
-                        <div className="flex items-center gap-2">
-                          <span className="text-lg font-semibold text-foreground">{dayPlan.dayName}</span>
+                    <AccordionTrigger className="py-5 hover:no-underline">
+                      <div className="flex w-full flex-col gap-4 pr-4 lg:flex-row lg:items-center lg:justify-between">
+                        <div className="flex flex-wrap items-center gap-2.5">
+                          <span className="text-xl font-semibold tracking-tight text-foreground">{dayPlan.dayName}</span>
                           {isToday && (
-                            <span className="bg-emerald-500 text-white text-xs px-2 py-0.5 rounded-full font-medium">
+                            <span className="rounded-full bg-emerald-500 px-2.5 py-1 text-xs font-medium text-white">
                               HOY
                             </span>
                           )}
                           {cheatDay && (
-                            <span className="bg-amber-500/20 text-amber-300 border border-amber-400/30 text-xs px-2 py-0.5 rounded-full flex items-center gap-1">
+                            <span className="flex items-center gap-1 rounded-full border border-amber-400/30 bg-amber-500/20 px-2.5 py-1 text-xs text-amber-300">
                               <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
                               Comodín
                             </span>
                           )}
                           {nonCompliant && (
-                            <span className="bg-red-500/20 text-red-400 border border-red-400/30 text-xs px-2 py-0.5 rounded-full">
+                            <span className="rounded-full border border-red-400/30 bg-red-500/20 px-2.5 py-1 text-xs text-red-400">
                               No cumplido +{dayLog!.excessKcal} kcal
                             </span>
                           )}
                         </div>
-                        <div className="flex items-center gap-1">
+                        <div className="flex flex-wrap items-center gap-2">
                           {dayPlan.exerciseAdj && (
-                            <span className="text-yellow-300 text-xs ml-2">
+                            <span className="text-xs text-yellow-300 md:text-sm">
                               ⚡ +{dayPlan.exerciseAdj.extraKcal}kcal
                             </span>
                           )}
                           {displayKcal > 0 && (
-                            <Badge className="bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 border-emerald-400/30">
+                            <Badge className="border-emerald-400/30 bg-emerald-500/20 px-2.5 py-1 text-sm text-emerald-700 dark:text-emerald-400">
                               {displayKcal} kcal
                             </Badge>
                           )}
                         </div>
                       </div>
                     </AccordionTrigger>
-                    <AccordionContent className="pb-4">
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+                    <AccordionContent className="pb-5">
+                      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 2xl:grid-cols-5">
                         {dayPlan.meals.map((meal) => (
                           <MealCard
                             key={meal.id}
@@ -714,7 +714,7 @@ export default function WeeklyPlanPage() {
 
         {/* ── Screen shopping list ── */}
         {shoppingList.length > 0 && (
-          <Card className="backdrop-blur-xl bg-black/5 dark:bg-white/10 border border-black/10 dark:border-white/20 rounded-3xl p-6 print:hidden">
+          <Card className="backdrop-blur-xl bg-black/5 dark:bg-white/10 border border-black/10 dark:border-white/20 rounded-3xl p-7 print:hidden">
             <div className="flex items-center gap-2 mb-6">
               <ShoppingCart className="h-5 w-5 text-emerald-400" />
               <h3 className="text-xl font-semibold text-foreground">Lista de la compra</h3>

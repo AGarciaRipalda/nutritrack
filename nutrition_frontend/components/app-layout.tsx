@@ -46,7 +46,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
           />
         </div>
         <main className="flex-1 pt-10 md:pt-0 min-w-0 print:pt-0">
-          <div className="max-w-7xl mx-auto h-full">
+          <div className="max-w-[1680px] mx-auto h-full">
             {children}
           </div>
         </main>
