@@ -335,7 +335,16 @@ def _extract_date(row: dict[str, Any]) -> date | None:
             return None
 
     text = str(value).strip()
-    for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y", "%m/%d/%Y", "%Y/%m/%d"):
+    for fmt in (
+        "%Y-%m-%d",
+        "%d/%m/%Y",
+        "%d/%m/%y",
+        "%d-%m-%Y",
+        "%d-%m-%y",
+        "%m/%d/%Y",
+        "%m/%d/%y",
+        "%Y/%m/%d",
+    ):
         try:
             return datetime.strptime(text, fmt).date()
         except ValueError:
