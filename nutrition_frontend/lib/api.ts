@@ -1,11 +1,29 @@
 import { searchFood as searchFoodClient, type FoodSearchResult } from "./food-search"
 export type { FoodSearchResult } from "./food-search"
 
-// On Capacitor/iOS the origin is capacitor://localhost, so window.location
-// resolves to capacitor://localhost:8000 which is not a valid HTTP URL.
-// Always use an explicit base URL: set NEXT_PUBLIC_API_URL in .env.production.
-const API_BASE =
-  (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000").replace(/\/+$/, "")
+// On static deployments, a blank NEXT_PUBLIC_API_URL turns API calls into
+// same-origin requests like /dashboard, which then 404 on the frontend host.
+const DEFAULT_REMOTE_API_BASE = "https://api.metabolic.es"
+const DEFAULT_LOCAL_API_BASE = "http://localhost:8000"
+
+function resolveApiBase() {
+  const configured = process.env.NEXT_PUBLIC_API_URL?.trim()
+  if (configured) return configured.replace(/\/+$/, "")
+
+  if (typeof window !== "undefined") {
+    const { protocol, hostname } = window.location
+    if (
+      protocol === "http:" &&
+      (hostname === "localhost" || hostname === "127.0.0.1")
+    ) {
+      return DEFAULT_LOCAL_API_BASE
+    }
+  }
+
+  return DEFAULT_REMOTE_API_BASE
+}
+
+const API_BASE = resolveApiBase()
 
 // â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
