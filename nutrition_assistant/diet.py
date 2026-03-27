@@ -28,6 +28,10 @@ CARB_SOURCES = {
     "crackers":      {"name": "crackers",                 "kcal": 430},
     "tortita_arroz": {"name": "tortitas de arroz",        "kcal": 380},
     "quinoa":        {"name": "quinoa cocida",            "kcal": 120},
+    "frutos_secos":  {"name": "frutos secos",             "kcal": 600},
+    "pechuga_pavo":  {"name": "pechuga de pavo",          "kcal": 110},
+    "fresas":        {"name": "fresas",                    "kcal": 33},
+    "cana_lomo":     {"name": "caña de lomo",              "kcal": 120},
 }
 
 # ─── Carbohidratos favoritos (seleccionables por el usuario) ─────────────────
@@ -103,7 +107,7 @@ DESAYUNOS = [
     {
         "template": "{carb_g}g de {carb_name} con 3-4 lonchas (30g) de jamón serrano o caña de lomo + café",
         "carb_source": "pan_centeno",
-        "fixed_kcal": 155,   # jamón/lomo 30g (75) + aceite 1 cda (90) - tomate free
+        "fixed_kcal": 165,   # jamón/lomo 30g (75) + aceite 1 cda (90)
         "note": "Extiende bien el aceite de oliva (1 cda sopera). Pan recomendado: Thins, Rustik, centeno, espelta Mercadona.",
     },
     {
@@ -115,13 +119,13 @@ DESAYUNOS = [
     {
         "template": "{carb_g}g de {carb_name} con ¼ aguacate (40g) y tomate + café",
         "carb_source": "pan_integral",
-        "fixed_kcal": 160,   # aguacate 40g (64) + aceite ½ cda (45) + tomate (6) + limón
+        "fixed_kcal": 160,   # aguacate 40g (64) + aceite 1 cda (90) + tomate (6)
         "note": "Con moderación — el aguacate es grasa saludable pero calórico.",
     },
     {
         "template": "{carb_g}g de {carb_name} con 3-4 lonchas de jamón serrano y tomate + café",
         "carb_source": "pan_semillas",
-        "fixed_kcal": 155,   # jamón 30g (78) + aceite 1 cda (87) - tomate libre
+        "fixed_kcal": 165,   # jamón 30g (78) + aceite 1 cda (87)
         "note": "Pan de semillas Mercadona. Opciones de topping: jamón, lomo, queso fresco, aguacate.",
     },
     # ── Cereales ──────────────────────────────────────────────────────────
@@ -141,7 +145,7 @@ DESAYUNOS = [
     {
         "template": "Tortita de avena: {carb_g}g de {carb_name} + 2 huevos + chorrito de leche + 1 cdta crema de cacahuete + 1 onza de chocolate negro",
         "carb_source": "avena",
-        "fixed_kcal": 300,   # 2 huevos (186) + leche 50ml (25) + cacahuete 1 cdta (55) + chocolate 10g (55) - sin aceite
+        "fixed_kcal": 300,   # 2 huevos (186) + leche 50ml (25) + cacahuete 1 cdta (34) + chocolate 10g (55)
         "note": "Mezcla todo y cocina en sartén antiadherente sin aceite. Desayuno del domingo.",
     },
     {
@@ -155,21 +159,20 @@ DESAYUNOS = [
 MEDIA_MANANA = [
     {
         "template": "1 fruta de temporada (150g) + {carb_g}g de frutos secos (nueces/almendras)",
-        "carb_source": "crackers",
+        "carb_source": "frutos_secos",
         "fixed_kcal": 75,
-        "display_override": "frutos secos",
         "note": "Pesa los frutos secos — son muy calóricos. Elige fruta de temporada.",
     },
     {
         "template": "1 fruta de temporada (150g) + 3-4 nueces",
-        "carb_source": "crackers",
+        "carb_source": "frutos_secos",
         "fixed_kcal": 75,
         "display_override": "nueces",
         "note": "Opción sencilla. Fruta = manzana, pera, naranja, mandarina o melocotón.",
     },
     {
         "template": "1 fruta de temporada + 5 pistachos",
-        "carb_source": "crackers",
+        "carb_source": "frutos_secos",
         "fixed_kcal": 75,
         "display_override": "pistachos",
         "note": "Los pistachos son ricos en proteína vegetal.",
@@ -183,23 +186,20 @@ MEDIA_MANANA = [
     },
     {
         "template": "Yogurt proteínas (200g) o batido de proteínas + {carb_g}g de frutos secos",
-        "carb_source": "crackers",
+        "carb_source": "frutos_secos",
         "fixed_kcal": 120,
-        "display_override": "frutos secos",
         "note": "Yogurt proteínas sin azúcar añadida. Frutos secos de la bolsa de Aldi.",
     },
     {
         "template": "50g de caña de lomo de pavo + {carb_g}g de frutos secos",
-        "carb_source": "crackers",
+        "carb_source": "frutos_secos",
         "fixed_kcal": 110,
-        "display_override": "frutos secos",
         "note": "Opción fácil de llevar al trabajo.",
     },
     {
         "template": "70g de pechuga de pavo/pollo + {carb_g}g de frutos secos",
-        "carb_source": "crackers",
+        "carb_source": "frutos_secos",
         "fixed_kcal": 77,
-        "display_override": "frutos secos",
         "note": "Proteína alta. Frutos secos de la bolsa Aldi son los mejores en ratio precio/calidad.",
     },
     {
@@ -216,16 +216,14 @@ MEDIA_MANANA = [
     },
     {
         "template": "Medio kefir (125ml) con sandía + {carb_g}g de frutos secos",
-        "carb_source": "crackers",
+        "carb_source": "frutos_secos",
         "fixed_kcal": 90,
-        "display_override": "frutos secos",
         "note": "El kefir mejora la microbiota intestinal. Puedes cambiar kefir por yogurt proteínas.",
     },
     {
         "template": "Piña en rodajas (200g) + {carb_g}g de pechuga de pavo",
-        "carb_source": "crackers",
+        "carb_source": "pechuga_pavo",
         "fixed_kcal": 80,
-        "display_override": "pechuga de pavo",
         "note": "La piña ayuda a la digestión. 1 lata de piña al natural (sin almíbar).",
     },
 ]
@@ -296,7 +294,7 @@ ALMUERZOS = [
     {
         "template": "Sushi casero: {carb_g}g de {carb_name} con 100g de salmón o atún, medio aguacate y salsa de soja",
         "carb_source": "arroz",
-        "fixed_kcal": 270,   # salmón 100g (208) + aguacate 50g (80) - sin aceite adicional
+        "fixed_kcal": 288,   # salmón 100g (208) + aguacate 50g (80)
         "note": "Puedes hacerlo en bowl. Añade pepino y alga nori troceada.",
     },
     # ── Ñoquis ──────────────────────────────────────────────────────────────
@@ -383,7 +381,7 @@ ALMUERZOS = [
     {
         "template": "160g de salmón a la plancha con {carb_g}g de {carb_name} y brócoli",
         "carb_source": "arroz",
-        "fixed_kcal": 330,   # salmón 160g (332) + brócoli (20) — sin aceite
+        "fixed_kcal": 352,   # salmón 160g (332) + brócoli (20)
         "note": "Salmón al punto. Salsa fit: leche + soja + cacahuete polvo.",
     },
     {
@@ -438,7 +436,7 @@ ALMUERZOS = [
     {
         "template": "1 muslo de pollo en salsa con {carb_g}g de {carb_name} y verduras al gusto",
         "carb_source": "arroz",
-        "fixed_kcal": 250,   # muslo pollo con piel (250) + verduras (30) — estimar
+        "fixed_kcal": 280,   # muslo pollo con piel (250) + verduras (30)
         "note": "Receta de Instagram de la nutricionista. Pedir si no se encuentra.",
     },
     {
@@ -478,9 +476,8 @@ ALMUERZOS = [
 MERIENDAS = [
     {
         "template": "2 tajas de sandía (200g) + {carb_g}g de frutos secos",
-        "carb_source": "crackers",
+        "carb_source": "frutos_secos",
         "fixed_kcal": 40,
-        "display_override": "frutos secos",
         "note": "Los frutos secos son el snack más saciante.",
     },
     {
@@ -497,16 +494,14 @@ MERIENDAS = [
     },
     {
         "template": "Yogurt proteínas (200g) con 1 cda de crema de cacahuete en polvo + {carb_g}g de fresas",
-        "carb_source": "crackers",
+        "carb_source": "fresas",
         "fixed_kcal": 155,
-        "display_override": "fresas",
         "note": "Endulza con eritritol o stevia si lo necesitas.",
     },
     {
         "template": "Medio kefir (125ml) con sandía + {carb_g}g de frutos secos",
-        "carb_source": "crackers",
+        "carb_source": "frutos_secos",
         "fixed_kcal": 90,
-        "display_override": "frutos secos",
         "note": "Puedes cambiar kefir por yogurt proteínas.",
     },
     {
@@ -517,9 +512,8 @@ MERIENDAS = [
     },
     {
         "template": "1 lata de piña al natural + {carb_g}g de frutos secos (4 nueces o 10 pistachos)",
-        "carb_source": "crackers",
+        "carb_source": "frutos_secos",
         "fixed_kcal": 65,
-        "display_override": "frutos secos",
         "note": "Piña sin almíbar. Digestiva y baja en calorías.",
     },
     {
@@ -537,20 +531,19 @@ MERIENDAS = [
     {
         "template": "250g de yogurt proteínas natural con 1 cda mantequilla de cacahuete + 2 cdas de avena",
         "carb_source": "avena",
-        "fixed_kcal": 160,   # yogurt 250g (160) + cacahuete 1 cda (90)
+        "fixed_kcal": 250,   # yogurt 250g (160) + cacahuete 1 cda (90)
         "note": "Coge el bote de 500g para tener para 2 días.",
     },
     {
         "template": "Bizcocho en taza: {carb_g}g de {carb_name} + levadura + 1 huevo + 2 onzas chocolate (4 min micro)",
         "carb_source": "avena",
-        "fixed_kcal": 175,   # huevo (93) + chocolate 20g (110) - restando avena
+        "fixed_kcal": 148,   # huevo (93) + chocolate 2 onzas 10g (55)
         "note": "4 minutos al microondas. Receta clásica de la dieta.",
     },
     {
         "template": "6 fresas con 2 onzas de chocolate negro derretido + {carb_g}g de caña de lomo",
-        "carb_source": "crackers",
+        "carb_source": "cana_lomo",
         "fixed_kcal": 135,
-        "display_override": "caña de lomo",
         "note": "Chocolate negro ≥70%. Capricho controlado.",
     },
     {
@@ -658,7 +651,7 @@ CENAS = [
     {
         "template": "2 latas de caballa o melva con pimientos del piquillo y 2 tostadas de crackers",
         "carb_source": "crackers",
-        "fixed_kcal": 195,   # caballa 2 latas (240) + pimientos (15) — crackers como carb source
+        "fixed_kcal": 255,   # caballa 2 latas (240) + pimientos (15)
         "note": "Fácil y rápido. Pimientos del piquillo de bote.",
     },
     {
