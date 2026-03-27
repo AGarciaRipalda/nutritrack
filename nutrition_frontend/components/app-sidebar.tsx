@@ -56,38 +56,44 @@ function SidebarContent({ collapsed, onToggleCollapse, onClose, showClose }: Sid
     >
       {/* Header row */}
       <div
-        className={`pb-4 border-b border-gray-200 dark:border-white/10 flex items-center ${
-          collapsed ? "justify-center" : "justify-between"
+        className={`pb-4 border-b border-gray-200 dark:border-white/10 ${
+          collapsed ? "flex flex-col items-center gap-2" : "flex items-center justify-between"
         }`}
       >
         {collapsed ? (
-          <Apple className="h-7 w-7 text-emerald-400 shrink-0" />
-        ) : (
-          <div className="flex items-center gap-2 min-w-0">
+          <>
             <Apple className="h-7 w-7 text-emerald-400 shrink-0" />
-            <div className="min-w-0">
-              <h1 className="text-xl font-bold text-gray-900 dark:text-white leading-tight">METABOLIC</h1>
-              <p className="text-gray-500 dark:text-white/60 text-xs truncate">Nutrición y Entrenamiento</p>
-            </div>
-          </div>
-        )}
-
-        {showClose ? (
-          <button onClick={onClose} className="text-gray-500 dark:text-white/60 hover:text-gray-900 dark:hover:text-white p-1 ml-2 shrink-0">
-            <X className="h-5 w-5" />
-          </button>
-        ) : (
-          <button
-            onClick={onToggleCollapse}
-            className="text-gray-500 dark:text-white/60 hover:text-gray-900 dark:hover:text-white p-1 shrink-0 hidden md:block"
-            aria-label={collapsed ? "Expandir menú" : "Contraer menú"}
-          >
-            {collapsed ? (
+            <button
+              onClick={onToggleCollapse}
+              className="text-gray-500 dark:text-white/60 hover:text-gray-900 dark:hover:text-white p-1 shrink-0 hidden md:block"
+              aria-label="Expandir menú"
+            >
               <ChevronRight className="h-4 w-4" />
+            </button>
+          </>
+        ) : (
+          <>
+            <div className="flex items-center gap-2 min-w-0">
+              <Apple className="h-7 w-7 text-emerald-400 shrink-0" />
+              <div className="min-w-0">
+                <h1 className="text-xl font-bold text-gray-900 dark:text-white leading-tight">METABOLIC</h1>
+                <p className="text-gray-500 dark:text-white/60 text-xs truncate">Nutrición y Entrenamiento</p>
+              </div>
+            </div>
+            {showClose ? (
+              <button onClick={onClose} className="text-gray-500 dark:text-white/60 hover:text-gray-900 dark:hover:text-white p-1 ml-2 shrink-0">
+                <X className="h-5 w-5" />
+              </button>
             ) : (
-              <ChevronLeft className="h-4 w-4" />
+              <button
+                onClick={onToggleCollapse}
+                className="text-gray-500 dark:text-white/60 hover:text-gray-900 dark:hover:text-white p-1 shrink-0 hidden md:block"
+                aria-label="Contraer menú"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </button>
             )}
-          </button>
+          </>
         )}
       </div>
 
