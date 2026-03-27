@@ -39,18 +39,20 @@ final class APIClient: Sendable {
         let (data, response) = try await session.data(for: request)
         guard let http = response as? HTTPURLResponse,
               (200..<300).contains(http.statusCode) else {
-            throw APIError.badResponse
+            let code = (response as? HTTPURLResponse)?.statusCode ?? 0
+            throw APIError.badResponse(statusCode: code)
         }
         return try JSONDecoder().decode(T.self, from: data)
     }
 }
 
 enum APIError: LocalizedError, Sendable {
-    case badResponse
+    case badResponse(statusCode: Int)
 
     var errorDescription: String? {
         switch self {
-        case .badResponse: return "Error de conexión con el servidor"
+        case .badResponse(let code):
+            return "Error del servidor (código \(code))"
         }
     }
 }

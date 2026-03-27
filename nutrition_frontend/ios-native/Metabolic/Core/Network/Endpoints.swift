@@ -32,6 +32,9 @@ enum Endpoint {
     }
 
     var url: URL {
-        URL(string: Endpoint.baseURL + path)!
+        guard let url = URL(string: Endpoint.baseURL + path) else {
+            preconditionFailure("Invalid URL for endpoint \(self): \(Endpoint.baseURL + path)")
+        }
+        return url
     }
 }

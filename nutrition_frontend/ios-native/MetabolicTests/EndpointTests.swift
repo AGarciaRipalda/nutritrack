@@ -42,6 +42,14 @@ final class EndpointTests: XCTestCase {
         XCTAssertEqual(Endpoint.baseURL, "https://api.metabolic.es")
     }
 
+    func testLogWeightURL() {
+        XCTAssertEqual(Endpoint.logWeight.url.absoluteString, "https://api.metabolic.es/weight")
+    }
+
+    func testRoutinesURL() {
+        XCTAssertEqual(Endpoint.routines.url.absoluteString, "https://api.metabolic.es/v2/training/routines")
+    }
+
     func testGetRequestBuildsCorrectly() {
         // Verify that a URLRequest is created with GET method (default) and timezone header
         let endpoint = Endpoint.dashboard
