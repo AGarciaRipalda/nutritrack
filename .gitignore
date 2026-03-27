@@ -9,3 +9,19 @@ __pycache__/
 # Local env and logs
 .DS_Store
 *.log
+
+# Backend local/runtime state
+nutrition_assistant/venv/
+nutrition_assistant/google_credentials.json
+nutrition_assistant/google_sheets_config.json
+nutrition_assistant/session.json
+nutrition_assistant/user_profile.json
+nutrition_assistant/exercise_history.json
+nutrition_assistant/weight_history.json
+nutrition_assistant/adherence_log.json
+nutrition_assistant/survey_history.json
+nutrition_assistant/competition.json
+nutrition_assistant/preferences.json
+nutrition_assistant/routines.json
+nutrition_assistant/workouts.json
+nutrition_assistant/prs.json
