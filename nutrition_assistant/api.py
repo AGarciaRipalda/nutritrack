@@ -99,6 +99,8 @@ app = FastAPI(
     title="Nutrition Assistant API",
     description="Backend para el asistente de nutrición y entrenamiento",
     version="1.0.0",
+)
+
 origins = [
     "http://localhost:3000",      # Tu Next.js en el PC
     "capacitor://localhost",      # Tu App en el iPhone (iOS)
