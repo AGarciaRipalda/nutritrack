@@ -27,6 +27,7 @@
   - `Features/Ajustes/`
   - `Shared/Components/`
   - `Shared/Extensions/`
+  - `Shared/ViewState.swift`
 - [ ] Verify the test target `MetabolicTests` was created automatically (check Product → Test)
 - [ ] Run tests: **Cmd+U in Xcode** — expected: all tests pass (empty test suite, 0 failures)
 - [ ] Commit:
@@ -217,10 +218,44 @@ struct MetricBadge: View {
 ```
 
 - [ ] Build: **Cmd+B in Xcode** — expected: compiles with no errors
+
+### Tests
+
+In `MetabolicTests/`, add `SharedComponentsTests.swift`:
+
+```swift
+import XCTest
+@testable import Metabolic
+
+final class SharedComponentsTests: XCTestCase {
+
+    func testGlassCardBodyIsNotNil() {
+        let card = GlassCard { Text("test") }
+        _ = card.body
+        // If this line executes without crashing, the component is constructable
+        XCTAssertTrue(true)
+    }
+
+    func testPillButtonBodyIsNotNil() {
+        let button = PillButton("Test") {}
+        _ = button.body
+        XCTAssertTrue(true)
+    }
+
+    func testMetricBadgeBodyIsNotNil() {
+        let badge = MetricBadge(icon: "flame.fill", value: "350", label: "kcal", color: .red)
+        _ = badge.body
+        XCTAssertTrue(true)
+    }
+}
+```
+
+- [ ] Run tests: **Cmd+U in Xcode** — expected: `SharedComponentsTests` passes (3 tests, 0 failures)
 - [ ] Commit:
 
 ```bash
 git add nutrition_frontend/ios-native/Metabolic/Shared/Components/
+git add nutrition_frontend/ios-native/MetabolicTests/SharedComponentsTests.swift
 git commit -m "feat: add shared glass components"
 ```
 
@@ -602,12 +637,12 @@ enum Endpoint {
     case logWeight
     case workouts
     case routines
-    case startWorkout
-    case gymHistory
+    case gymHistory  // v2: used by future importGymHistory feature
     case profile
     case preferences
-    case updateProfile
-    case updatePreferences
+    // Note: POST vs GET is determined by calling APIClient.post() vs APIClient.get().
+    // There are no separate .startWorkout, .updateProfile, or .updatePreferences cases —
+    // use .workouts, .profile, and .preferences with the appropriate HTTP method.
 
     var path: String {
         switch self {
@@ -619,12 +654,9 @@ enum Endpoint {
         case .logWeight:             return "/weight"
         case .workouts:              return "/v2/training/workouts"
         case .routines:              return "/v2/training/routines"
-        case .startWorkout:          return "/v2/training/workouts"
         case .gymHistory:            return "/exercise/gym-history"
         case .profile:               return "/profile"
         case .preferences:           return "/preferences"
-        case .updateProfile:         return "/profile"
-        case .updatePreferences:     return "/preferences"
         }
     }
 
@@ -639,7 +671,7 @@ enum Endpoint {
 ```swift
 import Foundation
 
-@MainActor
+// Not @MainActor — network I/O runs off main thread; ViewModels use @MainActor instead
 final class APIClient {
     static let shared = APIClient()
     private let session = URLSession.shared
@@ -730,6 +762,7 @@ final class EndpointTests: XCTestCase {
     }
 
     func testWorkoutsURL() {
+        // .workouts serves both GET (list) and POST (start new workout) — method selected by caller
         XCTAssertEqual(Endpoint.workouts.url.absoluteString,
                        "https://api.metabolic.es/v2/training/workouts")
     }
@@ -807,6 +840,26 @@ struct ContentView: View {
 
 > Note: iOS 26 `TabView` with `Tab` initializer automatically renders with Liquid Glass material. No extra modifiers needed. The five Feature views referenced here will be stub placeholders until Tasks 7–11 complete.
 
+### Tests
+
+In `MetabolicTests/`, add `ContentViewTests.swift`:
+
+```swift
+import XCTest
+@testable import Metabolic
+
+final class ContentViewTests: XCTestCase {
+
+    func testContentViewBodyDoesNotThrow() {
+        let view = ContentView()
+        _ = view.body
+        XCTAssertTrue(true)
+    }
+}
+```
+
+- [ ] Run tests: **Cmd+U in Xcode** — expected: `ContentViewTests` passes (1 test, 0 failures)
+
 - [ ] Create stub placeholder files for each unbuilt feature view so the project compiles:
   - `Features/Panel/PanelView.swift` → `struct PanelView: View { var body: some View { Text("Panel") } }`
   - `Features/Dieta/DietaView.swift` → same pattern
@@ -820,6 +873,7 @@ struct ContentView: View {
 ```bash
 git add nutrition_frontend/ios-native/Metabolic/App/
 git add nutrition_frontend/ios-native/Metabolic/Features/
+git add nutrition_frontend/ios-native/MetabolicTests/ContentViewTests.swift
 git commit -m "feat: add root TabView navigation"
 ```
 
@@ -834,6 +888,7 @@ git commit -m "feat: add root TabView navigation"
 ```swift
 import Foundation
 
+@MainActor
 @Observable
 final class PanelViewModel {
     var state: ViewState<DashboardResponse> = .idle
@@ -1080,7 +1135,8 @@ final class PanelViewModelTests: XCTestCase {
         XCTAssertEqual(vm.restantes, 800)
     }
 
-    func testRestantesZeroWhenConsumedExceedsTarget() {
+    func testRestantesIsNegativeWhenConsumedExceedsTarget() {
+        // When consumed > target, restantes is negative (over-budget indicator)
         let vm = makeViewModel(targetKcal: 2000, consumedKcal: 2200,
                                intake: 2200, target: 2000, activeExpenditure: 0)
         XCTAssertEqual(vm.restantes, -200)
@@ -1122,6 +1178,7 @@ git commit -m "feat: add Panel screen"
 ```swift
 import Foundation
 
+@MainActor
 @Observable
 final class DietaViewModel {
     var selectedPlan: PlanMode = .daily
@@ -1373,6 +1430,7 @@ git commit -m "feat: add Dieta screen"
 ```swift
 import Foundation
 
+@MainActor
 @Observable
 final class EntrenoViewModel {
     var workoutsState: ViewState<[Workout]> = .idle
@@ -1399,15 +1457,15 @@ final class EntrenoViewModel {
     }
 
     func startNewWorkout() async throws {
-        let _: Workout = try await APIClient.shared.post(.startWorkout)
+        // POST to .workouts — same path as GET list, method determined by APIClient.post()
+        let _: Workout = try await APIClient.shared.post(.workouts)
         await load()
     }
 
-    func importGymHistory() async throws {
-        // GET /exercise/gym-history — implementation triggers sheet display
-        // Handled in the view layer via a sheet with gym history data
-    }
+    // "Importar" button: not implemented in v1 — show a "Próximamente" alert
+    // .gymHistory endpoint is kept in Endpoints.swift for future v2 use
 }
+
 ```
 
 **`nutrition_frontend/ios-native/Metabolic/Features/Entreno/EntrenoView.swift`**
@@ -1419,6 +1477,7 @@ struct EntrenoView: View {
     @State private var viewModel = EntrenoViewModel()
     @State private var showNewWorkoutAlert = false
     @State private var errorMessage: String?
+    @State private var showProximamenteAlert = false
 
     var body: some View {
         NavigationStack {
@@ -1433,10 +1492,8 @@ struct EntrenoView: View {
                             }
                         }
                         PillButton("Importar", icon: "square.and.arrow.down") {
-                            Task {
-                                do { try await viewModel.importGymHistory() }
-                                catch { errorMessage = error.localizedDescription }
-                            }
+                            // v1: not implemented — show Próximamente alert
+                            showProximamenteAlert = true
                         }
                         PillButton("Nuevo", icon: "plus") {
                             Task {
@@ -1488,6 +1545,11 @@ struct EntrenoView: View {
                 Button("OK") { errorMessage = nil }
             } message: {
                 Text(errorMessage ?? "")
+            }
+            .alert("Próximamente", isPresented: $showProximamenteAlert) {
+                Button("OK") {}
+            } message: {
+                Text("Esta función estará disponible en una próxima versión.")
             }
         }
         .task { await viewModel.load() }
@@ -1596,6 +1658,7 @@ git commit -m "feat: add Entreno screen"
 ```swift
 import Foundation
 
+@MainActor
 @Observable
 final class ProgresoViewModel {
     var state: ViewState<WeightHistoryResponse> = .idle
@@ -1603,6 +1666,7 @@ final class ProgresoViewModel {
     var logWeight: Double = 80.0
     var logDate: Date = Date()
     var isLogging = false
+    var logError: String? = nil
 
     var currentEntry: WeightEntry? {
         guard case .loaded(let data) = state else { return nil }
@@ -1639,7 +1703,7 @@ final class ProgresoViewModel {
             showLogSheet = false
             await load()
         } catch {
-            // error shown via state
+            logError = error.localizedDescription
         }
         isLogging = false
     }
@@ -1759,6 +1823,11 @@ struct ProgresoView: View {
             }
             .sheet(isPresented: $viewModel.showLogSheet) {
                 LogWeightSheet(viewModel: viewModel)
+            }
+            .alert("Error", isPresented: .constant(viewModel.logError != nil)) {
+                Button("OK") { viewModel.logError = nil }
+            } message: {
+                Text(viewModel.logError ?? "")
             }
         }
         .task { await viewModel.load() }
@@ -1885,6 +1954,7 @@ git commit -m "feat: add Progreso screen"
 import Foundation
 import SwiftUI
 
+@MainActor
 @Observable
 final class AjustesViewModel {
     // Profile fields
@@ -1909,6 +1979,8 @@ final class AjustesViewModel {
 
     var isSaving = false
     var isLoaded = false
+    var loadError: String? = nil
+    var saveError: String? = nil
 
     func load() async {
         do {
@@ -1926,7 +1998,9 @@ final class AjustesViewModel {
             favorites = pref.favorites
             disliked = pref.disliked
             isLoaded = true
-        } catch { }
+        } catch {
+            self.loadError = error.localizedDescription
+        }
     }
 
     func save() async {
@@ -1940,8 +2014,9 @@ final class AjustesViewModel {
             struct PrefsPayload: Encodable {
                 let excluded: [String]; let favorites: [String]; let disliked: [String]
             }
+            // PUT to .profile and .preferences — same paths as GET, method selected by APIClient.put()
             async let savedProfile: UserProfile = APIClient.shared.put(
-                .updateProfile,
+                .profile,
                 body: ProfilePayload(
                     name: name, gender: gender, age: age,
                     height_cm: heightCm, weight_kg: weightKg,
@@ -1949,11 +2024,13 @@ final class AjustesViewModel {
                 )
             )
             async let savedPrefs: UserPreferences = APIClient.shared.put(
-                .updatePreferences,
+                .preferences,
                 body: PrefsPayload(excluded: excluded, favorites: favorites, disliked: disliked)
             )
             _ = try await (savedProfile, savedPrefs)
-        } catch { }
+        } catch {
+            self.saveError = error.localizedDescription
+        }
         isSaving = false
     }
 }
@@ -2080,6 +2157,16 @@ struct AjustesView: View {
             .navigationTitle("Ajustes")
             .navigationSubtitle("Perfil y preferencias")
             .preferredColorScheme(colorScheme)
+            .alert("Error al cargar", isPresented: .constant(viewModel.loadError != nil)) {
+                Button("OK") { viewModel.loadError = nil }
+            } message: {
+                Text(viewModel.loadError ?? "")
+            }
+            .alert("Error al guardar", isPresented: .constant(viewModel.saveError != nil)) {
+                Button("OK") { viewModel.saveError = nil }
+            } message: {
+                Text(viewModel.saveError ?? "")
+            }
         }
         .task { await viewModel.load() }
     }
@@ -2148,8 +2235,58 @@ private struct TagChip: View {
     }
 }
 
-// Simple flow layout for wrapping tags
-private struct FlowLayout: Layout {
+// IMPORTANT: FlowLayout must stay in AjustesView.swift — it is declared private and cannot be moved to Shared/Components/
+// (see also: Shared/Components/FlowLayout.swift created in Task 11 as a shared copy with internal access)
+struct FlowLayout: Layout {
+    var spacing: CGFloat = 4
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let maxWidth = proposal.width ?? .infinity
+        var height: CGFloat = 0
+        var rowWidth: CGFloat = 0
+        var rowHeight: CGFloat = 0
+        for subview in subviews {
+            let size = subview.sizeThatFits(.unspecified)
+            if rowWidth + size.width > maxWidth, rowWidth > 0 {
+                height += rowHeight + spacing
+                rowWidth = 0
+                rowHeight = 0
+            }
+            rowWidth += size.width + spacing
+            rowHeight = max(rowHeight, size.height)
+        }
+        height += rowHeight
+        return CGSize(width: maxWidth, height: height)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        var x = bounds.minX
+        var y = bounds.minY
+        var rowHeight: CGFloat = 0
+        for subview in subviews {
+            let size = subview.sizeThatFits(.unspecified)
+            if x + size.width > bounds.maxX, x > bounds.minX {
+                y += rowHeight + spacing
+                x = bounds.minX
+                rowHeight = 0
+            }
+            subview.place(at: CGPoint(x: x, y: y), proposal: ProposedViewSize(size))
+            x += size.width + spacing
+            rowHeight = max(rowHeight, size.height)
+        }
+    }
+}
+```
+
+**`nutrition_frontend/ios-native/Metabolic/Shared/Components/FlowLayout.swift`**
+
+```swift
+import SwiftUI
+
+// Shared FlowLayout with internal access — usable across the app.
+// Note: AjustesView.swift also contains a local copy (struct FlowLayout)
+// that was declared in-file before this shared version was extracted.
+struct FlowLayout: Layout {
     var spacing: CGFloat = 4
 
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
@@ -2243,6 +2380,7 @@ final class AjustesViewModelTests: XCTestCase {
 
 ```bash
 git add nutrition_frontend/ios-native/Metabolic/Features/Ajustes/
+git add nutrition_frontend/ios-native/Metabolic/Shared/Components/FlowLayout.swift
 git add nutrition_frontend/ios-native/MetabolicTests/AjustesViewModelTests.swift
 git commit -m "feat: add Ajustes screen"
 ```
@@ -2256,12 +2394,14 @@ git commit -m "feat: add Ajustes screen"
   - `DesignSystemTests` (2 tests)
   - `ModelDecodingTests` (5 tests)
   - `EndpointTests` (6 tests)
+  - `SharedComponentsTests` (3 tests)
+  - `ContentViewTests` (1 test)
   - `PanelViewModelTests` (4 tests)
   - `DietaViewModelTests` (3 tests)
   - `EntrenoViewModelTests` (3 tests)
   - `ProgresoViewModelTests` (4 tests)
   - `AjustesViewModelTests` (2 tests)
-  - **Total: 29 tests, 0 failures**
+  - **Total: 33 tests, 0 failures**
 - [ ] Run on iOS 26 Simulator (e.g. iPhone 16 Pro):
   - Confirm Liquid Glass tab bar renders at bottom
   - Navigate to each tab — no crashes
@@ -2289,13 +2429,13 @@ git commit -m "feat: Metabolic iOS native app — complete"
 |------|-------|-------|
 | 1 — Xcode Setup | Xcode project scaffolded manually | Cmd+U: empty suite passes |
 | 2 — Design System | `Color+Brand.swift`, `DesignSystem.swift` | 2 smoke tests |
-| 3 — Shared Components | `GlassCard`, `PillButton`, `MetricBadge` | Build check |
+| 3 — Shared Components | `GlassCard`, `PillButton`, `MetricBadge` | 3 smoke tests |
 | 4 — Models | 4 model files | 5 decode tests |
 | 5 — Networking | `Endpoints.swift`, `APIClient.swift`, `ViewState.swift` | 6 URL tests |
-| 6 — Tab Bar | `MetabolicApp.swift`, `ContentView.swift` | Simulator check |
-| 7 — Panel | `PanelViewModel`, `PanelView` | 4 ViewModel tests |
-| 8 — Dieta | `DietaViewModel`, `DietaView` | 3 ViewModel tests |
-| 9 — Entreno | `EntrenoViewModel`, `EntrenoView` | 3 ViewModel tests |
-| 10 — Progreso | `ProgresoViewModel`, `ProgresoView` | 4 ViewModel tests |
-| 11 — Ajustes | `AjustesViewModel`, `AjustesView` | 2 ViewModel tests |
-| 12 — Polish | Integration + visual checks | 29 total, 0 failures |
+| 6 — Tab Bar | `MetabolicApp.swift`, `ContentView.swift` | 1 smoke test |
+| 7 — Panel | `PanelViewModel` (`@MainActor`), `PanelView` | 4 ViewModel tests |
+| 8 — Dieta | `DietaViewModel` (`@MainActor`), `DietaView` | 3 ViewModel tests |
+| 9 — Entreno | `EntrenoViewModel` (`@MainActor`), `EntrenoView` | 3 ViewModel tests |
+| 10 — Progreso | `ProgresoViewModel` (`@MainActor`), `ProgresoView` | 4 ViewModel tests |
+| 11 — Ajustes | `AjustesViewModel` (`@MainActor`), `AjustesView`, `FlowLayout.swift` | 2 ViewModel tests |
+| 12 — Polish | Integration + visual checks | 33 total, 0 failures |
