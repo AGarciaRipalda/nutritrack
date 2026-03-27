@@ -48,7 +48,7 @@ struct DietaView: View {
     }
 
     private var consumedSubtitle: String {
-        "\(viewModel.totalConsumedKcal) / \(viewModel.dailyTarget) kcal consumidas"
+        "\(viewModel.plannedKcal) kcal planificadas hoy"
     }
 
     // MARK: — Daily Content
