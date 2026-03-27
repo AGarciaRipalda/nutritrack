@@ -59,7 +59,7 @@
 		056981235A917CCF119FA915 /* WorkoutModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutModels.swift; sourceTree = "<group>"; };
 		0F0763B657D1CED7C558DA7D /* MetabolicTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = MetabolicTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		10E1738419FE15903F229CC8 /* UserProfile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserProfile.swift; sourceTree = "<group>"; };
-		138025F76D190F531F6998E5 /* Metabolic.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Metabolic.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		138025F76D190F531F6998E5 /* Metabolic.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Metabolic.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		2D0EE955D2B87903B3A3953E /* NutritionModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NutritionModels.swift; sourceTree = "<group>"; };
 		2F81BD1D2FADA4218DC8EE6D /* ProgresoView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProgresoView.swift; sourceTree = "<group>"; };
 		3CB04BC052CC47F72B133AEE /* ModelDecodingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelDecodingTests.swift; sourceTree = "<group>"; };
@@ -317,11 +317,6 @@
 			attributes = {
 				BuildIndependentTargetsInParallel = YES;
 				LastUpgradeCheck = 2600;
-				TargetAttributes = {
-					83E73E4785FEAE44DEE696EC = {
-						DevelopmentTeam = "";
-					};
-				};
 			};
 			buildConfigurationList = BF6D14E6186C41515EEE8522 /* Build configuration list for PBXProject "Metabolic" */;
 			developmentRegion = en;
@@ -466,7 +461,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = L3GG4HMKN5;
 				INFOPLIST_FILE = Metabolic/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -500,7 +495,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = L3GG4HMKN5;
 				INFOPLIST_FILE = Metabolic/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
