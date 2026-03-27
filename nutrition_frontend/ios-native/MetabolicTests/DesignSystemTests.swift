@@ -1,4 +1,5 @@
 import XCTest
+import SwiftUI
 @testable import Metabolic
 
 final class DesignSystemTests: XCTestCase {

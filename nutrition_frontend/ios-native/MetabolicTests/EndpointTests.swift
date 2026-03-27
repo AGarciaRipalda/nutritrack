@@ -56,6 +56,6 @@ final class EndpointTests: XCTestCase {
         var request = URLRequest(url: endpoint.url)
         request.setValue("Europe/Madrid", forHTTPHeaderField: "x_user_timezone")
         XCTAssertEqual(request.value(forHTTPHeaderField: "x_user_timezone"), "Europe/Madrid")
-        XCTAssertNil(request.httpMethod) // nil defaults to GET in URLSession
+        XCTAssertEqual(request.httpMethod, "GET") // URLRequest defaults httpMethod to "GET"
     }
 }

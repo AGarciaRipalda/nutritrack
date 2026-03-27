@@ -73,13 +73,13 @@ final class AjustesViewModel {
         }
     }
 
-    func addToList(_ list: WritableKeyPath<AjustesViewModel, [String]>, value: String) {
+    func addToList(_ list: ReferenceWritableKeyPath<AjustesViewModel, [String]>, value: String) {
         let trimmed = value.trimmingCharacters(in: .whitespaces)
         guard !trimmed.isEmpty, !self[keyPath: list].contains(trimmed) else { return }
         self[keyPath: list].append(trimmed)
     }
 
-    func removeFromList(_ list: WritableKeyPath<AjustesViewModel, [String]>, value: String) {
+    func removeFromList(_ list: ReferenceWritableKeyPath<AjustesViewModel, [String]>, value: String) {
         self[keyPath: list].removeAll { $0 == value }
     }
 }
