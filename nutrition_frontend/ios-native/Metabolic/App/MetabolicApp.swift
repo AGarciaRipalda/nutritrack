@@ -4,7 +4,7 @@ import SwiftUI
 struct MetabolicApp: App {
     var body: some Scene {
         WindowGroup {
-            Text("Metabolic")
+            ContentView()
         }
     }
 }
