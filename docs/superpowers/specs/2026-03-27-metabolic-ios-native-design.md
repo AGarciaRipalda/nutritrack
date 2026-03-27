@@ -111,7 +111,7 @@ All SF Pro (system font):
 
 - **Tab bar**: automatic iOS 26 liquid glass
 - **Cards** (Panel, Progreso, Entreno): `.glassEffect()` with rounded corners (16pt)
-- **Pill buttons** (IA, Importar, Nuevo, Generar plan): `.glassEffect()` with green tint
+- **Pill buttons** (IA, Importar, Nuevo, Generar plan): `.glassEffect()` with green tint; use `.clipShape(Capsule())`, height 36pt
 - **Settings Form**: native iOS 26 `Form` with glass grouped style
 - **Background**: `systemGroupedBackground` (new iOS 26 material base)
 
@@ -137,13 +137,20 @@ All SF Pro (system font):
 ### 3. Entreno (Workout) — `GET /v2/training/workouts`, `GET /v2/training/routines`
 
 - Title "Entreno" + sessions today subtitle
-- Action pills: "IA", "Importar", "Nuevo"
+- Action pills (functional):
+  - **"IA"**: generates a workout using AI — calls `POST /v2/training/routines` with AI-generated parameters, then starts the session
+  - **"Importar"**: imports from gym history — calls `GET /exercise/gym-history`
+  - **"Nuevo"**: creates a blank new workout session — calls `POST /v2/training/workouts`
 - Section "RECIENTES": workout rows with glass card
   - Each row: AI icon, name, duration, kcal burned, delete button, chevron
 
 ### 4. Progreso (Progress) — `GET /weight/history`
 
 - Title "Progreso" + "+ Registrar" button
+  - Tapping "+ Registrar" opens a sheet/modal with two fields:
+    - **Weight (kg)**: decimal stepper or text field
+    - **Date**: `DatePicker`
+  - On confirm, calls `POST /weight` with the entered values
 - "Seguimiento de peso" section header
 - Current weight card: weight value + delta + date
 - "Evolución" section: Swift Charts line chart (date X axis, weight Y axis)
@@ -194,6 +201,9 @@ enum ViewState<T> {
 | Dieta regenerate | POST | `/diet/today/regenerate` |
 | Entreno | GET | `/v2/training/workouts` |
 | Entreno | GET | `/v2/training/routines` |
+| Entreno IA | POST | `/v2/training/routines` |
+| Entreno Importar | GET | `/exercise/gym-history` |
+| Entreno Nuevo | POST | `/v2/training/workouts` |
 | Progreso | GET | `/weight/history` |
 | Progreso log | POST | `/weight` |
 | Ajustes read | GET | `/profile` |
