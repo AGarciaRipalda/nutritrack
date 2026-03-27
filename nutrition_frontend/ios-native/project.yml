@@ -3,13 +3,12 @@ options:
   bundleIdPrefix: com.metabolic.app
   deploymentTarget:
     iOS: "26.0"
-  xcodeVersion: "16.0"
+  xcodeVersion: "26.0"
   generateEmptyDirectories: true
 
 settings:
   base:
     SWIFT_VERSION: 6.0
-    IPHONEOS_DEPLOYMENT_TARGET: "26.0"
 
 targets:
   Metabolic:

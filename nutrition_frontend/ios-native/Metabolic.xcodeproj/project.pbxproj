@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		8769F77FF50BE6F6FD976E9F /* MetabolicApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6741018736FC65AC47A64D68 /* MetabolicApp.swift */; };
 		A655BD45B4F5882AE2D5D63B /* MetabolicTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B080A8E824C3776052E87E07 /* MetabolicTests.swift */; };
+		F45A8B1DBAA578D01AB6392E /* ViewState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 62E62D96D9DF00FF5C3AE02A /* ViewState.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -24,6 +25,7 @@
 /* Begin PBXFileReference section */
 		0F0763B657D1CED7C558DA7D /* MetabolicTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = MetabolicTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		138025F76D190F531F6998E5 /* Metabolic.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Metabolic.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		62E62D96D9DF00FF5C3AE02A /* ViewState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewState.swift; sourceTree = "<group>"; };
 		6741018736FC65AC47A64D68 /* MetabolicApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetabolicApp.swift; sourceTree = "<group>"; };
 		B080A8E824C3776052E87E07 /* MetabolicTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetabolicTests.swift; sourceTree = "<group>"; };
 		B831A5BBDF427FE2F709AD4A /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
@@ -163,6 +165,7 @@
 		F051A44C642BFEA15784C0B0 /* Shared */ = {
 			isa = PBXGroup;
 			children = (
+				62E62D96D9DF00FF5C3AE02A /* ViewState.swift */,
 				1E1779746210728A657C3633 /* Components */,
 				4D926B18842ADF8EE2E4C5B9 /* Extensions */,
 			);
@@ -214,7 +217,7 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = YES;
-				LastUpgradeCheck = 1600;
+				LastUpgradeCheck = 2600;
 				TargetAttributes = {
 					83E73E4785FEAE44DEE696EC = {
 						DevelopmentTeam = "";
@@ -247,6 +250,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				8769F77FF50BE6F6FD976E9F /* MetabolicApp.swift in Sources */,
+				F45A8B1DBAA578D01AB6392E /* ViewState.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
