@@ -35,8 +35,12 @@ final class PanelViewModelTests: XCTestCase {
         XCTAssertEqual(vm.diferencia, -450)
     }
 
-    func testTodayDateStringIsNotEmpty() {
+    func testTodayDateStringContainsCommaAndMonth() {
         let vm = PanelViewModel()
-        XCTAssertFalse(vm.todayDateString.isEmpty)
+        let dateString = vm.todayDateString
+        // Spanish locale format: "Viernes, 27 Mar" — should contain a comma
+        XCTAssertTrue(dateString.contains(","), "Expected Spanish date format with comma, got: \(dateString)")
+        // Should not be empty
+        XCTAssertFalse(dateString.isEmpty)
     }
 }
