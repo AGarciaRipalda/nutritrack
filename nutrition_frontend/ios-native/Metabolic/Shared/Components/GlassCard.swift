@@ -10,7 +10,6 @@ struct GlassCard<Content: View>: View {
     var body: some View {
         content()
             .padding(DS.Spacing.md)
-            .background(.regularMaterial)
             .glassEffect(.regular.tint(Color.brandGlass), in: RoundedRectangle(cornerRadius: DS.Radius.card))
     }
 }
