@@ -102,6 +102,8 @@ app = FastAPI(
 )
 
 origins = [
+    "https://www.metabolic.es",
+    "https://metabolic.es",
     "http://localhost:3000",      # Tu Next.js en el PC
     "capacitor://localhost",      # Tu App en el iPhone (iOS)
     "http://localhost",            # Tu App en Android
