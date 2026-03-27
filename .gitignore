@@ -25,3 +25,7 @@ nutrition_assistant/preferences.json
 nutrition_assistant/routines.json
 nutrition_assistant/workouts.json
 nutrition_assistant/prs.json
+
+# Secrets
+*.key
+*.pem
