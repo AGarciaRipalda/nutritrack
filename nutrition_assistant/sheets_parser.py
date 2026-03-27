@@ -100,7 +100,15 @@ def _load_google_sheets_sessions(days: int) -> list[dict[str, Any]]:
         spreadsheet = client.open(spreadsheet_name)
 
     rows: list[dict[str, Any]] = []
-    for worksheet_name in _get_google_worksheet_candidates(config):
+    candidate_names = _get_google_worksheet_candidates(config)
+    candidate_keys = {_normalize_key(name) for name in candidate_names}
+    matched_titles = [
+        worksheet.title
+        for worksheet in spreadsheet.worksheets()
+        if _normalize_key(worksheet.title) in candidate_keys
+    ]
+
+    for worksheet_name in _unique_names(matched_titles or candidate_names):
         try:
             worksheet = spreadsheet.worksheet(worksheet_name)
         except Exception:
