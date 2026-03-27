@@ -6,19 +6,28 @@ import Observation
 final class EntrenoViewModel {
     var workoutsState: ViewState<[Workout]> = .idle
 
+    // Cached ISO8601 formatters — DateFormatter allocation is expensive
+    private static let iso8601WithFractional: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return f
+    }()
+
+    private static let iso8601Standard: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime]
+        return f
+    }()
+
     var todayCount: Int {
         guard case .loaded(let workouts) = workoutsState else { return 0 }
         let todayStart = Calendar.current.startOfDay(for: Date())
         return workouts.filter { workout in
             guard let dateStr = workout.finishedAt else { return false }
-            let formatter = ISO8601DateFormatter()
-            formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-            if let date = formatter.date(from: dateStr) {
+            if let date = EntrenoViewModel.iso8601WithFractional.date(from: dateStr) {
                 return Calendar.current.startOfDay(for: date) == todayStart
             }
-            // Try without fractional seconds
-            formatter.formatOptions = [.withInternetDateTime]
-            if let date = formatter.date(from: dateStr) {
+            if let date = EntrenoViewModel.iso8601Standard.date(from: dateStr) {
                 return Calendar.current.startOfDay(for: date) == todayStart
             }
             return false
