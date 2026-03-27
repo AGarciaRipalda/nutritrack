@@ -1,0 +1,490 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		8769F77FF50BE6F6FD976E9F /* MetabolicApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6741018736FC65AC47A64D68 /* MetabolicApp.swift */; };
+		A655BD45B4F5882AE2D5D63B /* MetabolicTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B080A8E824C3776052E87E07 /* MetabolicTests.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		B2E28D11ACF3B3F7891C1D6C /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 2395DB6C1CDC3E4734671A47 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 83E73E4785FEAE44DEE696EC;
+			remoteInfo = Metabolic;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		0F0763B657D1CED7C558DA7D /* MetabolicTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = MetabolicTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		138025F76D190F531F6998E5 /* Metabolic.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Metabolic.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		6741018736FC65AC47A64D68 /* MetabolicApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetabolicApp.swift; sourceTree = "<group>"; };
+		B080A8E824C3776052E87E07 /* MetabolicTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetabolicTests.swift; sourceTree = "<group>"; };
+		B831A5BBDF427FE2F709AD4A /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXGroup section */
+		1E1779746210728A657C3633 /* Components */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = Components;
+			sourceTree = "<group>";
+		};
+		31257961E98B6DDE3628491F /* App */ = {
+			isa = PBXGroup;
+			children = (
+				6741018736FC65AC47A64D68 /* MetabolicApp.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		4280E6A3C703DFEDB5537DC0 /* MetabolicTests */ = {
+			isa = PBXGroup;
+			children = (
+				B080A8E824C3776052E87E07 /* MetabolicTests.swift */,
+			);
+			path = MetabolicTests;
+			sourceTree = "<group>";
+		};
+		4D926B18842ADF8EE2E4C5B9 /* Extensions */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = Extensions;
+			sourceTree = "<group>";
+		};
+		5406DE89C1C34D29FD03093C /* Progreso */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = Progreso;
+			sourceTree = "<group>";
+		};
+		6EAABA4C81454993F614951F /* Panel */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = Panel;
+			sourceTree = "<group>";
+		};
+		6EB728D2AA0CD8E90E47682E /* Entreno */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = Entreno;
+			sourceTree = "<group>";
+		};
+		7F8205F45D8258F609C36028 /* Ajustes */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = Ajustes;
+			sourceTree = "<group>";
+		};
+		8F2B9E00A66886DABC3349D8 /* Core */ = {
+			isa = PBXGroup;
+			children = (
+				9A5D7FD74B1761AB7999FAC2 /* Models */,
+				E4A2257B6EE374C4C75B4150 /* Network */,
+			);
+			path = Core;
+			sourceTree = "<group>";
+		};
+		9A5D7FD74B1761AB7999FAC2 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		AEEE23D155E6FC93873A3EFF /* Metabolic */ = {
+			isa = PBXGroup;
+			children = (
+				B831A5BBDF427FE2F709AD4A /* Info.plist */,
+				31257961E98B6DDE3628491F /* App */,
+				8F2B9E00A66886DABC3349D8 /* Core */,
+				C62A61DB304047F82C828E6E /* Features */,
+				F051A44C642BFEA15784C0B0 /* Shared */,
+			);
+			path = Metabolic;
+			sourceTree = "<group>";
+		};
+		C62A61DB304047F82C828E6E /* Features */ = {
+			isa = PBXGroup;
+			children = (
+				7F8205F45D8258F609C36028 /* Ajustes */,
+				D7DCB2238E618A8755E6B515 /* Dieta */,
+				6EB728D2AA0CD8E90E47682E /* Entreno */,
+				6EAABA4C81454993F614951F /* Panel */,
+				5406DE89C1C34D29FD03093C /* Progreso */,
+			);
+			path = Features;
+			sourceTree = "<group>";
+		};
+		CE1CCC34BBC8A8335E558B0B = {
+			isa = PBXGroup;
+			children = (
+				AEEE23D155E6FC93873A3EFF /* Metabolic */,
+				4280E6A3C703DFEDB5537DC0 /* MetabolicTests */,
+				E6574CA0E7DE1BB977DEC9B6 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		D7DCB2238E618A8755E6B515 /* Dieta */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = Dieta;
+			sourceTree = "<group>";
+		};
+		E4A2257B6EE374C4C75B4150 /* Network */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = Network;
+			sourceTree = "<group>";
+		};
+		E6574CA0E7DE1BB977DEC9B6 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				138025F76D190F531F6998E5 /* Metabolic.app */,
+				0F0763B657D1CED7C558DA7D /* MetabolicTests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		F051A44C642BFEA15784C0B0 /* Shared */ = {
+			isa = PBXGroup;
+			children = (
+				1E1779746210728A657C3633 /* Components */,
+				4D926B18842ADF8EE2E4C5B9 /* Extensions */,
+			);
+			path = Shared;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		83E73E4785FEAE44DEE696EC /* Metabolic */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 67E0014D725F4340C074E75E /* Build configuration list for PBXNativeTarget "Metabolic" */;
+			buildPhases = (
+				495CF27B7410D1D757E9F625 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = Metabolic;
+			packageProductDependencies = (
+			);
+			productName = Metabolic;
+			productReference = 138025F76D190F531F6998E5 /* Metabolic.app */;
+			productType = "com.apple.product-type.application";
+		};
+		C056D746A15784A9137B146E /* MetabolicTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = E048AD2AB029E9E0582248EB /* Build configuration list for PBXNativeTarget "MetabolicTests" */;
+			buildPhases = (
+				931BC142578747DD35249BA5 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				6D0B46E2DAD33DF8A90BE46D /* PBXTargetDependency */,
+			);
+			name = MetabolicTests;
+			packageProductDependencies = (
+			);
+			productName = MetabolicTests;
+			productReference = 0F0763B657D1CED7C558DA7D /* MetabolicTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		2395DB6C1CDC3E4734671A47 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1600;
+				TargetAttributes = {
+					83E73E4785FEAE44DEE696EC = {
+						DevelopmentTeam = "";
+					};
+				};
+			};
+			buildConfigurationList = BF6D14E6186C41515EEE8522 /* Build configuration list for PBXProject "Metabolic" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = CE1CCC34BBC8A8335E558B0B;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = E6574CA0E7DE1BB977DEC9B6 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				83E73E4785FEAE44DEE696EC /* Metabolic */,
+				C056D746A15784A9137B146E /* MetabolicTests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXSourcesBuildPhase section */
+		495CF27B7410D1D757E9F625 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				8769F77FF50BE6F6FD976E9F /* MetabolicApp.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		931BC142578747DD35249BA5 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A655BD45B4F5882AE2D5D63B /* MetabolicTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		6D0B46E2DAD33DF8A90BE46D /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 83E73E4785FEAE44DEE696EC /* Metabolic */;
+			targetProxy = B2E28D11ACF3B3F7891C1D6C /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		00D5CB7974348EB8289C81E7 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 6.0;
+			};
+			name = Release;
+		};
+		084141F40E7A8AD923030385 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				DEVELOPMENT_TEAM = "";
+				INFOPLIST_FILE = Metabolic/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.metabolic.app.native;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		145D05CAD6FD769EE831F390 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.metabolic.app.native.tests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Metabolic.app/Metabolic";
+			};
+			name = Release;
+		};
+		77BCAA065A59EE2ABD545617 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				DEVELOPMENT_TEAM = "";
+				INFOPLIST_FILE = Metabolic/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.metabolic.app.native;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		8EEFE09930F90631306A37A9 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 6.0;
+			};
+			name = Debug;
+		};
+		9BE549092A9C96E7306EEE71 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.metabolic.app.native.tests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Metabolic.app/Metabolic";
+			};
+			name = Debug;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		67E0014D725F4340C074E75E /* Build configuration list for PBXNativeTarget "Metabolic" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				084141F40E7A8AD923030385 /* Debug */,
+				77BCAA065A59EE2ABD545617 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		BF6D14E6186C41515EEE8522 /* Build configuration list for PBXProject "Metabolic" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				8EEFE09930F90631306A37A9 /* Debug */,
+				00D5CB7974348EB8289C81E7 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		E048AD2AB029E9E0582248EB /* Build configuration list for PBXNativeTarget "MetabolicTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				9BE549092A9C96E7306EEE71 /* Debug */,
+				145D05CAD6FD769EE831F390 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 2395DB6C1CDC3E4734671A47 /* Project object */;
+}
