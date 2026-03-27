@@ -113,7 +113,8 @@ def _load_google_sheets_sessions(days: int) -> list[dict[str, Any]]:
             worksheet = spreadsheet.worksheet(worksheet_name)
         except Exception:
             continue
-        rows.extend(worksheet.get_all_records(default_blank=""))
+        sheet_rows = worksheet.get_all_values()
+        rows.extend(_extract_rows_from_sheet_values(sheet_rows))
 
     return _build_sessions(rows, days)
 
@@ -132,14 +133,14 @@ def _load_excel_sessions(days: int) -> list[dict[str, Any]]:
         if worksheet_name not in workbook.sheetnames:
             continue
         sheet = workbook[worksheet_name]
-        rows = list(sheet.iter_rows(values_only=True))
-        if not rows:
+        raw_rows = list(sheet.iter_rows(values_only=True))
+        if not raw_rows:
             continue
-        headers = [str(cell).strip() if cell is not None else "" for cell in rows[0]]
-        for row in rows[1:]:
-            if not any(cell not in (None, "") for cell in row):
-                continue
-            payload.append({headers[idx]: row[idx] for idx in range(min(len(headers), len(row)))})
+        normalized_rows = [
+            ["" if cell is None else str(cell) for cell in row]
+            for row in raw_rows
+        ]
+        payload.extend(_extract_rows_from_sheet_values(normalized_rows))
     return _build_sessions(payload, days)
 
 
@@ -166,6 +167,96 @@ def _load_json_sessions(days: int) -> list[dict[str, Any]]:
     if not isinstance(rows, list):
         return []
     return _build_sessions(rows, days)
+
+
+def _extract_rows_from_sheet_values(rows: list[list[Any]]) -> list[dict[str, Any]]:
+    if not rows:
+        return []
+
+    header_index = _find_standard_header_row(rows)
+    if header_index is not None:
+        headers = [str(cell).strip() if cell is not None else "" for cell in rows[header_index]]
+        payload: list[dict[str, Any]] = []
+        for row in rows[header_index + 1:]:
+            if not any(_cell_text(cell) for cell in row):
+                continue
+            payload.append({headers[idx]: row[idx] for idx in range(min(len(headers), len(row)))})
+        return payload
+
+    return _extract_rows_from_monthly_grid(rows)
+
+
+def _find_standard_header_row(rows: list[list[Any]]) -> int | None:
+    for idx, row in enumerate(rows[:25]):
+        normalized = {_normalize_key(cell) for cell in row if _cell_text(cell)}
+        if {"fecha", "ejercicio"} <= normalized:
+            return idx
+        if {"date", "exercise"} <= normalized:
+            return idx
+    return None
+
+
+def _extract_rows_from_monthly_grid(rows: list[list[Any]]) -> list[dict[str, Any]]:
+    payload: list[dict[str, Any]] = []
+    current_type = ""
+    current_date = ""
+
+    row_count = len(rows)
+    for row_idx, row in enumerate(rows):
+        cells = [_cell_text(cell) for cell in row]
+        normalized = [_normalize_key(cell) for cell in cells]
+
+        if "tipo_de_entrenamiento" in normalized:
+            idx = normalized.index("tipo_de_entrenamiento")
+            current_type = next((cell for cell in cells[idx + 1:] if cell), current_type)
+            continue
+
+        if "fecha" in normalized:
+            idx = normalized.index("fecha")
+            current_date = next((cell for cell in cells[idx + 1:] if cell), current_date)
+            continue
+
+        if "ejercicio" not in normalized:
+            continue
+
+        exercise_idx = normalized.index("ejercicio")
+        reps_indices = [i for i, value in enumerate(normalized) if value == "reps"]
+        kgs_indices = [i for i, value in enumerate(normalized) if value in {"kgs", "kg"}]
+        tonnage_idx = next((i for i, value in enumerate(normalized) if value == "tonelaje"), None)
+
+        if not reps_indices or not kgs_indices:
+            continue
+
+        first_reps_idx = reps_indices[0]
+        second_reps_idx = reps_indices[1] if len(reps_indices) > 1 else reps_indices[0]
+        first_kgs_idx = kgs_indices[0]
+        second_kgs_idx = kgs_indices[1] if len(kgs_indices) > 1 else kgs_indices[0]
+
+        for exercise_row in rows[row_idx + 1:row_count]:
+            exercise_cells = [_cell_text(cell) for cell in exercise_row]
+            if not any(exercise_cells):
+                break
+            exercise_norm = [_normalize_key(cell) for cell in exercise_cells]
+            if "tipo_de_entrenamiento" in exercise_norm or "fecha" in exercise_norm or "ejercicio" in exercise_norm:
+                break
+
+            exercise_name = exercise_cells[exercise_idx] if exercise_idx < len(exercise_cells) else ""
+            if not exercise_name:
+                continue
+
+            payload.append({
+                "fecha": current_date,
+                "tipo": current_type,
+                "ejercicio": exercise_name,
+                "reps_s1": exercise_cells[first_reps_idx] if first_reps_idx < len(exercise_cells) else "",
+                "kg_s1": exercise_cells[first_kgs_idx] if first_kgs_idx < len(exercise_cells) else "",
+                "reps_s2": exercise_cells[second_reps_idx] if second_reps_idx < len(exercise_cells) else "",
+                "kg_s2": exercise_cells[second_kgs_idx] if second_kgs_idx < len(exercise_cells) else "",
+                "volumen": exercise_cells[tonnage_idx] if tonnage_idx is not None and tonnage_idx < len(exercise_cells) else "",
+            })
+        current_type = current_type
+
+    return payload
 
 
 def _build_sessions(rows: list[dict[str, Any]], days: int) -> list[dict[str, Any]]:
@@ -380,6 +471,10 @@ def _normalize_key(value: Any) -> str:
     text = "".join(ch for ch in text if not unicodedata.combining(ch))
     text = re.sub(r"[^a-z0-9]+", "_", text)
     return text.strip("_")
+
+
+def _cell_text(value: Any) -> str:
+    return str(value).strip() if value is not None else ""
 
 
 _DATE_KEYS = {
