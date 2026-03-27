@@ -75,12 +75,14 @@ final class ModelDecodingTests: XCTestCase {
             "finished_at": "2026-03-26T11:05:00",
             "duration_seconds": 3900,
             "total_volume_kg": 4500.0,
-            "total_sets": 20
+            "total_sets": 20,
+            "training_block": "hypertrophy"
         }
         """.data(using: .utf8)!
         let workout = try JSONDecoder().decode(Workout.self, from: json)
         XCTAssertEqual(workout.name, "Tren superior")
         XCTAssertEqual(workout.durationFormatted, "65 min")
+        XCTAssertEqual(workout.trainingBlock, "hypertrophy")
     }
 
     func testGoalBalanceDecodes() throws {

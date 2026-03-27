@@ -26,11 +26,8 @@ struct Workout: Codable, Identifiable, Sendable {
         return "\(secs / 60) min"
     }
 
-    // Returns "--" when no real kcal data is available — not estimated
-    var kcalDisplay: String {
-        guard let vol = totalVolumeKg, vol > 0 else { return "-- kcal" }
-        return "-- kcal"
-    }
+    // Returns "--" — real kcal data is not available from this endpoint
+    var kcalDisplay: String { "-- kcal" }
 }
 
 struct Routine: Codable, Identifiable, Sendable {
