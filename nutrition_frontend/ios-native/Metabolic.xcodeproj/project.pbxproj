@@ -7,8 +7,41 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		09F67981200CF0F5F823C302 /* AjustesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61F6BF73C4C7BEFE07578C96 /* AjustesView.swift */; };
+		0D778066BAD0DBAB2684E6D9 /* EntrenoViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B841AEF609E965D4CDBEB127 /* EntrenoViewModelTests.swift */; };
+		0E3CD9A64B3AD7D87C8D14DB /* PanelViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84471664C462A24BC80AC98D /* PanelViewModelTests.swift */; };
+		35AB1B7BFD0333D839B1E7CE /* DietaView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D129557FBC0B04D90B7D81D7 /* DietaView.swift */; };
+		371AFCA9AA67FE56D32CB648 /* ProgresoViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 479DCE630CCBF1943D0FA060 /* ProgresoViewModel.swift */; };
+		41D0113B50D662C4590FEFB8 /* APIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EEB2BF91E271AD214BAB643 /* APIClient.swift */; };
+		422E5043E80685CD80150B10 /* SharedComponentsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00E531714561E7195EC06B5 /* SharedComponentsTests.swift */; };
+		4C1E506FAB98ADEE282BD869 /* AjustesViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7DEC6D64217346F49F2FFBA1 /* AjustesViewModel.swift */; };
+		4E206754C85CAB158F6859AF /* DesignSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA0F378E34A5849556492D63 /* DesignSystem.swift */; };
+		514B46C264D23C890D69CCDF /* ContentViewTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4ECD2E03EF366AB6BB359A98 /* ContentViewTests.swift */; };
+		53A22685B3BEDE2360B556AD /* EndpointTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB1D073E7B0FDDC403F6CE94 /* EndpointTests.swift */; };
+		5AA9B65C1BD4D4A88F6FFC35 /* Endpoints.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2A9EBAAADA3CBA999065093 /* Endpoints.swift */; };
+		62DB323481CEDFA1497824D0 /* FlowLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = B474F4ACB1C75BF50F73C2DB /* FlowLayout.swift */; };
+		697AD63F2A07016EBEBC1DD9 /* PanelViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB89DE2D817412CB18722F1D /* PanelViewModel.swift */; };
+		7589B1B51BACDAD4DD267114 /* WorkoutModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 056981235A917CCF119FA915 /* WorkoutModels.swift */; };
+		7AB1F01B0FC60BB8632F795F /* EntrenoView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 412C251A3E18817D66EDE141 /* EntrenoView.swift */; };
+		7E824BD388F887D765A6DCE8 /* GlassCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = CBFDA4651579CD56AB4D74F2 /* GlassCard.swift */; };
+		7F7958F0F8594AFDE5F43197 /* ProgresoView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F81BD1D2FADA4218DC8EE6D /* ProgresoView.swift */; };
+		83D37CCDC7EDF808F5C6911B /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8727036F98BD82E4C0B9292 /* ContentView.swift */; };
 		8769F77FF50BE6F6FD976E9F /* MetabolicApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6741018736FC65AC47A64D68 /* MetabolicApp.swift */; };
+		8EE8088ACD4EE1C05728F5D8 /* PanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E9C51F01EC7D8ADD58E7464 /* PanelView.swift */; };
+		91F33CA2532D1698A6581B02 /* UserProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10E1738419FE15903F229CC8 /* UserProfile.swift */; };
+		9A91F0630E74F8A1CF38BF17 /* DesignSystemTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = ECB978B0233AF987BC565E27 /* DesignSystemTests.swift */; };
+		9D5CB5E15C2EE1B3E032CE2C /* DietaViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79CC5D82FA6816C8F452D356 /* DietaViewModel.swift */; };
+		A3C0EE693DB647149ECF1388 /* ProgressModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = F218A765C7A8B956040C166C /* ProgressModels.swift */; };
 		A655BD45B4F5882AE2D5D63B /* MetabolicTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B080A8E824C3776052E87E07 /* MetabolicTests.swift */; };
+		BCB42F073AFE3B32E2D09EFE /* ProgresoViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9458CFED0087903CB4551DA7 /* ProgresoViewModelTests.swift */; };
+		D35AA77B4A4ED92091F4F473 /* EntrenoViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54C2A5FC0C16B7EB45D49956 /* EntrenoViewModel.swift */; };
+		DCAE0A69C9417562F0967F0D /* MetricBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA99A618D4771C1286E3C927 /* MetricBadge.swift */; };
+		DFFB418564D7C4A925A126E6 /* DietaViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61F6C9CB3860690524781769 /* DietaViewModelTests.swift */; };
+		E550CFCC2507E86145E63EC8 /* NutritionModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D0EE955D2B87903B3A3953E /* NutritionModels.swift */; };
+		EDF1406B2788CA6413D54419 /* ModelDecodingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3CB04BC052CC47F72B133AEE /* ModelDecodingTests.swift */; };
+		EE7F42F1917D7EF228E186F8 /* AjustesViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EAA479862D685C44B84CACC5 /* AjustesViewModelTests.swift */; };
+		F0C89D346C248986FB2ECD0D /* PillButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE2F4C7A007822C2DA243C5C /* PillButton.swift */; };
+		F2B520F098B191438DB37D22 /* Color+Brand.swift in Sources */ = {isa = PBXBuildFile; fileRef = C61681019F17B4C32ED75D78 /* Color+Brand.swift */; };
 		F45A8B1DBAA578D01AB6392E /* ViewState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 62E62D96D9DF00FF5C3AE02A /* ViewState.swift */; };
 /* End PBXBuildFile section */
 
@@ -23,18 +56,55 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		056981235A917CCF119FA915 /* WorkoutModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutModels.swift; sourceTree = "<group>"; };
 		0F0763B657D1CED7C558DA7D /* MetabolicTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = MetabolicTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		10E1738419FE15903F229CC8 /* UserProfile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserProfile.swift; sourceTree = "<group>"; };
 		138025F76D190F531F6998E5 /* Metabolic.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Metabolic.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		2D0EE955D2B87903B3A3953E /* NutritionModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NutritionModels.swift; sourceTree = "<group>"; };
+		2F81BD1D2FADA4218DC8EE6D /* ProgresoView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProgresoView.swift; sourceTree = "<group>"; };
+		3CB04BC052CC47F72B133AEE /* ModelDecodingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelDecodingTests.swift; sourceTree = "<group>"; };
+		3EEB2BF91E271AD214BAB643 /* APIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClient.swift; sourceTree = "<group>"; };
+		412C251A3E18817D66EDE141 /* EntrenoView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EntrenoView.swift; sourceTree = "<group>"; };
+		479DCE630CCBF1943D0FA060 /* ProgresoViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProgresoViewModel.swift; sourceTree = "<group>"; };
+		4E9C51F01EC7D8ADD58E7464 /* PanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelView.swift; sourceTree = "<group>"; };
+		4ECD2E03EF366AB6BB359A98 /* ContentViewTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentViewTests.swift; sourceTree = "<group>"; };
+		54C2A5FC0C16B7EB45D49956 /* EntrenoViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EntrenoViewModel.swift; sourceTree = "<group>"; };
+		61F6BF73C4C7BEFE07578C96 /* AjustesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AjustesView.swift; sourceTree = "<group>"; };
+		61F6C9CB3860690524781769 /* DietaViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DietaViewModelTests.swift; sourceTree = "<group>"; };
 		62E62D96D9DF00FF5C3AE02A /* ViewState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewState.swift; sourceTree = "<group>"; };
 		6741018736FC65AC47A64D68 /* MetabolicApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetabolicApp.swift; sourceTree = "<group>"; };
+		79CC5D82FA6816C8F452D356 /* DietaViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DietaViewModel.swift; sourceTree = "<group>"; };
+		7DEC6D64217346F49F2FFBA1 /* AjustesViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AjustesViewModel.swift; sourceTree = "<group>"; };
+		84471664C462A24BC80AC98D /* PanelViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelViewModelTests.swift; sourceTree = "<group>"; };
+		9458CFED0087903CB4551DA7 /* ProgresoViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProgresoViewModelTests.swift; sourceTree = "<group>"; };
+		A2A9EBAAADA3CBA999065093 /* Endpoints.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Endpoints.swift; sourceTree = "<group>"; };
+		B00E531714561E7195EC06B5 /* SharedComponentsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedComponentsTests.swift; sourceTree = "<group>"; };
 		B080A8E824C3776052E87E07 /* MetabolicTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetabolicTests.swift; sourceTree = "<group>"; };
+		B474F4ACB1C75BF50F73C2DB /* FlowLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowLayout.swift; sourceTree = "<group>"; };
 		B831A5BBDF427FE2F709AD4A /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		B841AEF609E965D4CDBEB127 /* EntrenoViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EntrenoViewModelTests.swift; sourceTree = "<group>"; };
+		BA0F378E34A5849556492D63 /* DesignSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem.swift; sourceTree = "<group>"; };
+		BE2F4C7A007822C2DA243C5C /* PillButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PillButton.swift; sourceTree = "<group>"; };
+		C61681019F17B4C32ED75D78 /* Color+Brand.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Color+Brand.swift"; sourceTree = "<group>"; };
+		CBFDA4651579CD56AB4D74F2 /* GlassCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlassCard.swift; sourceTree = "<group>"; };
+		D129557FBC0B04D90B7D81D7 /* DietaView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DietaView.swift; sourceTree = "<group>"; };
+		DA99A618D4771C1286E3C927 /* MetricBadge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetricBadge.swift; sourceTree = "<group>"; };
+		EAA479862D685C44B84CACC5 /* AjustesViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AjustesViewModelTests.swift; sourceTree = "<group>"; };
+		ECB978B0233AF987BC565E27 /* DesignSystemTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystemTests.swift; sourceTree = "<group>"; };
+		F218A765C7A8B956040C166C /* ProgressModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProgressModels.swift; sourceTree = "<group>"; };
+		F8727036F98BD82E4C0B9292 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		FB1D073E7B0FDDC403F6CE94 /* EndpointTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EndpointTests.swift; sourceTree = "<group>"; };
+		FB89DE2D817412CB18722F1D /* PanelViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelViewModel.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
 		1E1779746210728A657C3633 /* Components */ = {
 			isa = PBXGroup;
 			children = (
+				B474F4ACB1C75BF50F73C2DB /* FlowLayout.swift */,
+				CBFDA4651579CD56AB4D74F2 /* GlassCard.swift */,
+				DA99A618D4771C1286E3C927 /* MetricBadge.swift */,
+				BE2F4C7A007822C2DA243C5C /* PillButton.swift */,
 			);
 			path = Components;
 			sourceTree = "<group>";
@@ -42,6 +112,7 @@
 		31257961E98B6DDE3628491F /* App */ = {
 			isa = PBXGroup;
 			children = (
+				F8727036F98BD82E4C0B9292 /* ContentView.swift */,
 				6741018736FC65AC47A64D68 /* MetabolicApp.swift */,
 			);
 			path = App;
@@ -50,7 +121,17 @@
 		4280E6A3C703DFEDB5537DC0 /* MetabolicTests */ = {
 			isa = PBXGroup;
 			children = (
+				EAA479862D685C44B84CACC5 /* AjustesViewModelTests.swift */,
+				4ECD2E03EF366AB6BB359A98 /* ContentViewTests.swift */,
+				ECB978B0233AF987BC565E27 /* DesignSystemTests.swift */,
+				61F6C9CB3860690524781769 /* DietaViewModelTests.swift */,
+				FB1D073E7B0FDDC403F6CE94 /* EndpointTests.swift */,
+				B841AEF609E965D4CDBEB127 /* EntrenoViewModelTests.swift */,
 				B080A8E824C3776052E87E07 /* MetabolicTests.swift */,
+				3CB04BC052CC47F72B133AEE /* ModelDecodingTests.swift */,
+				84471664C462A24BC80AC98D /* PanelViewModelTests.swift */,
+				9458CFED0087903CB4551DA7 /* ProgresoViewModelTests.swift */,
+				B00E531714561E7195EC06B5 /* SharedComponentsTests.swift */,
 			);
 			path = MetabolicTests;
 			sourceTree = "<group>";
@@ -58,6 +139,7 @@
 		4D926B18842ADF8EE2E4C5B9 /* Extensions */ = {
 			isa = PBXGroup;
 			children = (
+				C61681019F17B4C32ED75D78 /* Color+Brand.swift */,
 			);
 			path = Extensions;
 			sourceTree = "<group>";
@@ -65,6 +147,8 @@
 		5406DE89C1C34D29FD03093C /* Progreso */ = {
 			isa = PBXGroup;
 			children = (
+				2F81BD1D2FADA4218DC8EE6D /* ProgresoView.swift */,
+				479DCE630CCBF1943D0FA060 /* ProgresoViewModel.swift */,
 			);
 			path = Progreso;
 			sourceTree = "<group>";
@@ -72,6 +156,8 @@
 		6EAABA4C81454993F614951F /* Panel */ = {
 			isa = PBXGroup;
 			children = (
+				4E9C51F01EC7D8ADD58E7464 /* PanelView.swift */,
+				FB89DE2D817412CB18722F1D /* PanelViewModel.swift */,
 			);
 			path = Panel;
 			sourceTree = "<group>";
@@ -79,6 +165,8 @@
 		6EB728D2AA0CD8E90E47682E /* Entreno */ = {
 			isa = PBXGroup;
 			children = (
+				412C251A3E18817D66EDE141 /* EntrenoView.swift */,
+				54C2A5FC0C16B7EB45D49956 /* EntrenoViewModel.swift */,
 			);
 			path = Entreno;
 			sourceTree = "<group>";
@@ -86,6 +174,8 @@
 		7F8205F45D8258F609C36028 /* Ajustes */ = {
 			isa = PBXGroup;
 			children = (
+				61F6BF73C4C7BEFE07578C96 /* AjustesView.swift */,
+				7DEC6D64217346F49F2FFBA1 /* AjustesViewModel.swift */,
 			);
 			path = Ajustes;
 			sourceTree = "<group>";
@@ -102,6 +192,10 @@
 		9A5D7FD74B1761AB7999FAC2 /* Models */ = {
 			isa = PBXGroup;
 			children = (
+				2D0EE955D2B87903B3A3953E /* NutritionModels.swift */,
+				F218A765C7A8B956040C166C /* ProgressModels.swift */,
+				10E1738419FE15903F229CC8 /* UserProfile.swift */,
+				056981235A917CCF119FA915 /* WorkoutModels.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -142,6 +236,8 @@
 		D7DCB2238E618A8755E6B515 /* Dieta */ = {
 			isa = PBXGroup;
 			children = (
+				D129557FBC0B04D90B7D81D7 /* DietaView.swift */,
+				79CC5D82FA6816C8F452D356 /* DietaViewModel.swift */,
 			);
 			path = Dieta;
 			sourceTree = "<group>";
@@ -149,6 +245,8 @@
 		E4A2257B6EE374C4C75B4150 /* Network */ = {
 			isa = PBXGroup;
 			children = (
+				3EEB2BF91E271AD214BAB643 /* APIClient.swift */,
+				A2A9EBAAADA3CBA999065093 /* Endpoints.swift */,
 			);
 			path = Network;
 			sourceTree = "<group>";
@@ -165,6 +263,7 @@
 		F051A44C642BFEA15784C0B0 /* Shared */ = {
 			isa = PBXGroup;
 			children = (
+				BA0F378E34A5849556492D63 /* DesignSystem.swift */,
 				62E62D96D9DF00FF5C3AE02A /* ViewState.swift */,
 				1E1779746210728A657C3633 /* Components */,
 				4D926B18842ADF8EE2E4C5B9 /* Extensions */,
@@ -249,8 +348,31 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				41D0113B50D662C4590FEFB8 /* APIClient.swift in Sources */,
+				09F67981200CF0F5F823C302 /* AjustesView.swift in Sources */,
+				4C1E506FAB98ADEE282BD869 /* AjustesViewModel.swift in Sources */,
+				F2B520F098B191438DB37D22 /* Color+Brand.swift in Sources */,
+				83D37CCDC7EDF808F5C6911B /* ContentView.swift in Sources */,
+				4E206754C85CAB158F6859AF /* DesignSystem.swift in Sources */,
+				35AB1B7BFD0333D839B1E7CE /* DietaView.swift in Sources */,
+				9D5CB5E15C2EE1B3E032CE2C /* DietaViewModel.swift in Sources */,
+				5AA9B65C1BD4D4A88F6FFC35 /* Endpoints.swift in Sources */,
+				7AB1F01B0FC60BB8632F795F /* EntrenoView.swift in Sources */,
+				D35AA77B4A4ED92091F4F473 /* EntrenoViewModel.swift in Sources */,
+				62DB323481CEDFA1497824D0 /* FlowLayout.swift in Sources */,
+				7E824BD388F887D765A6DCE8 /* GlassCard.swift in Sources */,
 				8769F77FF50BE6F6FD976E9F /* MetabolicApp.swift in Sources */,
+				DCAE0A69C9417562F0967F0D /* MetricBadge.swift in Sources */,
+				E550CFCC2507E86145E63EC8 /* NutritionModels.swift in Sources */,
+				8EE8088ACD4EE1C05728F5D8 /* PanelView.swift in Sources */,
+				697AD63F2A07016EBEBC1DD9 /* PanelViewModel.swift in Sources */,
+				F0C89D346C248986FB2ECD0D /* PillButton.swift in Sources */,
+				7F7958F0F8594AFDE5F43197 /* ProgresoView.swift in Sources */,
+				371AFCA9AA67FE56D32CB648 /* ProgresoViewModel.swift in Sources */,
+				A3C0EE693DB647149ECF1388 /* ProgressModels.swift in Sources */,
+				91F33CA2532D1698A6581B02 /* UserProfile.swift in Sources */,
 				F45A8B1DBAA578D01AB6392E /* ViewState.swift in Sources */,
+				7589B1B51BACDAD4DD267114 /* WorkoutModels.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -258,7 +380,17 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				EE7F42F1917D7EF228E186F8 /* AjustesViewModelTests.swift in Sources */,
+				514B46C264D23C890D69CCDF /* ContentViewTests.swift in Sources */,
+				9A91F0630E74F8A1CF38BF17 /* DesignSystemTests.swift in Sources */,
+				DFFB418564D7C4A925A126E6 /* DietaViewModelTests.swift in Sources */,
+				53A22685B3BEDE2360B556AD /* EndpointTests.swift in Sources */,
+				0D778066BAD0DBAB2684E6D9 /* EntrenoViewModelTests.swift in Sources */,
 				A655BD45B4F5882AE2D5D63B /* MetabolicTests.swift in Sources */,
+				EDF1406B2788CA6413D54419 /* ModelDecodingTests.swift in Sources */,
+				0E3CD9A64B3AD7D87C8D14DB /* PanelViewModelTests.swift in Sources */,
+				BCB42F073AFE3B32E2D09EFE /* ProgresoViewModelTests.swift in Sources */,
+				422E5043E80685CD80150B10 /* SharedComponentsTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -350,6 +482,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -446,6 +579,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",

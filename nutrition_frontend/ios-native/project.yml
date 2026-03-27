@@ -40,3 +40,4 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.metabolic.app.native.tests
+        GENERATE_INFOPLIST_FILE: YES

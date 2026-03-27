@@ -153,7 +153,7 @@ struct AjustesView: View {
         icon: String,
         tags: [String],
         newValue: Binding<String>,
-        list: WritableKeyPath<AjustesViewModel, [String]>
+        list: ReferenceWritableKeyPath<AjustesViewModel, [String]>
     ) -> some View {
         VStack(alignment: .leading, spacing: DS.Spacing.sm) {
             Label(title, systemImage: icon)
@@ -184,7 +184,7 @@ struct AjustesView: View {
         .padding(.vertical, DS.Spacing.xs)
     }
 
-    private func tagChip(_ tag: String, list: WritableKeyPath<AjustesViewModel, [String]>) -> some View {
+    private func tagChip(_ tag: String, list: ReferenceWritableKeyPath<AjustesViewModel, [String]>) -> some View {
         HStack(spacing: 4) {
             Text(tag)
                 .font(.caption)
