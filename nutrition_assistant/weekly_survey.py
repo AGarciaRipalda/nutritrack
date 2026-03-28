@@ -11,6 +11,7 @@ import os
 from datetime import date
 from pathlib import Path
 from data_dir import DATA_DIR
+from user_paths import get_user_data_dir
 
 SURVEY_FILE = DATA_DIR / "survey_history.json"
 
@@ -31,11 +32,7 @@ def _use_db():
 
 
 def _user_dir(user_id: str | None) -> Path:
-    if user_id:
-        d = DATA_DIR / user_id
-        d.mkdir(parents=True, exist_ok=True)
-        return d
-    return DATA_DIR
+    return get_user_data_dir(user_id, default_dir=DATA_DIR)
 
 
 def _survey_file(user_id: str | None) -> Path:

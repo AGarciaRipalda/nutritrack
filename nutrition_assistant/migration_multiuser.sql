@@ -12,11 +12,19 @@ CREATE TABLE IF NOT EXISTS users (
     email       TEXT UNIQUE NOT NULL,
     password_hash TEXT NOT NULL,
     name        TEXT NOT NULL DEFAULT 'Usuario',
+    role        TEXT NOT NULL DEFAULT 'user',
     created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                   WHERE table_name = 'users' AND column_name = 'role') THEN
+        ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'user';
+    END IF;
+END $$;
 
 -- 2. Añadir user_id a todas las tablas existentes ---------------------------
 -- Usamos DO blocks para que sea idempotente.

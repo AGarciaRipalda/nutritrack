@@ -12,6 +12,7 @@ from typing import Optional
 
 from exercise_library import EXERCISE_LIBRARY, MUSCLE_LABELS
 from data_dir import DATA_DIR
+from user_paths import get_user_data_dir
 
 _DIR = os.path.dirname(os.path.abspath(__file__))
 PRS_FILE = os.path.join(_DIR, "prs.json")
@@ -19,11 +20,7 @@ WORKOUTS_FILE = os.path.join(_DIR, "workouts.json")
 
 
 def _user_dir(user_id: str | None) -> Path:
-    if user_id:
-        d = DATA_DIR / user_id
-        d.mkdir(parents=True, exist_ok=True)
-        return d
-    return Path(_DIR)
+    return get_user_data_dir(user_id, default_dir=Path(_DIR))
 
 
 def _load_json(path: str) -> dict:

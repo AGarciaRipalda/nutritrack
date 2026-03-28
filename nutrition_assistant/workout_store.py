@@ -15,6 +15,7 @@ from typing import Optional
 
 from exercise_library import EXERCISE_LIBRARY
 from data_dir import DATA_DIR
+from user_paths import get_user_data_dir
 
 # ── File paths (default, sin user_id) ────────────────────────────────────────
 _DIR = os.path.dirname(os.path.abspath(__file__))
@@ -34,11 +35,7 @@ def _uuid() -> str:
 
 
 def _user_dir(user_id: str | None) -> Path:
-    if user_id:
-        d = DATA_DIR / user_id
-        d.mkdir(parents=True, exist_ok=True)
-        return d
-    return Path(_DIR)
+    return get_user_data_dir(user_id, default_dir=Path(_DIR))
 
 
 def _load_json(path: str) -> dict:
