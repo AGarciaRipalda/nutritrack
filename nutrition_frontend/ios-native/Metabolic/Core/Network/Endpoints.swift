@@ -4,6 +4,8 @@ enum Endpoint {
     static let baseURL = "https://api.metabolic.es"
 
     case authLogin
+    case authRefresh
+    case authLogout
     case authMe
     case dashboard
     case dietToday
@@ -20,6 +22,8 @@ enum Endpoint {
     var path: String {
         switch self {
         case .authLogin:            return "/auth/login"
+        case .authRefresh:          return "/auth/refresh"
+        case .authLogout:           return "/auth/logout"
         case .authMe:               return "/auth/me"
         case .dashboard:            return "/dashboard"
         case .dietToday:            return "/diet/today"

@@ -13,7 +13,7 @@ final class AuthManager {
     private(set) var lastError: String?
 
     func restoreSession() async {
-        guard AuthTokenStore.shared.readToken() != nil else {
+        guard AuthTokenStore.shared.readAccessToken() != nil else {
             currentScreen = .landing
             return
         }
@@ -23,7 +23,7 @@ final class AuthManager {
             lastError = nil
             currentScreen = .home
         } catch {
-            AuthTokenStore.shared.clearToken()
+            AuthTokenStore.shared.clearTokens()
             currentScreen = .landing
         }
     }
@@ -36,7 +36,10 @@ final class AuthManager {
                 requiresAuth: false
             )
 
-            guard AuthTokenStore.shared.saveToken(response.accessToken) else {
+            guard AuthTokenStore.shared.saveSession(
+                accessToken: response.accessToken,
+                refreshToken: response.refreshToken
+            ) else {
                 let message = "No se pudo guardar la sesión."
                 lastError = message
                 return message
@@ -55,9 +58,11 @@ final class AuthManager {
     }
 
     func signOut() {
-        AuthTokenStore.shared.clearToken()
         lastError = nil
         currentScreen = .landing
+        Task {
+            await APIClient.shared.logoutCurrentSession()
+        }
     }
 
     func showLogin() {
