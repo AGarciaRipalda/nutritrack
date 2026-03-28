@@ -862,6 +862,7 @@ def generate_week_plan(
     daily_target: int = 1800,
     history: list | None = None,
     reference_date: date | None = None,
+    week_start_day: int = 0,
     meal_count: int = 5,
 ) -> dict:
     """
@@ -879,7 +880,8 @@ def generate_week_plan(
     # ── 1. Determine Monday of current week ──────────────────────────────
     # Use caller-provided reference_date (timezone-aware); fall back to UTC today.
     today = reference_date if reference_date is not None else date.today()
-    monday = today - timedelta(days=today.weekday())
+    week_start_day = week_start_day if week_start_day in range(7) else 0
+    cycle_start = today - timedelta(days=(today.weekday() - week_start_day) % 7)
 
     # ── 2. Adjust target based on history ────────────────────────────────
     adjusted_target = daily_target
@@ -919,9 +921,9 @@ def generate_week_plan(
     main_budget  = adjusted_target - num_snacks * snack_budget
     days = []
     for i in range(7):
-        day_date = monday + timedelta(days=i)
+        day_date = cycle_start + timedelta(days=i)
         day_iso  = day_date.isoformat()
-        day_name = DAY_NAMES_ES[i]
+        day_name = DAY_NAMES_ES[day_date.weekday()]
         meals_raw = {}
         for mid in meal_ids:
             if mid in SNACK_MEALS and mid not in splits:
@@ -943,7 +945,7 @@ def generate_week_plan(
 
     return {
         "days":                days,
-        "generated_at":        monday.isoformat(),
+        "generated_at":        cycle_start.isoformat(),
         "weekly_target_kcal":  adjusted_target,
         "weekly_summary":      weekly_summary_used,
     }

@@ -1,41 +1,52 @@
 import { searchFood as searchFoodClient, type FoodSearchResult } from "./food-search"
+import { API_BASE } from "./api-base"
+import { clearActiveSession, getAccessToken } from "./auth"
 export type { FoodSearchResult } from "./food-search"
 
-// On static deployments, a blank NEXT_PUBLIC_API_URL turns API calls into
-// same-origin requests like /dashboard, which then 404 on the frontend host.
-const DEFAULT_REMOTE_API_BASE = "https://api.metabolic.es"
-const DEFAULT_LOCAL_API_BASE = "http://localhost:8000"
-
-function resolveApiBase() {
-  const configured = process.env.NEXT_PUBLIC_API_URL?.trim()
-  if (configured) return configured.replace(/\/+$/, "")
-
-  if (typeof window !== "undefined") {
-    const { protocol, hostname } = window.location
-    if (
-      protocol === "http:" &&
-      (hostname === "localhost" || hostname === "127.0.0.1")
-    ) {
-      return DEFAULT_LOCAL_API_BASE
-    }
-  }
-
-  return DEFAULT_REMOTE_API_BASE
-}
-
-const API_BASE = resolveApiBase()
-
 // â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+export class ApiError extends Error {
+  status: number
+
+  constructor(message: string, status: number) {
+    super(message)
+    this.name = "ApiError"
+    this.status = status
+  }
+}
 
 function getHeaders(extra?: Record<string, string>): Record<string, string> {
   const base: Record<string, string> = {}
   if (API_BASE.includes("ngrok")) {
     base["ngrok-skip-browser-warning"] = "true"
   }
+  if (typeof Intl !== "undefined") {
+    base["X-User-Timezone"] = Intl.DateTimeFormat().resolvedOptions().timeZone
+  }
+  const accessToken = getAccessToken()
+  if (accessToken) {
+    base.Authorization = `Bearer ${accessToken}`
+  }
   return {
     ...base,
     ...extra,
   }
+}
+
+async function readError(res: Response, fallback: string) {
+  const payload = (await res.json().catch(() => null)) as { detail?: unknown } | null
+  const detail = payload?.detail
+  return typeof detail === "string" && detail.trim() ? detail : fallback
+}
+
+async function ensureOk(res: Response, fallback: string) {
+  if (res.ok) return
+
+  if (res.status === 401) {
+    clearActiveSession()
+  }
+
+  throw new ApiError(await readError(res, fallback), res.status)
 }
 
 async function get<T>(path: string, signal?: AbortSignal): Promise<T> {
@@ -44,7 +55,7 @@ async function get<T>(path: string, signal?: AbortSignal): Promise<T> {
     headers: getHeaders(),
     signal,
   })
-  if (!res.ok) throw new Error(`GET ${path} failed: ${res.status}`)
+  await ensureOk(res, `GET ${path} failed`)
   return res.json()
 }
 
@@ -56,7 +67,7 @@ async function post<T>(path: string, body?: unknown): Promise<T> {
       : getHeaders(),
     body: body ? JSON.stringify(body) : undefined,
   })
-  if (!res.ok) throw new Error(`POST ${path} failed: ${res.status}`)
+  await ensureOk(res, `POST ${path} failed`)
   return res.json()
 }
 
@@ -66,13 +77,22 @@ async function put<T>(path: string, body: unknown): Promise<T> {
     headers: getHeaders({ "Content-Type": "application/json" }),
     body: JSON.stringify(body),
   })
-  if (!res.ok) throw new Error(`PUT ${path} failed: ${res.status}`)
+  await ensureOk(res, `PUT ${path} failed`)
   return res.json()
 }
 
 async function del(path: string): Promise<void> {
   const res = await fetch(`${API_BASE}${path}`, { method: "DELETE", headers: getHeaders() })
-  if (!res.ok) throw new Error(`DELETE ${path} failed: ${res.status}`)
+  await ensureOk(res, `DELETE ${path} failed`)
+}
+
+async function getBlob(path: string): Promise<Blob> {
+  const res = await fetch(`${API_BASE}${path}`, {
+    cache: "no-store",
+    headers: getHeaders(),
+  })
+  await ensureOk(res, `GET ${path} failed`)
+  return res.blob()
 }
 
 // â”€â”€ Tipos pÃºblicos (usados por los componentes de v0) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -268,6 +288,14 @@ export interface UpcomingEvent {
   date: string
   daysToEvent: number | null
   message?: string
+}
+
+export interface ManagedUser {
+  id: string
+  email: string
+  name: string
+  role: "user" | "admin"
+  created_at?: string | null
 }
 
 export interface SettingsData {
@@ -529,7 +557,17 @@ export async function regenerateWeeklyPlan(
 ): Promise<WeeklyPlanResponse> {
   const d = await post<any>("/diet/weekly/regenerate", { apply_from: applyFrom })
   const days: PlanDay[] = (d.days ?? []).map(transformPlanDay)
-  return { days, summary: null, stale: false }
+  return { days, summary: d.summary ?? null, stale: false }
+}
+
+export async function repeatWeeklyPlan(): Promise<WeeklyPlanResponse> {
+  const d = await post<any>("/diet/weekly/repeat")
+  const days: PlanDay[] = (d.days ?? []).map(transformPlanDay)
+  return {
+    days,
+    summary: d.summary ?? null,
+    stale: d.stale ?? false,
+  }
 }
 
 export async function fetchTraining(): Promise<TrainingData> {
@@ -924,6 +962,30 @@ export async function deleteEvent(): Promise<void> {
   await del("/event")
 }
 
+export async function fetchAdminUsers(): Promise<ManagedUser[]> {
+  return get<ManagedUser[]>("/admin/users")
+}
+
+export async function createManagedUser(input: {
+  email: string
+  password: string
+  name: string
+  role: "user" | "admin"
+}): Promise<ManagedUser> {
+  return post<ManagedUser>("/admin/users", input)
+}
+
+export async function updateManagedUserRole(
+  userId: string,
+  role: "user" | "admin",
+): Promise<ManagedUser> {
+  return put<ManagedUser>(`/admin/users/${userId}/role`, { role })
+}
+
+export async function deleteManagedUser(userId: string): Promise<void> {
+  await del(`/admin/users/${userId}`)
+}
+
 export async function fetchFavoriteCarbs(): Promise<FavoriteCarb[]> {
   const d = await get<any>("/diet/carbs")
   return d.carbs ?? []
@@ -957,8 +1019,8 @@ export async function fetchGamification(): Promise<GamificationStatus> {
 
 // â”€â”€ PDF Export â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-export function getReportPdfUrl(): string {
-  return `${API_BASE}/report/download`
+export async function downloadReportPdf(): Promise<Blob> {
+  return getBlob("/report/download")
 }
 
 // â”€â”€ Food Search (OpenFoodFacts) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€

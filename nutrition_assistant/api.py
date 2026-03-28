@@ -5,7 +5,10 @@ Documentación automática en: http://localhost:8000/docs
 """
 
 import os, json
+from collections import deque
 from datetime import date, timedelta
+from threading import Lock
+from time import monotonic
 from typing import Optional, List
 import zoneinfo
 
@@ -25,8 +28,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, model_validator
 
 from auth import (
-    RegisterModel, LoginModel, TokenResponse,
-    register_user, login_user, get_current_user,
+    RegisterModel, LoginModel, TokenResponse, ManagedUserModel,
+    register_user, login_user, get_current_user, get_current_admin,
+    list_users, update_user_role, delete_user,
 )
 
 # ── Módulos del proyecto ──────────────────────────────────────────────────────
@@ -39,7 +43,7 @@ from calculator import (
     calculate_macros, ACTIVITY_LEVELS, GOAL_ADJUSTMENTS,
 )
 from diet import (
-    generate_week_plan, get_day_from_plan,
+    DAY_NAMES_ES, generate_week_plan, get_day_from_plan,
     regenerate_meal, FAVORITE_CARBS,
 )
 from exercise_log import (
@@ -100,11 +104,18 @@ except ImportError as e:
     traceback.print_exc()
 from pdf_export import export_week_plan_pdf
 
+APP_ENV = os.environ.get("APP_ENV", os.environ.get("ENVIRONMENT", "development")).strip().lower()
+IS_PRODUCTION = APP_ENV == "production"
+ENABLE_API_DOCS = os.environ.get("ENABLE_API_DOCS", "").strip().lower() in {"1", "true", "yes"}
+
 # ── App ───────────────────────────────────────────────────────────────────────
 app = FastAPI(
     title="Nutrition Assistant API",
     description="Backend para el asistente de nutrición y entrenamiento",
     version="1.0.0",
+    docs_url="/docs" if (ENABLE_API_DOCS or not IS_PRODUCTION) else None,
+    redoc_url="/redoc" if (ENABLE_API_DOCS or not IS_PRODUCTION) else None,
+    openapi_url="/openapi.json" if (ENABLE_API_DOCS or not IS_PRODUCTION) else None,
 )
 
 origins = [
@@ -119,25 +130,68 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,         # Deja pasar a los de la lista
     allow_credentials=True,
-    allow_methods=["*"],           # Permite GET, POST, PUT, DELETE...
-    allow_headers=["*"],           # Permite cualquier cabecera (auth, etc)
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "X-User-Timezone", "ngrok-skip-browser-warning"],
 )
+
+_RATE_LIMIT_BUCKETS: dict[str, deque[float]] = {}
+_RATE_LIMIT_LOCK = Lock()
+
+
+def _client_ip(request: Request) -> str:
+    return request.client.host if request.client else "unknown"
+
+
+def _enforce_rate_limit(scope: str, key: str, limit: int, window_seconds: int) -> None:
+    now = monotonic()
+    bucket_key = f"{scope}:{key}"
+    window_start = now - window_seconds
+
+    with _RATE_LIMIT_LOCK:
+        bucket = _RATE_LIMIT_BUCKETS.setdefault(bucket_key, deque())
+        while bucket and bucket[0] <= window_start:
+            bucket.popleft()
+
+        if len(bucket) >= limit:
+            raise HTTPException(status_code=429, detail="Demasiados intentos. Intentalo mas tarde.")
+
+        bucket.append(now)
+
+
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("X-Frame-Options", "DENY")
+    response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+    response.headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+    if request.url.path.startswith("/auth/"):
+        response.headers["Cache-Control"] = "no-store"
+    return response
 
 # ══════════════════════════════════════════════════════════════════════════════
 # AUTENTICACIÓN
 # ══════════════════════════════════════════════════════════════════════════════
 
 @app.post("/auth/register", tags=["Auth"], response_model=TokenResponse)
-def auth_register(data: RegisterModel):
+def auth_register(data: RegisterModel, request: Request):
     """Registra un nuevo usuario y devuelve el token JWT."""
+    client_ip = _client_ip(request)
+    email_key = f"{client_ip}:{data.email.strip().lower()}"
+    _enforce_rate_limit("auth-register-ip", client_ip, 10, 300)
+    _enforce_rate_limit("auth-register-email", email_key, 5, 300)
     user = register_user(data.email, data.password, data.name)
     result = login_user(data.email, data.password)
     return TokenResponse(access_token=result["access_token"], user=result["user"])
 
 
 @app.post("/auth/login", tags=["Auth"], response_model=TokenResponse)
-def auth_login(data: LoginModel):
+def auth_login(data: LoginModel, request: Request):
     """Autentica un usuario existente y devuelve el token JWT."""
+    client_ip = _client_ip(request)
+    email_key = f"{client_ip}:{data.email.strip().lower()}"
+    _enforce_rate_limit("auth-login-ip", client_ip, 20, 300)
+    _enforce_rate_limit("auth-login-email", email_key, 8, 300)
     result = login_user(data.email, data.password)
     return TokenResponse(access_token=result["access_token"], user=result["user"])
 
@@ -146,6 +200,41 @@ def auth_login(data: LoginModel):
 def auth_me(user: dict = Depends(get_current_user)):
     """Devuelve los datos del usuario autenticado."""
     return user
+
+
+class AdminCreateUserModel(BaseModel):
+    email: str
+    password: str
+    name: str = "Usuario"
+    role: str = "user"
+
+
+class AdminUpdateUserRoleModel(BaseModel):
+    role: str
+
+
+@app.get("/admin/users", tags=["Admin"], response_model=list[ManagedUserModel])
+def admin_list_users(_admin: dict = Depends(get_current_admin)):
+    return list_users()
+
+
+@app.post("/admin/users", tags=["Admin"], response_model=ManagedUserModel)
+def admin_create_user(data: AdminCreateUserModel, _admin: dict = Depends(get_current_admin)):
+    return register_user(data.email, data.password, data.name, role=data.role)
+
+
+@app.put("/admin/users/{user_id}/role", tags=["Admin"], response_model=ManagedUserModel)
+def admin_update_user_role(
+    user_id: str,
+    data: AdminUpdateUserRoleModel,
+    admin: dict = Depends(get_current_admin),
+):
+    return update_user_role(user_id, data.role, admin["id"])
+
+
+@app.delete("/admin/users/{user_id}", tags=["Admin"], status_code=204)
+def admin_delete_user(user_id: str, admin: dict = Depends(get_current_admin)):
+    delete_user(user_id, admin["id"])
 
 
 # ── Helper para extraer user_id de la dependencia ───────────────────────────
@@ -184,6 +273,36 @@ def _get_today_for_tz(tz_header: str | None) -> str:
         tz = zoneinfo.ZoneInfo("UTC")
     from datetime import datetime
     return datetime.now(tz=tz).date().isoformat()
+
+
+def _get_reference_date_for_tz(tz_header: str | None) -> date:
+    return date.fromisoformat(_get_today_for_tz(tz_header))
+
+
+def _project_plan_to_current_cycle(
+    plan: dict,
+    *,
+    reference_date: date,
+    week_start_day: int,
+) -> dict:
+    import copy
+
+    cycle_start = reference_date - timedelta(
+        days=(reference_date.weekday() - week_start_day) % 7
+    )
+
+    projected_days = []
+    for index, existing_day in enumerate(plan.get("days", [])):
+        projected_date = cycle_start + timedelta(days=index)
+        projected_day = copy.deepcopy(existing_day)
+        projected_day["date"] = projected_date.isoformat()
+        projected_day["dayName"] = DAY_NAMES_ES[projected_date.weekday()]
+        projected_days.append(projected_day)
+
+    projected_plan = copy.deepcopy(plan)
+    projected_plan["days"] = projected_days
+    projected_plan["generated_at"] = cycle_start.isoformat()
+    return projected_plan
 
 
 def _get_week_start_for_tz(tz_header: str | None, user_id: str | None = None) -> str:
@@ -359,6 +478,8 @@ def get_today_diet(x_user_timezone: Optional[str] = Header(None), user: dict = D
     session  = _get_session(uid)
     tz       = x_user_timezone
     today    = _get_today_for_tz(tz)
+    profile  = load_profile(uid)
+    reference_date = _get_reference_date_for_tz(tz)
 
     plan = session.get("week_plan")
 
@@ -367,10 +488,27 @@ def get_today_diet(x_user_timezone: Optional[str] = Header(None), user: dict = D
         excluded  = load_excluded(uid)
         favorites = load_favorites(uid)
         history   = session.get("weekly_history", []) or load_weekly_history(uid)
-        plan = generate_week_plan(excluded, favorites, _get_daily_target(uid), history=history or None, meal_count=_get_meal_count(uid))
+        plan = generate_week_plan(
+            excluded,
+            favorites,
+            _get_daily_target(uid),
+            history=history or None,
+            reference_date=reference_date,
+            week_start_day=profile.get("week_start_day", 0),
+            meal_count=_get_meal_count(uid),
+        )
         save_session(week_plan=plan, user_id=uid)
 
     stale         = _is_stale(plan, tz)
+    effective_plan = (
+        _project_plan_to_current_cycle(
+            plan,
+            reference_date=reference_date,
+            week_start_day=profile.get("week_start_day", 0),
+        )
+        if stale
+        else plan
+    )
     exercise_adj  = dict(session.get("exercise_adj", {}))
     today_training = session.get("today_training") or {}
     bonus_kcal     = today_training.get("bonus_kcal", 0)
@@ -380,7 +518,7 @@ def get_today_diet(x_user_timezone: Optional[str] = Header(None), user: dict = D
             "extra_kcal": existing_extra + bonus_kcal,
             "source":     "today_training",
         }
-    day          = get_day_from_plan(today, plan, exercise_adj)
+    day          = get_day_from_plan(today, effective_plan, exercise_adj)
 
     if day is None:
         raise HTTPException(
@@ -416,7 +554,16 @@ def regenerate_today_diet(x_user_timezone: Optional[str] = Header(None), user: d
     excluded  = load_excluded(uid)
     favorites = load_favorites(uid)
     history   = load_weekly_history(uid)
-    plan = generate_week_plan(excluded, favorites, _get_daily_target(uid), history=history or None, meal_count=_get_meal_count(uid))
+    profile = load_profile(uid)
+    plan = generate_week_plan(
+        excluded,
+        favorites,
+        _get_daily_target(uid),
+        history=history or None,
+        reference_date=_get_reference_date_for_tz(x_user_timezone),
+        week_start_day=profile.get("week_start_day", 0),
+        meal_count=_get_meal_count(uid),
+    )
     save_session(week_plan=plan, user_id=uid)
     today        = _get_today_for_tz(x_user_timezone)
     exercise_adj = session.get("exercise_adj", {})
@@ -518,22 +665,42 @@ def get_weekly_plan(x_user_timezone: Optional[str] = Header(None), user: dict = 
         excluded  = load_excluded(uid)
         favorites = load_favorites(uid)
         history   = load_weekly_history(uid)
-        plan = generate_week_plan(excluded, favorites, _get_daily_target(uid), history=history or None, meal_count=_get_meal_count(uid))
+        profile = load_profile(uid)
+        plan = generate_week_plan(
+            excluded,
+            favorites,
+            _get_daily_target(uid),
+            history=history or None,
+            reference_date=_get_reference_date_for_tz(x_user_timezone),
+            week_start_day=profile.get("week_start_day", 0),
+            meal_count=_get_meal_count(uid),
+        )
         save_session(week_plan=plan, user_id=uid)
 
+    profile = load_profile(uid)
     stale        = _is_stale(plan, x_user_timezone)
+    reference_date = _get_reference_date_for_tz(x_user_timezone)
+    effective_plan = (
+        _project_plan_to_current_cycle(
+            plan,
+            reference_date=reference_date,
+            week_start_day=profile.get("week_start_day", 0),
+        )
+        if stale
+        else plan
+    )
     exercise_adj = session.get("exercise_adj", {})
 
     # Apply exercise adjustments to each day
     days_with_adj = []
-    for day in plan.get("days", []):
-        enriched = get_day_from_plan(day["date"], plan, exercise_adj)
+    for day in effective_plan.get("days", []):
+        enriched = get_day_from_plan(day["date"], effective_plan, exercise_adj)
         if enriched:
             days_with_adj.append(enriched)
 
     return {
         "days":    days_with_adj,
-        "summary": plan.get("weekly_summary"),
+        "summary": effective_plan.get("weekly_summary"),
         "stale":   stale,
     }
 
@@ -579,6 +746,43 @@ def swap_weekly_meal(data: SwapWeeklyMealModel, x_user_timezone: Optional[str] =
     return updated_day
 
 
+@app.post("/diet/weekly/repeat", tags=["Dieta"])
+def repeat_weekly_plan(
+    x_user_timezone: Optional[str] = Header(None),
+    user: dict = Depends(get_current_user),
+):
+    """Reuses the existing weekly menu for the current cycle and persists it."""
+    uid = _uid(user)
+    session = _get_session(uid)
+    plan = session.get("week_plan")
+    if not plan:
+        raise HTTPException(
+            404,
+            {"error": "no_plan", "detail": "No hay plan semanal para repetir."},
+        )
+
+    profile = load_profile(uid)
+    repeated_plan = _project_plan_to_current_cycle(
+        plan,
+        reference_date=_get_reference_date_for_tz(x_user_timezone),
+        week_start_day=profile.get("week_start_day", 0),
+    )
+    save_session(week_plan=repeated_plan, user_id=uid)
+
+    exercise_adj = session.get("exercise_adj", {})
+    days_with_adj = []
+    for day in repeated_plan.get("days", []):
+        enriched = get_day_from_plan(day["date"], repeated_plan, exercise_adj)
+        if enriched:
+            days_with_adj.append(enriched)
+
+    return {
+        "days": days_with_adj,
+        "summary": repeated_plan.get("weekly_summary"),
+        "stale": False,
+    }
+
+
 @app.post("/diet/weekly/regenerate", tags=["Dieta"])
 def regenerate_weekly_plan(
     data: RegenerateWeeklyModel = RegenerateWeeklyModel(),
@@ -592,7 +796,16 @@ def regenerate_weekly_plan(
     favorites = load_favorites(uid)
     history   = load_weekly_history(uid)
 
-    new_plan = generate_week_plan(excluded, favorites, _get_daily_target(uid), history=history or None, meal_count=_get_meal_count(uid))
+    profile = load_profile(uid)
+    new_plan = generate_week_plan(
+        excluded,
+        favorites,
+        _get_daily_target(uid),
+        history=history or None,
+        reference_date=_get_reference_date_for_tz(x_user_timezone),
+        week_start_day=profile.get("week_start_day", 0),
+        meal_count=_get_meal_count(uid),
+    )
 
     today = _get_today_for_tz(x_user_timezone)
     apply_from = data.apply_from  # "today" or "tomorrow"
@@ -642,7 +855,10 @@ def regenerate_weekly_plan(
 
 
 @app.get("/diet/shopping-list", tags=["Dieta"])
-def get_shopping_list(user: dict = Depends(get_current_user)):
+def get_shopping_list(
+    x_user_timezone: Optional[str] = Header(None),
+    user: dict = Depends(get_current_user),
+):
     """Lista de la compra a partir del plan semanal actual."""
     uid     = _uid(user)
     session = _get_session(uid)
@@ -650,7 +866,14 @@ def get_shopping_list(user: dict = Depends(get_current_user)):
     if not plan:
         excluded  = load_excluded(uid)
         favorites = load_favorites(uid)
-        plan = generate_week_plan(excluded, favorites, meal_count=_get_meal_count(uid))
+        profile = load_profile(uid)
+        plan = generate_week_plan(
+            excluded,
+            favorites,
+            meal_count=_get_meal_count(uid),
+            reference_date=_get_reference_date_for_tz(x_user_timezone),
+            week_start_day=profile.get("week_start_day", 0),
+        )
         save_session(week_plan=plan, user_id=uid)
     shopping = build_shopping_list(plan)
     # Convertir sets a listas para JSON
@@ -1706,11 +1929,16 @@ def download_report_pdf(user: dict = Depends(get_current_user)):
 # ══════════════════════════════════════════════════════════════════════════════
 
 @app.get("/food/search", tags=["Alimentos"])
-def search_food(q: str = Query(..., min_length=2, description="Nombre del alimento")):
+def search_food(
+    request: Request,
+    q: str = Query(..., min_length=2, max_length=80, description="Nombre del alimento"),
+    user: dict = Depends(get_current_user),
+):
     """
     Busca alimentos en OpenFoodFacts y devuelve nombre + kcal por 100g.
     Actúa como proxy para evitar CORS y normalizar la respuesta.
     """
+    _enforce_rate_limit("food-search", _client_ip(request), 60, 60)
     params = urllib.parse.urlencode({
         "search_terms": q,
         "search_simple": 1,
@@ -1726,7 +1954,7 @@ def search_food(q: str = Query(..., min_length=2, description="Nombre del alimen
         with urllib.request.urlopen(req, timeout=8) as resp:
             data = json.loads(resp.read().decode())
     except Exception:
-        raise HTTPException(502, "No se pudo consultar OpenFoodFacts")
+        return {"results": [], "upstream_unavailable": True}
 
     results = []
     for product in data.get("products", []):

@@ -16,7 +16,12 @@ import {
   Cookie, Moon, FileDown, Lightbulb, RefreshCw, X, Star, Shuffle, AlertTriangle,
 } from "lucide-react"
 import type { WeeklyPlanResponse, PlanDay, WeeklyHistorySummary } from "@/lib/api"
-import { fetchWeeklyPlan, regenerateWeeklyPlan, swapWeeklyMeal } from "@/lib/api"
+import {
+  fetchWeeklyPlan,
+  regenerateWeeklyPlan,
+  repeatWeeklyPlan,
+  swapWeeklyMeal,
+} from "@/lib/api"
 import { loadDayFromStorage } from "@/context/DietDayContext"
 import { useCheatDay } from "@/context/CheatDayContext"
 
@@ -505,6 +510,7 @@ export default function WeeklyPlanPage() {
   const [showRegenModal, setShowRegenModal] = useState(false)
   const [regenApplyFrom, setRegenApplyFrom] = useState<"today" | "tomorrow" | "all">("tomorrow")
   const [regenerating, setRegenerating] = useState(false)
+  const [repeating, setRepeating] = useState(false)
   const [regenError, setRegenError] = useState<string | null>(null)
   const [shoppingList, setShoppingList] = useState<{ category: string; items: string[] }[]>([])
   const [swapping, setSwapping] = useState<{ date: string; mealId: string } | null>(null)
@@ -529,6 +535,9 @@ export default function WeeklyPlanPage() {
       .then((d) => {
         setStale(d.stale)
         setData(d)
+        if (d.stale) {
+          setShowRegenModal(true)
+        }
       })
       .catch(() => setData(mockWeeklyPlanResponse))
       .finally(() => setLoading(false))
@@ -539,13 +548,36 @@ export default function WeeklyPlanPage() {
     setRegenError(null)
     try {
       const result = await regenerateWeeklyPlan(regenApplyFrom)
-      setData({ days: result.days, summary: data?.summary ?? null, stale: false })
+      setData({
+        days: result.days,
+        summary: result.summary ?? data?.summary ?? null,
+        stale: false,
+      })
       setStale(false)
       setShowRegenModal(false)
     } catch {
       setRegenError("Error al regenerar el plan. Inténtalo de nuevo.")
     } finally {
       setRegenerating(false)
+    }
+  }
+
+  const handleRepeatMenu = async () => {
+    setRepeating(true)
+    setRegenError(null)
+    try {
+      const result = await repeatWeeklyPlan()
+      setData({
+        days: result.days,
+        summary: result.summary ?? data?.summary ?? null,
+        stale: false,
+      })
+      setStale(false)
+      setShowRegenModal(false)
+    } catch {
+      setRegenError("Error al repetir el menú. Inténtalo de nuevo.")
+    } finally {
+      setRepeating(false)
     }
   }
 
@@ -581,7 +613,7 @@ export default function WeeklyPlanPage() {
         {stale && (
           <div className="bg-amber-500/20 border border-amber-400/30 rounded-2xl p-4 flex items-center justify-between mb-4">
             <span className="text-amber-300 text-sm">
-              Tu plan es de la semana pasada.
+              Tu plan es de la semana pasada. Elige si quieres repetirlo o regenerarlo.
             </span>
             <button
               onClick={() => setShowRegenModal(true)}
@@ -699,7 +731,9 @@ export default function WeeklyPlanPage() {
                           <MealCard
                             key={meal.id}
                             meal={meal}
-                            onSwap={() => handleSwapMeal(dayPlan.date, meal.id)}
+                            onSwap={
+                              stale ? undefined : () => handleSwapMeal(dayPlan.date, meal.id)
+                            }
                             swapping={swapping?.date === dayPlan.date && swapping?.mealId === meal.id}
                           />
                         ))}
@@ -820,7 +854,9 @@ export default function WeeklyPlanPage() {
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
             <div className="backdrop-blur-xl bg-white dark:bg-white/10 border border-black/10 dark:border-white/20 rounded-3xl p-6 w-full max-w-md">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-foreground font-bold text-lg">Regenerar plan semanal</h3>
+                <h3 className="text-foreground font-bold text-lg">
+                  {stale ? "Elegir menú para esta semana" : "Regenerar plan semanal"}
+                </h3>
                 <button onClick={() => setShowRegenModal(false)} className="text-muted-foreground hover:text-foreground">
                   <X className="w-5 h-5" />
                 </button>
@@ -880,16 +916,25 @@ export default function WeeklyPlanPage() {
                 <p className="text-red-400 text-sm mb-3">{regenError}</p>
               )}
 
-              <div className="flex gap-3">
+              <div className="flex flex-col gap-3 sm:flex-row">
                 <button
                   onClick={() => setShowRegenModal(false)}
                   className="flex-1 px-4 py-2 border border-black/20 dark:border-white/20 rounded-xl text-foreground/70 text-sm hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
                 >
                   Cancelar
                 </button>
+                {stale && (
+                  <button
+                    onClick={handleRepeatMenu}
+                    disabled={repeating || regenerating}
+                    className="flex-1 px-4 py-2 border border-amber-400/30 bg-amber-500/20 rounded-xl text-amber-200 text-sm font-medium hover:bg-amber-500/30 disabled:opacity-50 transition-colors"
+                  >
+                    {repeating ? "Repitiendo menú..." : "Repetir menú"}
+                  </button>
+                )}
                 <button
                   onClick={handleRegenerate}
-                  disabled={regenerating}
+                  disabled={regenerating || repeating}
                   className="flex-1 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 rounded-xl text-white text-sm font-medium transition-colors"
                 >
                   {regenerating ? "Regenerando..." : "Regenerar"}

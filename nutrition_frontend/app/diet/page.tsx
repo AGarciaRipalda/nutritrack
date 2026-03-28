@@ -186,7 +186,7 @@ export default function DietPage() {
   }, [init])
 
   const handleSwap = async (mealId: string) => {
-    if (!planDay) return
+    if (!planDay || stale) return
     setSwapping(mealId)
     try {
       const updated = await swapMeal(mealId)
@@ -522,7 +522,8 @@ export default function DietPage() {
                       <div className="flex gap-2">
                         <button
                           onClick={() => handleSwap(meal.id)}
-                          className="flex flex-1 items-center justify-center gap-1.5 rounded-2xl border border-slate-200 bg-white py-2.5 text-xs font-bold text-slate-600 transition-colors hover:bg-white dark:border-white/10 dark:bg-white/10 dark:text-foreground/60 dark:hover:bg-white/10 dark:hover:text-foreground"
+                          disabled={stale}
+                          className="flex flex-1 items-center justify-center gap-1.5 rounded-2xl border border-slate-200 bg-white py-2.5 text-xs font-bold text-slate-600 transition-colors hover:bg-white disabled:opacity-50 dark:border-white/10 dark:bg-white/10 dark:text-foreground/60 dark:hover:bg-white/10 dark:hover:text-foreground"
                         >
                           <Shuffle className={`h-3 w-3 ${swapping === meal.id ? 'animate-spin' : ''}`} /> Cambiar
                         </button>
