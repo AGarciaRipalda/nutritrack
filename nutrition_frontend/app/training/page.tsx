@@ -89,9 +89,8 @@ const mockCalisthenicsRoutine: ExerciseRoutine[] = [
 ]
 
 // ── Constantes ───────────────────────────────────────────────────────────────
-// Pega aquí el enlace iCloud cuando compartas el Shortcut desde tu iPhone:
-// Shortcuts → ··· → Compartir → Copiar enlace iCloud
-const SHORTCUT_URL = "https://www.icloud.com/shortcuts/ce9f7daa9e0d4b50af2fe50cb9e63096"
+// Archivo .shortcut servido desde /public — el usuario lo descarga y se abre en Atajos de iOS
+const SHORTCUT_URL = "/metabolic-health-sync.shortcut"
 
 const TODAY_TRAINING_BONUS: Record<string, number> = {
   "1": 150,
@@ -999,8 +998,7 @@ export default function TrainingPage() {
                 </div>
                 <a
                   href={SHORTCUT_URL || undefined}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                  download="Metabolic Health Sync.shortcut"
                   aria-disabled={!SHORTCUT_URL}
                   tabIndex={SHORTCUT_URL ? undefined : -1}
                   className={!SHORTCUT_URL ? "pointer-events-none" : ""}
