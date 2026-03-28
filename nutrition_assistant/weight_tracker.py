@@ -1,11 +1,14 @@
 """
 Registro semanal de peso y seguimiento de progreso.
 Guarda el historial en weight_history.json o PostgreSQL.
+
+Soporte multi-usuario: user_id opcional en todas las funciones.
 """
 
 import json
 import os
 from datetime import date, timedelta
+from pathlib import Path
 from data_dir import DATA_DIR
 
 HISTORY_FILE = DATA_DIR / "weight_history.json"
@@ -25,55 +28,84 @@ def _use_db():
         return False
 
 
-def _load() -> list:
+def _user_dir(user_id: str | None) -> Path:
+    if user_id:
+        d = DATA_DIR / user_id
+        d.mkdir(parents=True, exist_ok=True)
+        return d
+    return DATA_DIR
+
+
+def _history_file(user_id: str | None) -> Path:
+    return _user_dir(user_id) / "weight_history.json"
+
+
+def _load(user_id: str | None = None) -> list:
     """Devuelve lista de {date, weight_kg} ordenada por fecha."""
     if _use_db():
         from database import fetchall
-        rows = fetchall("SELECT date, week, weight_kg FROM weight_history ORDER BY date")
+        if user_id:
+            rows = fetchall("SELECT date, week, weight_kg FROM weight_history WHERE user_id = %s ORDER BY date", (user_id,))
+        else:
+            rows = fetchall("SELECT date, week, weight_kg FROM weight_history ORDER BY date")
         return [
             {"date": str(r["date"]), "week": r["week"], "weight_kg": float(r["weight_kg"])}
             for r in rows
         ]
 
-    if not os.path.exists(HISTORY_FILE):
+    hf = _history_file(user_id)
+    if not os.path.exists(hf):
         return []
-    with open(HISTORY_FILE, "r", encoding="utf-8") as f:
+    with open(hf, "r", encoding="utf-8") as f:
         return json.load(f)
 
 
-def _save(history: list) -> None:
+def _save(history: list, user_id: str | None = None) -> None:
     if _use_db():
         from database import execute
         for entry in history:
-            execute("""
-                INSERT INTO weight_history (date, week, weight_kg)
-                VALUES (%s, %s, %s)
-                ON CONFLICT (date) DO UPDATE SET
-                    week = EXCLUDED.week,
-                    weight_kg = EXCLUDED.weight_kg
-            """, (entry["date"], entry.get("week", ""), entry["weight_kg"]))
+            if user_id:
+                execute("""
+                    INSERT INTO weight_history (date, week, weight_kg, user_id)
+                    VALUES (%s, %s, %s, %s)
+                    ON CONFLICT (user_id, date) DO UPDATE SET
+                        week = EXCLUDED.week,
+                        weight_kg = EXCLUDED.weight_kg
+                """, (entry["date"], entry.get("week", ""), entry["weight_kg"], user_id))
+            else:
+                execute("""
+                    INSERT INTO weight_history (date, week, weight_kg)
+                    VALUES (%s, %s, %s)
+                    ON CONFLICT (date) DO UPDATE SET
+                        week = EXCLUDED.week,
+                        weight_kg = EXCLUDED.weight_kg
+                """, (entry["date"], entry.get("week", ""), entry["weight_kg"]))
         return
 
-    with open(HISTORY_FILE, "w", encoding="utf-8") as f:
+    hf = _history_file(user_id)
+    with open(hf, "w", encoding="utf-8") as f:
         json.dump(history, f, indent=2, ensure_ascii=False)
 
 
-def _last_record_week() -> str | None:
+def _last_record_week(user_id: str | None = None) -> str | None:
     """Devuelve la semana ISO del último registro, o None si no hay datos."""
     if _use_db():
         from database import fetchone
-        row = fetchone("SELECT week FROM weight_history ORDER BY date DESC LIMIT 1")
+        if user_id:
+            row = fetchone("SELECT week FROM weight_history WHERE user_id = %s ORDER BY date DESC LIMIT 1", (user_id,))
+        else:
+            row = fetchone("SELECT week FROM weight_history ORDER BY date DESC LIMIT 1")
         return row["week"] if row else None
 
-    history = _load()
+    history = _load(user_id)
     if not history:
         return None
     return history[-1].get("week")
 
 
-def needs_weigh_in() -> bool:
+def needs_weigh_in(user_id: str | None = None) -> bool:
     """True si aún no se ha registrado el peso esta semana."""
-    return _last_record_week() != date.today().strftime("%G-W%V")
+    return _last_record_week(user_id) != date.today().strftime("%G-W%V")
 
 
 def ask_and_record_weight(profile: dict) -> float:

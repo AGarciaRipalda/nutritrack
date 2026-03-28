@@ -1,17 +1,29 @@
 """
 PR Tracker — Personal Record detection, 1RM estimation, and training analytics.
+
+Soporte multi-usuario: user_id opcional en todas las funciones.
 """
 
 import os
 import json
 from datetime import datetime, timezone, timedelta
+from pathlib import Path
 from typing import Optional
+
+from exercise_library import EXERCISE_LIBRARY, MUSCLE_LABELS
+from data_dir import DATA_DIR
 
 _DIR = os.path.dirname(os.path.abspath(__file__))
 PRS_FILE = os.path.join(_DIR, "prs.json")
 WORKOUTS_FILE = os.path.join(_DIR, "workouts.json")
 
-from exercise_library import EXERCISE_LIBRARY, MUSCLE_LABELS
+
+def _user_dir(user_id: str | None) -> Path:
+    if user_id:
+        d = DATA_DIR / user_id
+        d.mkdir(parents=True, exist_ok=True)
+        return d
+    return Path(_DIR)
 
 
 def _load_json(path: str) -> dict:
@@ -26,16 +38,16 @@ def _save_json(path: str, data: dict):
         json.dump(data, f, indent=2, ensure_ascii=False)
 
 
-def _load_prs() -> dict:
-    return _load_json(PRS_FILE)
+def _load_prs(user_id: str | None = None) -> dict:
+    return _load_json(str(_user_dir(user_id) / "prs.json"))
 
 
-def _save_prs(data: dict):
-    _save_json(PRS_FILE, data)
+def _save_prs(data: dict, user_id: str | None = None):
+    _save_json(str(_user_dir(user_id) / "prs.json"), data)
 
 
-def _load_workouts() -> dict:
-    return _load_json(WORKOUTS_FILE)
+def _load_workouts(user_id: str | None = None) -> dict:
+    return _load_json(str(_user_dir(user_id) / "workouts.json"))
 
 
 # ── 1RM Estimation ──────────────────────────────────────────────────────────
@@ -53,12 +65,12 @@ def estimate_1rm(weight_kg: float, reps: int) -> float:
 
 # ── PR Detection ────────────────────────────────────────────────────────────
 
-def detect_prs(workout: dict) -> list:
+def detect_prs(workout: dict, user_id: str | None = None) -> list:
     """
     Compare each completed set in the workout against stored PRs.
     Returns list of new PR records and updates prs.json.
     """
-    prs_db = _load_prs()
+    prs_db = _load_prs(user_id)
     new_prs = []
     date = workout.get("finished_at", workout.get("started_at", ""))[:10]
     workout_id = workout.get("id", "")
@@ -171,16 +183,16 @@ def detect_prs(workout: dict) -> list:
 
         prs_db[exercise_id] = ex_prs
 
-    _save_prs(prs_db)
+    _save_prs(prs_db, user_id)
     return new_prs
 
 
 # ── Exercise Stats ──────────────────────────────────────────────────────────
 
-def get_exercise_stats(exercise_id: str) -> dict:
+def get_exercise_stats(exercise_id: str, user_id: str | None = None) -> dict:
     """Full statistics for a specific exercise."""
-    prs_db = _load_prs()
-    workouts = _load_workouts()
+    prs_db = _load_prs(user_id)
+    workouts = _load_workouts(user_id)
     lib_entry = EXERCISE_LIBRARY.get(exercise_id, {})
 
     ex_prs = prs_db.get(exercise_id, {})
@@ -245,9 +257,9 @@ def get_exercise_stats(exercise_id: str) -> dict:
 
 # ── Muscle Volume Analytics ─────────────────────────────────────────────────
 
-def get_muscle_volume(days: int = 7) -> list:
+def get_muscle_volume(days: int = 7, user_id: str | None = None) -> list:
     """Sets and volume per muscle group in the last N days."""
-    workouts = _load_workouts()
+    workouts = _load_workouts(user_id)
     cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
 
     volume_map: dict[str, dict] = {}
@@ -293,9 +305,9 @@ def get_muscle_volume(days: int = 7) -> list:
 
 # ── Weekly Stats ────────────────────────────────────────────────────────────
 
-def get_weekly_stats(weeks: int = 4) -> list:
+def get_weekly_stats(weeks: int = 4, user_id: str | None = None) -> list:
     """Weekly training summaries for the last N weeks."""
-    workouts = _load_workouts()
+    workouts = _load_workouts(user_id)
     now = datetime.now(timezone.utc)
 
     results = []
@@ -362,11 +374,11 @@ def get_weekly_stats(weeks: int = 4) -> list:
 
 # ── Calendar ────────────────────────────────────────────────────────────────
 
-def get_calendar(year: int, month: int) -> list:
-    """Training days for a given month. Also merges data from exercise_history.json."""
+def get_calendar(year: int, month: int, user_id: str | None = None) -> list:
+    """Training days for a given month. Also merges data from exercise_history."""
     import calendar
 
-    workouts = _load_workouts()
+    workouts = _load_workouts(user_id)
 
     # Build day map from v2 workouts
     day_map: dict[str, dict] = {}
@@ -394,8 +406,9 @@ def get_calendar(year: int, month: int) -> list:
                 day_map[w_date]["muscles_hit"].add(ex["muscle_primary"])
         day_map[w_date]["source"].add("manual")
 
-    # Also merge from legacy exercise_history.json
-    history_file = os.path.join(_DIR, "exercise_history.json")
+    # Also merge from exercise_history
+    from exercise_history import _history_file
+    history_file = str(_history_file(user_id))
     if os.path.exists(history_file):
         with open(history_file, "r", encoding="utf-8") as f:
             history_data = json.load(f)
@@ -448,9 +461,9 @@ def get_calendar(year: int, month: int) -> list:
 
 # ── Recent PRs ──────────────────────────────────────────────────────────────
 
-def get_recent_prs(limit: int = 20) -> list:
+def get_recent_prs(limit: int = 20, user_id: str | None = None) -> list:
     """Get most recent PRs across all exercises."""
-    workouts = _load_workouts()
+    workouts = _load_workouts(user_id)
     all_prs = []
 
     completed = [w for w in workouts.values() if w.get("status") == "completed"]

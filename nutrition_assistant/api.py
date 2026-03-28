@@ -19,10 +19,15 @@ import tempfile
 import urllib.request
 import urllib.parse
 
-from fastapi import FastAPI, HTTPException, Request, Header, Query
+from fastapi import FastAPI, HTTPException, Request, Header, Query, Depends
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, model_validator
+
+from auth import (
+    RegisterModel, LoginModel, TokenResponse,
+    register_user, login_user, get_current_user,
+)
 
 # ── Módulos del proyecto ──────────────────────────────────────────────────────
 from storage import (
@@ -41,12 +46,12 @@ from exercise_log import (
     EXERCISES, RECOVERY_FACTOR, TODAY_BONUS_KCAL, TODAY_TIMING,
     calculate_exercise_kcal,
 )
-from exercise_history import record_today, HISTORY_FILE as EX_HISTORY_FILE, _load as _load_ex_history
+from exercise_history import record_today, HISTORY_FILE as EX_HISTORY_FILE, _load as _load_ex_history, _history_file as _ex_history_file
 from weight_tracker import (
     HISTORY_FILE as W_HISTORY_FILE, EXPECTED_WEEKLY_CHANGE, needs_weigh_in,
     _load as load_weight_history, _save as save_weight_history,
 )
-from adherence import ADHERENCE_FILE, weekly_adherence, _load as _load_adh_log
+from adherence import ADHERENCE_FILE, weekly_adherence, _load as _load_adh_log, _adherence_file
 from weekly_survey import (
     needs_survey, last_survey_scores,
     _load as load_surveys, _save as save_surveys, QUESTIONS,
@@ -57,6 +62,7 @@ from weekly_report import (
 )
 from competition_planner import (
     get_event, days_to_event, COMPETITION_FILE, event_calorie_adjustment,
+    _competition_file,
 )
 from preferences import (
     _load as load_prefs, _save as save_prefs,
@@ -117,22 +123,54 @@ app.add_middleware(
     allow_headers=["*"],           # Permite cualquier cabecera (auth, etc)
 )
 
+# ══════════════════════════════════════════════════════════════════════════════
+# AUTENTICACIÓN
+# ══════════════════════════════════════════════════════════════════════════════
+
+@app.post("/auth/register", tags=["Auth"], response_model=TokenResponse)
+def auth_register(data: RegisterModel):
+    """Registra un nuevo usuario y devuelve el token JWT."""
+    user = register_user(data.email, data.password, data.name)
+    result = login_user(data.email, data.password)
+    return TokenResponse(access_token=result["access_token"], user=result["user"])
+
+
+@app.post("/auth/login", tags=["Auth"], response_model=TokenResponse)
+def auth_login(data: LoginModel):
+    """Autentica un usuario existente y devuelve el token JWT."""
+    result = login_user(data.email, data.password)
+    return TokenResponse(access_token=result["access_token"], user=result["user"])
+
+
+@app.get("/auth/me", tags=["Auth"])
+def auth_me(user: dict = Depends(get_current_user)):
+    """Devuelve los datos del usuario autenticado."""
+    return user
+
+
+# ── Helper para extraer user_id de la dependencia ───────────────────────────
+
+def _uid(user: dict) -> str:
+    """Extrae el user_id del dict de usuario autenticado."""
+    return user["id"]
+
+
 # ── Helpers para acceso a datos (delegan a módulos DB-aware) ─────────────────
 _cache: dict = {}
 
 
-def _load_exercise_history_data() -> dict:
+def _load_exercise_history_data(user_id: str | None = None) -> dict:
     """Carga historial de ejercicio usando el módulo DB-aware."""
-    return _load_ex_history()
+    return _load_ex_history(user_id)
 
 
-def _load_adherence_data() -> dict:
+def _load_adherence_data(user_id: str | None = None) -> dict:
     """Carga log de adherencia usando el módulo DB-aware."""
-    return _load_adh_log()
+    return _load_adh_log(user_id)
 
 
-def _get_session():
-    return load_session()
+def _get_session(user_id: str | None = None):
+    return load_session(user_id)
 
 
 def _get_today_for_tz(tz_header: str | None) -> str:
@@ -148,7 +186,7 @@ def _get_today_for_tz(tz_header: str | None) -> str:
     return datetime.now(tz=tz).date().isoformat()
 
 
-def _get_week_start_for_tz(tz_header: str | None) -> str:
+def _get_week_start_for_tz(tz_header: str | None, user_id: str | None = None) -> str:
     """Return the most recent week-start day in the user's timezone.
 
     week_start_day comes from the profile (0=Monday … 6=Sunday).
@@ -161,7 +199,7 @@ def _get_week_start_for_tz(tz_header: str | None) -> str:
     except Exception:
         tz = zoneinfo.ZoneInfo("UTC")
     today = datetime.now(tz=tz).date()
-    week_start_day = load_profile().get("week_start_day", 0)
+    week_start_day = load_profile(user_id).get("week_start_day", 0)
     days_since_start = (today.weekday() - week_start_day) % 7
     return (today - timedelta(days=days_since_start)).isoformat()
 
@@ -278,21 +316,21 @@ class SwapWeeklyMealModel(BaseModel):
 # ══════════════════════════════════════════════════════════════════════════════
 
 @app.get("/profile", tags=["Perfil"])
-def get_profile():
-    return load_profile()
+def get_profile(user: dict = Depends(get_current_user)):
+    return load_profile(_uid(user))
 
 
 @app.put("/profile", tags=["Perfil"])
-def update_profile(data: ProfileModel):
+def update_profile(data: ProfileModel, user: dict = Depends(get_current_user)):
     profile = data.model_dump()
-    save_profile(profile)
+    save_profile(profile, _uid(user))
     return {"ok": True, "profile": profile}
 
 
 @app.get("/profile/nutrition", tags=["Perfil"])
-def get_nutrition(exercise_adj: int = 0):
+def get_nutrition(exercise_adj: int = 0, user: dict = Depends(get_current_user)):
     """Calcula BMR, TDEE y macros con ajuste de ejercicio opcional."""
-    profile = load_profile()
+    profile = load_profile(_uid(user))
     bmr     = calculate_bmr(profile["gender"], profile["age"],
                             profile["height_cm"], profile["weight_kg"])
     tdee    = calculate_tdee(bmr, profile["activity_level"])
@@ -315,9 +353,10 @@ def get_nutrition(exercise_adj: int = 0):
 # ══════════════════════════════════════════════════════════════════════════════
 
 @app.get("/diet/today", tags=["Dieta"])
-def get_today_diet(x_user_timezone: Optional[str] = Header(None)):
+def get_today_diet(x_user_timezone: Optional[str] = Header(None), user: dict = Depends(get_current_user)):
     """Returns today's PlanDay from the weekly plan. Auto-generates plan if needed."""
-    session  = _get_session()
+    uid      = _uid(user)
+    session  = _get_session(uid)
     tz       = x_user_timezone
     today    = _get_today_for_tz(tz)
 
@@ -325,11 +364,11 @@ def get_today_diet(x_user_timezone: Optional[str] = Header(None)):
 
     # Auto-generate if no plan exists
     if not plan:
-        excluded  = load_excluded()
-        favorites = load_favorites()
-        history   = session.get("weekly_history", []) or load_weekly_history()
-        plan = generate_week_plan(excluded, favorites, _get_daily_target(), history=history or None, meal_count=_get_meal_count())
-        save_session(week_plan=plan)
+        excluded  = load_excluded(uid)
+        favorites = load_favorites(uid)
+        history   = session.get("weekly_history", []) or load_weekly_history(uid)
+        plan = generate_week_plan(excluded, favorites, _get_daily_target(uid), history=history or None, meal_count=_get_meal_count(uid))
+        save_session(week_plan=plan, user_id=uid)
 
     stale         = _is_stale(plan, tz)
     exercise_adj  = dict(session.get("exercise_adj", {}))
@@ -352,8 +391,9 @@ def get_today_diet(x_user_timezone: Optional[str] = Header(None)):
 
     # Attach persisted adherence state so the frontend can restore it on reload
     adh_log = {}
-    if os.path.exists(ADHERENCE_FILE):
-        with open(ADHERENCE_FILE) as f:
+    af = str(_adherence_file(uid))
+    if os.path.exists(af):
+        with open(af) as f:
             adh_log = json.load(f)
     today_adh = adh_log.get(today, {})
 
@@ -369,14 +409,15 @@ def get_today_diet(x_user_timezone: Optional[str] = Header(None)):
 
 
 @app.post("/diet/today/regenerate", tags=["Dieta"])
-def regenerate_today_diet(x_user_timezone: Optional[str] = Header(None)):
+def regenerate_today_diet(x_user_timezone: Optional[str] = Header(None), user: dict = Depends(get_current_user)):
     """Regenerates the full weekly plan and returns today's PlanDay."""
-    session   = _get_session()
-    excluded  = load_excluded()
-    favorites = load_favorites()
-    history   = load_weekly_history()
-    plan = generate_week_plan(excluded, favorites, _get_daily_target(), history=history or None, meal_count=_get_meal_count())
-    save_session(week_plan=plan)
+    uid       = _uid(user)
+    session   = _get_session(uid)
+    excluded  = load_excluded(uid)
+    favorites = load_favorites(uid)
+    history   = load_weekly_history(uid)
+    plan = generate_week_plan(excluded, favorites, _get_daily_target(uid), history=history or None, meal_count=_get_meal_count(uid))
+    save_session(week_plan=plan, user_id=uid)
     today        = _get_today_for_tz(x_user_timezone)
     exercise_adj = session.get("exercise_adj", {})
     day          = get_day_from_plan(today, plan, exercise_adj)
@@ -386,10 +427,11 @@ def regenerate_today_diet(x_user_timezone: Optional[str] = Header(None)):
 
 
 @app.post("/diet/today/swap", tags=["Dieta"])
-def swap_meal_new(data: SwapMealModel, x_user_timezone: Optional[str] = Header(None)):
+def swap_meal_new(data: SwapMealModel, x_user_timezone: Optional[str] = Header(None), user: dict = Depends(get_current_user)):
     """Swaps a meal in today's plan slot. Returns updated PlanDay."""
+    uid       = _uid(user)
     meal_type = data.meal_id
-    session   = _get_session()
+    session   = _get_session(uid)
     plan      = session.get("week_plan")
     if not plan:
         raise HTTPException(404, {"error": "no_plan", "detail": "No weekly plan. Call GET /diet/today first."})
@@ -400,8 +442,8 @@ def swap_meal_new(data: SwapMealModel, x_user_timezone: Optional[str] = Header(N
     if day_idx is None:
         raise HTTPException(404, {"error": "date_not_in_plan", "detail": f"No plan for {today}."})
 
-    excluded  = load_excluded()
-    favorites = load_favorites()
+    excluded  = load_excluded(uid)
+    favorites = load_favorites(uid)
 
     # Regenerate that meal slot in the plan day
     today_day = days[day_idx]
@@ -410,7 +452,7 @@ def swap_meal_new(data: SwapMealModel, x_user_timezone: Optional[str] = Header(N
 
     # Use existing regenerate_meal logic
     flat_day = {"daily_target": daily_target, "meals": updated_day_meals}
-    flat_day = regenerate_meal(flat_day, meal_type, excluded, favorites, meal_count=_get_meal_count())
+    flat_day = regenerate_meal(flat_day, meal_type, excluded, favorites, meal_count=_get_meal_count(uid))
     new_meals_dict = flat_day["meals"]
 
     # Rebuild meals list preserving order
@@ -424,7 +466,7 @@ def swap_meal_new(data: SwapMealModel, x_user_timezone: Optional[str] = Header(N
         "meals":     new_meals_list,
         "totalKcal": sum(m["kcal"] for m in new_meals_list),
     }
-    save_session(week_plan=plan)
+    save_session(week_plan=plan, user_id=uid)
 
     # Return the updated PlanDay with exercise_adj applied
     exercise_adj = session.get("exercise_adj", {})
@@ -433,29 +475,29 @@ def swap_meal_new(data: SwapMealModel, x_user_timezone: Optional[str] = Header(N
 
 
 @app.post("/diet/today/{meal_type}/swap", tags=["Dieta"], deprecated=True)
-def swap_meal_legacy(meal_type: str, x_user_timezone: Optional[str] = Header(None)):
+def swap_meal_legacy(meal_type: str, x_user_timezone: Optional[str] = Header(None), user: dict = Depends(get_current_user)):
     """Legacy endpoint — use POST /diet/today/swap with JSON body instead."""
     from pydantic import BaseModel as BM
     class _Body(BM):
         meal_id: str = meal_type
-    return swap_meal_new(_Body(meal_id=meal_type), x_user_timezone)
+    return swap_meal_new(_Body(meal_id=meal_type), x_user_timezone, user)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
 # PLAN SEMANAL
 # ══════════════════════════════════════════════════════════════════════════════
 
-def _get_daily_target() -> int:
-    profile  = load_profile()
+def _get_daily_target(user_id: str | None = None) -> int:
+    profile  = load_profile(user_id)
     bmr      = calculate_bmr(profile["gender"], profile["age"],
                               profile["height_cm"], profile["weight_kg"])
     return calculate_daily_target(bmr, profile["goal"],
                                   activity_level=profile.get("activity_level", 1))
 
 
-def _get_meal_count() -> int:
+def _get_meal_count(user_id: str | None = None) -> int:
     """Return the user's preferred meal count (3, 4, or 5). Defaults to 5."""
-    profile = load_profile()
+    profile = load_profile(user_id)
     mc = profile.get("meal_count", 5)
     return mc if mc in (3, 4, 5) else 5
 
@@ -467,16 +509,17 @@ def get_favorite_carbs():
 
 
 @app.get("/diet/weekly", tags=["Dieta"])
-def get_weekly_plan(x_user_timezone: Optional[str] = Header(None)):
+def get_weekly_plan(x_user_timezone: Optional[str] = Header(None), user: dict = Depends(get_current_user)):
     """Returns full weekly plan as { days: PlanDay[], summary, stale }."""
-    session = _get_session()
+    uid     = _uid(user)
+    session = _get_session(uid)
     plan    = session.get("week_plan")
     if not plan:
-        excluded  = load_excluded()
-        favorites = load_favorites()
-        history   = load_weekly_history()
-        plan = generate_week_plan(excluded, favorites, _get_daily_target(), history=history or None, meal_count=_get_meal_count())
-        save_session(week_plan=plan)
+        excluded  = load_excluded(uid)
+        favorites = load_favorites(uid)
+        history   = load_weekly_history(uid)
+        plan = generate_week_plan(excluded, favorites, _get_daily_target(uid), history=history or None, meal_count=_get_meal_count(uid))
+        save_session(week_plan=plan, user_id=uid)
 
     stale        = _is_stale(plan, x_user_timezone)
     exercise_adj = session.get("exercise_adj", {})
@@ -496,9 +539,10 @@ def get_weekly_plan(x_user_timezone: Optional[str] = Header(None)):
 
 
 @app.post("/diet/weekly/swap", tags=["Dieta"])
-def swap_weekly_meal(data: SwapWeeklyMealModel, x_user_timezone: Optional[str] = Header(None)):
+def swap_weekly_meal(data: SwapWeeklyMealModel, x_user_timezone: Optional[str] = Header(None), user: dict = Depends(get_current_user)):
     """Cambia una sola comida de cualquier día del plan semanal. Devuelve el PlanDay actualizado."""
-    session = _get_session()
+    uid     = _uid(user)
+    session = _get_session(uid)
     plan    = session.get("week_plan")
     if not plan:
         raise HTTPException(404, {"error": "no_plan", "detail": "No hay plan semanal. Regenera el plan primero."})
@@ -508,15 +552,15 @@ def swap_weekly_meal(data: SwapWeeklyMealModel, x_user_timezone: Optional[str] =
     if day_idx is None:
         raise HTTPException(404, {"error": "date_not_in_plan", "detail": f"No hay plan para {data.date}."})
 
-    excluded  = load_excluded()
-    favorites = load_favorites()
+    excluded  = load_excluded(uid)
+    favorites = load_favorites(uid)
 
     today_day    = days[day_idx]
     daily_target = plan.get("weekly_target_kcal", 1800)
 
     # Reutiliza la lógica ya existente de regenerate_meal
     flat_day  = {"daily_target": daily_target, "meals": {m["id"]: m for m in today_day["meals"]}}
-    flat_day  = regenerate_meal(flat_day, data.meal_id, excluded, favorites, meal_count=_get_meal_count())
+    flat_day  = regenerate_meal(flat_day, data.meal_id, excluded, favorites, meal_count=_get_meal_count(uid))
     new_meals = flat_day["meals"]
 
     new_meals_list = [
@@ -528,7 +572,7 @@ def swap_weekly_meal(data: SwapWeeklyMealModel, x_user_timezone: Optional[str] =
         "meals":     new_meals_list,
         "totalKcal": sum(m["kcal"] for m in new_meals_list),
     }
-    save_session(week_plan=plan)
+    save_session(week_plan=plan, user_id=uid)
 
     exercise_adj  = session.get("exercise_adj", {})
     updated_day   = get_day_from_plan(data.date, plan, exercise_adj)
@@ -539,14 +583,16 @@ def swap_weekly_meal(data: SwapWeeklyMealModel, x_user_timezone: Optional[str] =
 def regenerate_weekly_plan(
     data: RegenerateWeeklyModel = RegenerateWeeklyModel(),
     x_user_timezone: Optional[str] = Header(None),
+    user: dict = Depends(get_current_user),
 ):
     """Regenerates part or all of the weekly plan. Returns { days: PlanDay[] }."""
-    session   = _get_session()
-    excluded  = load_excluded()
-    favorites = load_favorites()
-    history   = load_weekly_history()
+    uid       = _uid(user)
+    session   = _get_session(uid)
+    excluded  = load_excluded(uid)
+    favorites = load_favorites(uid)
+    history   = load_weekly_history(uid)
 
-    new_plan = generate_week_plan(excluded, favorites, _get_daily_target(), history=history or None, meal_count=_get_meal_count())
+    new_plan = generate_week_plan(excluded, favorites, _get_daily_target(uid), history=history or None, meal_count=_get_meal_count(uid))
 
     today = _get_today_for_tz(x_user_timezone)
     apply_from = data.apply_from  # "today" or "tomorrow"
@@ -579,13 +625,13 @@ def regenerate_weekly_plan(
     exercise_adj = session.get("exercise_adj", {})
     if apply_from == "today":
         exercise_adj = {k: v for k, v in exercise_adj.items() if k <= today}
-        save_session(exercise_adj=exercise_adj)
+        save_session(exercise_adj=exercise_adj, user_id=uid)
 
     new_plan["days"] = merged_days
 
-    save_session(week_plan=new_plan)
+    save_session(week_plan=new_plan, user_id=uid)
 
-    exercise_adj = _get_session().get("exercise_adj", {})
+    exercise_adj = _get_session(uid).get("exercise_adj", {})
     days_with_adj = [
         get_day_from_plan(d["date"], new_plan, exercise_adj)
         for d in new_plan["days"]
@@ -596,15 +642,16 @@ def regenerate_weekly_plan(
 
 
 @app.get("/diet/shopping-list", tags=["Dieta"])
-def get_shopping_list():
+def get_shopping_list(user: dict = Depends(get_current_user)):
     """Lista de la compra a partir del plan semanal actual."""
-    session = _get_session()
+    uid     = _uid(user)
+    session = _get_session(uid)
     plan    = session.get("week_plan")
     if not plan:
-        excluded  = load_excluded()
-        favorites = load_favorites()
-        plan = generate_week_plan(excluded, favorites, meal_count=_get_meal_count())
-        save_session(week_plan=plan)
+        excluded  = load_excluded(uid)
+        favorites = load_favorites(uid)
+        plan = generate_week_plan(excluded, favorites, meal_count=_get_meal_count(uid))
+        save_session(week_plan=plan, user_id=uid)
     shopping = build_shopping_list(plan)
     # Convertir sets a listas para JSON
     return {cat: sorted(items) for cat, items in shopping.items()}
@@ -621,15 +668,16 @@ def get_exercise_types():
 
 
 @app.get("/exercise/yesterday", tags=["Ejercicio"])
-def get_yesterday_exercise():
-    session = _get_session()
+def get_yesterday_exercise(user: dict = Depends(get_current_user)):
+    session = _get_session(_uid(user))
     return session.get("exercise_data") or {"burned_kcal": 0, "adjustment_kcal": 0, "exercises": []}
 
 
 @app.post("/exercise/yesterday", tags=["Ejercicio"])
-def log_yesterday_exercise(data: YesterdayExerciseModel):
+def log_yesterday_exercise(data: YesterdayExerciseModel, user: dict = Depends(get_current_user)):
     """Registra el ejercicio de ayer y calcula el ajuste calórico."""
-    profile = load_profile()
+    uid     = _uid(user)
+    profile = load_profile(uid)
     goal    = profile["goal"]
 
     if data.rested or not data.entries:
@@ -654,19 +702,19 @@ def log_yesterday_exercise(data: YesterdayExerciseModel):
             "exercises":       log,
         }
 
-    save_session(exercise_data=ex_data, adaptive_day=None)
-    record_today(ex_data)
+    save_session(exercise_data=ex_data, adaptive_day=None, user_id=uid)
+    record_today(ex_data, uid)
     return ex_data
 
 
 @app.get("/exercise/today-training", tags=["Ejercicio"])
-def get_today_training():
-    session = _get_session()
+def get_today_training(user: dict = Depends(get_current_user)):
+    session = _get_session(_uid(user))
     return session.get("today_training") or {"bonus_kcal": 0, "training_type": None, "training_block": None}
 
 
 @app.post("/exercise/today-training", tags=["Ejercicio"])
-def log_today_training(data: TodayTrainingModel):
+def log_today_training(data: TodayTrainingModel, user: dict = Depends(get_current_user)):
     """Registra si el usuario entrena hoy y qué tipo."""
     if not data.trains or not data.exercise_key:
         today_data = {"bonus_kcal": 0, "training_type": None, "exercise_key": None, "training_block": None}
@@ -680,12 +728,12 @@ def log_today_training(data: TodayTrainingModel):
             "training_block": data.training_block,
         }
 
-    save_session(today_training=today_data, adaptive_day=None)
+    save_session(today_training=today_data, adaptive_day=None, user_id=_uid(user))
     return today_data
 
 
 @app.get("/exercise/gym-history", tags=["Ejercicio"])
-def get_gym_history(days: int = 7):
+def get_gym_history(days: int = 7, user: dict = Depends(get_current_user)):
     """
     Historial de sesiones de gym de los últimos N días leído desde Google Sheets
     (o Excel local como fallback). Incluye ejercicios y kcal estimadas.
@@ -717,14 +765,16 @@ def get_gym_history(days: int = 7):
         })
 
     # Sincronizar sesiones del gym al exercise_history.json (sin sobreescribir registros manuales)
+    uid = _uid(user)
+    ex_file = str(_ex_history_file(uid))
     if sessions:
         history = {}
-        if os.path.exists(EX_HISTORY_FILE):
-            with open(EX_HISTORY_FILE) as f:
+        if os.path.exists(ex_file):
+            with open(ex_file) as f:
                 history = json.load(f)
 
         changed = False
-        goal = load_profile()["goal"]
+        goal = load_profile(uid)["goal"]
         for s in sessions:
             if s["date"] is None:
                 continue
@@ -761,7 +811,7 @@ def get_gym_history(days: int = 7):
             changed = True
 
         if changed:
-            with open(EX_HISTORY_FILE, "w") as f:
+            with open(ex_file, "w") as f:
                 json.dump(history, f, indent=2, ensure_ascii=False)
 
     return {
@@ -774,11 +824,13 @@ def get_gym_history(days: int = 7):
 
 
 @app.get("/exercise/history", tags=["Ejercicio"])
-def get_exercise_history(days: int = 7):
+def get_exercise_history(days: int = 7, user: dict = Depends(get_current_user)):
     """Historial de ejercicio de los últimos N días."""
+    uid = _uid(user)
+    ex_file = str(_ex_history_file(uid))
     history = {}
-    if os.path.exists(EX_HISTORY_FILE):
-        with open(EX_HISTORY_FILE) as f:
+    if os.path.exists(ex_file):
+        with open(ex_file) as f:
             history = json.load(f)
 
     today = date.today()
@@ -811,8 +863,9 @@ def get_exercise_history(days: int = 7):
 
 
 @app.post("/exercise/log", tags=["Ejercicio"])
-def log_exercise_by_date(data: ExerciseLogByDateModel):
+def log_exercise_by_date(data: ExerciseLogByDateModel, user: dict = Depends(get_current_user)):
     """Registra ejercicio para cualquier fecha y evalúa su impacto en el plan semanal."""
+    uid = _uid(user)
     try:
         target_date = date.fromisoformat(data.date)
     except ValueError:
@@ -820,7 +873,7 @@ def log_exercise_by_date(data: ExerciseLogByDateModel):
 
     today = date.today()
     # Determinar el inicio de la semana según la preferencia del usuario
-    profile_tmp   = load_profile()
+    profile_tmp   = load_profile(uid)
     wsd           = profile_tmp.get("week_start_day", 0)
     monday        = today - timedelta(days=(today.weekday() - wsd) % 7)
     sunday        = monday + timedelta(days=6)
@@ -828,7 +881,7 @@ def log_exercise_by_date(data: ExerciseLogByDateModel):
     if data.rested or not data.entries:
         ex_data = {"burned_kcal": 0, "adjustment_kcal": 0, "exercises": []}
     else:
-        profile = load_profile()
+        profile = load_profile(uid)
         total_burned = 0.0
         log = []
         for entry in data.entries:
@@ -849,12 +902,13 @@ def log_exercise_by_date(data: ExerciseLogByDateModel):
         }
 
     # Guardar en historial para la fecha indicada
+    ex_file = str(_ex_history_file(uid))
     history = {}
-    if os.path.exists(EX_HISTORY_FILE):
-        with open(EX_HISTORY_FILE) as f:
+    if os.path.exists(ex_file):
+        with open(ex_file) as f:
             history = json.load(f)
     history[data.date] = ex_data
-    with open(EX_HISTORY_FILE, "w") as f:
+    with open(ex_file, "w") as f:
         json.dump(history, f, indent=2, ensure_ascii=False)
 
     # Evaluación de impacto en el plan semanal
@@ -903,30 +957,32 @@ def log_exercise_by_date(data: ExerciseLogByDateModel):
 
 
 @app.delete("/exercise/log/{target_date}", tags=["Ejercicio"])
-def delete_exercise_by_date(target_date: str):
+def delete_exercise_by_date(target_date: str, user: dict = Depends(get_current_user)):
     """Elimina el registro de ejercicio de una fecha concreta."""
+    uid = _uid(user)
     try:
         date.fromisoformat(target_date)
     except ValueError:
         raise HTTPException(400, "Formato de fecha inválido. Usa YYYY-MM-DD.")
 
+    ex_file = str(_ex_history_file(uid))
     history = {}
-    if os.path.exists(EX_HISTORY_FILE):
-        with open(EX_HISTORY_FILE) as f:
+    if os.path.exists(ex_file):
+        with open(ex_file) as f:
             history = json.load(f)
 
     if target_date not in history:
         raise HTTPException(404, f"No hay registro de ejercicio para {target_date}.")
 
     del history[target_date]
-    with open(EX_HISTORY_FILE, "w") as f:
+    with open(ex_file, "w") as f:
         json.dump(history, f, indent=2, ensure_ascii=False)
 
     return {"ok": True, "deleted_date": target_date}
 
 
 @app.post("/health/sync", tags=["Apple Health"])
-def sync_health_data(data: HealthSyncModel):
+def sync_health_data(data: HealthSyncModel, user: dict = Depends(get_current_user)):
     """
     Recibe datos de Apple Health (vía iOS Shortcuts) y los fusiona con el historial
     de ejercicio. Apple Health tiene prioridad sobre la estimación por fórmula para
@@ -947,13 +1003,15 @@ def sync_health_data(data: HealthSyncModel):
         raise HTTPException(400, "active_calories debe ser >= 0.")
 
     # Cargar historial existente
+    uid = _uid(user)
+    ex_file = str(_ex_history_file(uid))
     history: dict = {}
-    if os.path.exists(EX_HISTORY_FILE):
-        with open(EX_HISTORY_FILE) as f:
+    if os.path.exists(ex_file):
+        with open(ex_file) as f:
             history = json.load(f)
 
     existing = history.get(data.date, {})
-    profile  = load_profile()
+    profile  = load_profile(uid)
     factor   = RECOVERY_FACTOR.get(profile["goal"], 0.85)
 
     # Apple Health es la fuente de verdad para kcal cuando está disponible
@@ -989,7 +1047,7 @@ def sync_health_data(data: HealthSyncModel):
         merged["gym_detail"] = gym_detail
 
     history[data.date] = merged
-    with open(EX_HISTORY_FILE, "w") as f:
+    with open(ex_file, "w") as f:
         json.dump(history, f, indent=2, ensure_ascii=False)
 
     return {
@@ -1007,10 +1065,11 @@ def sync_health_data(data: HealthSyncModel):
 # ══════════════════════════════════════════════════════════════════════════════
 
 @app.get("/weight/history", tags=["Peso"])
-def get_weight_history():
+def get_weight_history(user: dict = Depends(get_current_user)):
     """Historial completo de peso con análisis de progreso."""
-    history = load_weight_history()
-    profile = load_profile()
+    uid     = _uid(user)
+    history = load_weight_history(uid)
+    profile = load_profile(uid)
     goal    = profile["goal"]
     expected = EXPECTED_WEEKLY_CHANGE.get(goal, 0)
 
@@ -1052,7 +1111,7 @@ def get_weight_history():
 
     return {
         "history":        history,
-        "needs_weigh_in": needs_weigh_in(),
+        "needs_weigh_in": needs_weigh_in(uid),
         "expected_weekly": expected,
         "analysis":       analysis,
         "current_weight": history[-1]["weight_kg"] if history else None,
@@ -1060,12 +1119,13 @@ def get_weight_history():
 
 
 @app.post("/weight", tags=["Peso"])
-def add_weight(data: WeightModel):
+def add_weight(data: WeightModel, user: dict = Depends(get_current_user)):
     """Registra el peso actual."""
+    uid = _uid(user)
     if not (30 <= data.weight_kg <= 300):
         raise HTTPException(400, "Peso fuera de rango (30-300 kg)")
 
-    history = load_weight_history()
+    history = load_weight_history(uid)
     today   = date.today()
     entry   = {
         "date":      today.isoformat(),
@@ -1075,13 +1135,13 @@ def add_weight(data: WeightModel):
     # Reemplazar si ya hay registro de hoy
     history = [e for e in history if e.get("date") != entry["date"]]
     history.append(entry)
-    save_weight_history(history)
+    save_weight_history(history, uid)
 
     # Actualizar perfil
-    profile = load_profile()
+    profile = load_profile(uid)
     profile["weight_kg"] = data.weight_kg
-    save_profile(profile)
-    save_session(adaptive_day=None)
+    save_profile(profile, uid)
+    save_session(adaptive_day=None, user_id=uid)
 
     return {"ok": True, "entry": entry}
 
@@ -1091,11 +1151,13 @@ def add_weight(data: WeightModel):
 # ══════════════════════════════════════════════════════════════════════════════
 
 @app.get("/adherence", tags=["Adherencia"])
-def get_adherence(days: int = 7):
+def get_adherence(days: int = 7, user: dict = Depends(get_current_user)):
     """Historial de adherencia de los últimos N días."""
+    uid = _uid(user)
     adh_log = {}
-    if os.path.exists(ADHERENCE_FILE):
-        with open(ADHERENCE_FILE) as f:
+    af = str(_adherence_file(uid))
+    if os.path.exists(af):
+        with open(af) as f:
             raw = json.load(f)
         # Normalizar: puede ser dict {date: {pct}} o lista [{date, pct}]
         if isinstance(raw, list):
@@ -1116,18 +1178,19 @@ def get_adherence(days: int = 7):
             "has_data":  entry is not None,
         })
 
-    weekly_avg = weekly_adherence()
+    weekly_avg = weekly_adherence(uid)
     return {"history": result, "weekly_average": weekly_avg}
 
 
 @app.post("/adherence", tags=["Adherencia"])
-def log_adherence_endpoint(data: AdherenceModel):
+def log_adherence_endpoint(data: AdherenceModel, user: dict = Depends(get_current_user)):
     """Registra la adherencia del día (qué comidas se han cumplido)."""
     meals     = data.meals        # {meal_key: bool}
     kcal_map  = data.kcal_map     # {meal_key: kcal}
     followed  = sum(1 for v in meals.values() if v)
     total     = len(meals)
     pct       = round(followed / total * 100) if total else 0
+    uid       = _uid(user)
     today_iso = date.today().isoformat()
 
     # Kcal de comidas seguidas del plan
@@ -1144,9 +1207,10 @@ def log_adherence_endpoint(data: AdherenceModel):
 
     consumed_kcal = round(plan_kcal + replacement_kcal) if (kcal_map or data.skipped_meals) else None
 
+    af = str(_adherence_file(uid))
     adh_log = {}
-    if os.path.exists(ADHERENCE_FILE):
-        with open(ADHERENCE_FILE) as f:
+    if os.path.exists(af):
+        with open(af) as f:
             adh_log = json.load(f)
 
     entry = {"meals": meals, "pct": pct}
@@ -1156,7 +1220,7 @@ def log_adherence_endpoint(data: AdherenceModel):
         entry["consumed_kcal"] = consumed_kcal
 
     adh_log[today_iso] = entry
-    with open(ADHERENCE_FILE, "w") as f:
+    with open(af, "w") as f:
         json.dump(adh_log, f, indent=2)
 
     return {"ok": True, "pct": pct, "followed": followed, "total": total,
@@ -1164,12 +1228,14 @@ def log_adherence_endpoint(data: AdherenceModel):
 
 
 @app.get("/adherence/today", tags=["Adherencia"])
-def get_today_adherence():
+def get_today_adherence(user: dict = Depends(get_current_user)):
     """Devuelve las kcal consumidas y adherencia del día de hoy."""
+    uid       = _uid(user)
     today_iso = date.today().isoformat()
+    af = str(_adherence_file(uid))
     adh_log   = {}
-    if os.path.exists(ADHERENCE_FILE):
-        with open(ADHERENCE_FILE) as f:
+    if os.path.exists(af):
+        with open(af) as f:
             adh_log = json.load(f)
     entry = adh_log.get(today_iso, {})
     return {
@@ -1184,18 +1250,19 @@ def get_today_adherence():
 # ══════════════════════════════════════════════════════════════════════════════
 
 @app.get("/survey", tags=["Encuesta"])
-def get_survey():
+def get_survey(user: dict = Depends(get_current_user)):
     """Última encuesta y si hace falta rellenar una nueva."""
+    uid = _uid(user)
     return {
-        "needs_survey": needs_survey(),
-        "last_scores":  last_survey_scores(),
-        "history":      load_surveys()[-4:],   # últimas 4 semanas
+        "needs_survey": needs_survey(uid),
+        "last_scores":  last_survey_scores(uid),
+        "history":      load_surveys(uid)[-4:],   # últimas 4 semanas
         "questions":    [{"key": k, "label": q} for k, q in QUESTIONS],
     }
 
 
 @app.post("/survey", tags=["Encuesta"])
-def submit_survey(data: SurveyModel):
+def submit_survey(data: SurveyModel, user: dict = Depends(get_current_user)):
     vals   = data.model_dump()
     score  = round(sum(vals.values()) / len(vals), 1)
     today  = date.today()
@@ -1205,9 +1272,10 @@ def submit_survey(data: SurveyModel):
         **vals,
         "score": score,
     }
-    history = load_surveys()
+    uid = _uid(user)
+    history = load_surveys(uid)
     history.append(entry)
-    save_surveys(history)
+    save_surveys(history, uid)
     return {"ok": True, "score": score, "entry": entry}
 
 
@@ -1216,20 +1284,21 @@ def submit_survey(data: SurveyModel):
 # ══════════════════════════════════════════════════════════════════════════════
 
 @app.get("/report/weekly", tags=["Informe"])
-def get_weekly_report():
-    profile       = load_profile()
+def get_weekly_report(user: dict = Depends(get_current_user)):
+    uid           = _uid(user)
+    profile       = load_profile(uid)
     goal          = profile["goal"]
-    ex_days, ex_kcal = _last_week_exercise()
-    prev_w, curr_w   = _weight_change()
-    adherence        = weekly_adherence()
-    survey           = last_survey_scores()
+    ex_days, ex_kcal = _last_week_exercise(uid)
+    prev_w, curr_w   = _weight_change(uid)
+    adherence        = weekly_adherence(uid)
+    survey           = last_survey_scores(uid)
     weight_change    = round(curr_w - prev_w, 1) if prev_w and curr_w else None
     rec_raw          = _recommendation(goal, adherence, ex_days, weight_change, survey)
     recommendations  = [line.strip().lstrip("•").strip()
                         for line in rec_raw.strip().split("\n") if line.strip()]
 
-    if needs_weekly_report():
-        mark_report_shown()
+    if needs_weekly_report(uid):
+        mark_report_shown(uid)
 
     return {
         "exercise": {"days_trained": ex_days, "kcal_burned": ex_kcal},
@@ -1246,19 +1315,21 @@ def get_weekly_report():
 # ══════════════════════════════════════════════════════════════════════════════
 
 @app.get("/dashboard", tags=["Dashboard"])
-def get_dashboard():
+def get_dashboard(user: dict = Depends(get_current_user)):
     """Todo lo necesario para el dashboard en un solo request."""
-    profile  = load_profile()
-    session  = _get_session()
+    uid      = _uid(user)
+    profile  = load_profile(uid)
+    session  = _get_session(uid)
     ex_data  = session.get("exercise_data") or {"burned_kcal": 0, "adjustment_kcal": 0, "exercises": []}
 
     # Enrich exercise_data with health_data from exercise history
     # (Apple Health data is stored in the history file, not the session)
     today_iso = date.today().isoformat()
     yesterday_iso = (date.today() - timedelta(days=1)).isoformat()
+    ex_file = str(_ex_history_file(uid))
     ex_history = {}
-    if os.path.exists(EX_HISTORY_FILE):
-        with open(EX_HISTORY_FILE) as f:
+    if os.path.exists(ex_file):
+        with open(ex_file) as f:
             ex_history = json.load(f)
 
     # Today's health data (steps, HR, active_calories synced from Apple Health)
@@ -1269,9 +1340,10 @@ def get_dashboard():
         ex_data = {**ex_data, **yesterday_entry}
 
     # Kcal consumidas hoy (desde adherencia)
+    af = str(_adherence_file(uid))
     adh_log   = {}
-    if os.path.exists(ADHERENCE_FILE):
-        with open(ADHERENCE_FILE) as f:
+    if os.path.exists(af):
+        with open(af) as f:
             adh_log = json.load(f)
     consumed_kcal = adh_log.get(today_iso, {}).get("consumed_kcal", 0)
     today_tr = session.get("today_training") or {}
@@ -1284,15 +1356,15 @@ def get_dashboard():
                                      activity_level=profile.get("activity_level", 1))
     macros  = calculate_macros(profile["weight_kg"], target, profile["goal"])
 
-    d_event = days_to_event()
-    event   = get_event()
+    d_event = days_to_event(uid)
+    event   = get_event(uid)
 
     alerts = []
-    if needs_weigh_in():
+    if needs_weigh_in(uid):
         alerts.append({"type": "weigh_in", "message": "Toca registrar tu peso esta semana"})
-    if needs_survey():
+    if needs_survey(uid):
         alerts.append({"type": "survey", "message": "Encuesta semanal pendiente"})
-    if needs_weekly_report():
+    if needs_weekly_report(uid):
         alerts.append({"type": "weekly_report", "message": "Informe semanal disponible"})
     if d_event is not None and d_event <= 7:
         alerts.append({"type": "event", "message": f"Evento '{event['name']}' en {d_event} días",
@@ -1336,53 +1408,58 @@ def get_dashboard():
 # ══════════════════════════════════════════════════════════════════════════════
 
 @app.get("/preferences", tags=["Preferencias"])
-def get_preferences():
-    return load_prefs()
+def get_preferences(user: dict = Depends(get_current_user)):
+    return load_prefs(_uid(user))
 
 
 @app.put("/preferences", tags=["Preferencias"])
-def update_preferences(data: PreferencesModel):
+def update_preferences(data: PreferencesModel, user: dict = Depends(get_current_user)):
+    uid   = _uid(user)
     prefs = {"excluded": data.excluded, "favorites": data.favorites, "disliked": data.disliked}
-    save_prefs(prefs)
-    save_session(week_plan=None, adaptive_day=None)
+    save_prefs(prefs, uid)
+    save_session(week_plan=None, adaptive_day=None, user_id=uid)
     return {"ok": True, "preferences": prefs}
 
 
 @app.post("/preferences/excluded", tags=["Preferencias"])
-def add_excluded(keyword: str):
-    prefs = load_prefs()
+def add_excluded(keyword: str, user: dict = Depends(get_current_user)):
+    uid   = _uid(user)
+    prefs = load_prefs(uid)
     if keyword not in prefs["excluded"]:
         prefs["excluded"].append(keyword.lower().strip())
-        save_prefs(prefs)
-        save_session(week_plan=None, adaptive_day=None)
+        save_prefs(prefs, uid)
+        save_session(week_plan=None, adaptive_day=None, user_id=uid)
     return prefs
 
 
 @app.delete("/preferences/excluded/{keyword}", tags=["Preferencias"])
-def remove_excluded(keyword: str):
-    prefs = load_prefs()
+def remove_excluded(keyword: str, user: dict = Depends(get_current_user)):
+    uid   = _uid(user)
+    prefs = load_prefs(uid)
     prefs["excluded"] = [k for k in prefs["excluded"] if k != keyword]
-    save_prefs(prefs)
-    save_session(week_plan=None, adaptive_day=None)
+    save_prefs(prefs, uid)
+    save_session(week_plan=None, adaptive_day=None, user_id=uid)
     return prefs
 
 
 @app.post("/preferences/favorites", tags=["Preferencias"])
-def add_favorite(keyword: str):
-    prefs = load_prefs()
+def add_favorite(keyword: str, user: dict = Depends(get_current_user)):
+    uid   = _uid(user)
+    prefs = load_prefs(uid)
     if keyword not in prefs["favorites"]:
         prefs["favorites"].append(keyword.lower().strip())
-        save_prefs(prefs)
-        save_session(week_plan=None, adaptive_day=None)
+        save_prefs(prefs, uid)
+        save_session(week_plan=None, adaptive_day=None, user_id=uid)
     return prefs
 
 
 @app.delete("/preferences/favorites/{keyword}", tags=["Preferencias"])
-def remove_favorite(keyword: str):
-    prefs = load_prefs()
+def remove_favorite(keyword: str, user: dict = Depends(get_current_user)):
+    uid   = _uid(user)
+    prefs = load_prefs(uid)
     prefs["favorites"] = [k for k in prefs["favorites"] if k != keyword]
-    save_prefs(prefs)
-    save_session(week_plan=None, adaptive_day=None)
+    save_prefs(prefs, uid)
+    save_session(week_plan=None, adaptive_day=None, user_id=uid)
     return prefs
 
 
@@ -1391,9 +1468,10 @@ def remove_favorite(keyword: str):
 # ══════════════════════════════════════════════════════════════════════════════
 
 @app.get("/event", tags=["Evento"])
-def get_event_status():
-    event = get_event()
-    d     = days_to_event()
+def get_event_status(user: dict = Depends(get_current_user)):
+    uid   = _uid(user)
+    event = get_event(uid)
+    d     = days_to_event(uid)
     if not event:
         return {"has_event": False}
 
@@ -1408,22 +1486,26 @@ def get_event_status():
 
 
 @app.post("/event", tags=["Evento"])
-def create_event(data: EventModel):
+def create_event(data: EventModel, user: dict = Depends(get_current_user)):
+    uid = _uid(user)
     event_date = date.fromisoformat(data.date)
     if event_date <= date.today():
         raise HTTPException(400, "La fecha debe ser futura")
     event = {"name": data.name, "date": data.date}
-    with open(COMPETITION_FILE, "w") as f:
+    cf = str(_competition_file(uid))
+    with open(cf, "w") as f:
         json.dump(event, f, indent=2)
-    save_session(adaptive_day=None)
+    save_session(adaptive_day=None, user_id=uid)
     return {"ok": True, "event": event}
 
 
 @app.delete("/event", tags=["Evento"])
-def delete_event():
-    if os.path.exists(COMPETITION_FILE):
-        os.remove(COMPETITION_FILE)
-    save_session(adaptive_day=None)
+def delete_event(user: dict = Depends(get_current_user)):
+    uid = _uid(user)
+    cf = str(_competition_file(uid))
+    if os.path.exists(cf):
+        os.remove(cf)
+    save_session(adaptive_day=None, user_id=uid)
     return {"ok": True}
 
 
@@ -1432,12 +1514,12 @@ def delete_event():
 # ══════════════════════════════════════════════════════════════════════════════
 
 @app.get("/training/routine", tags=["Entrenamiento"])
-def get_routine(days: int = 3, type: str = "gym"):
+def get_routine(days: int = 3, type: str = "gym", user: dict = Depends(get_current_user)):
     """
     Genera una rutina de entrenamiento.
     type: "gym" | "calistenia"
     """
-    profile = load_profile()
+    profile = load_profile(_uid(user))
     weight  = profile["weight_kg"]
 
     if type == "gym":
@@ -1474,8 +1556,9 @@ def get_calistenia_routine(
     level: str = "intermedio",
     has_barra: bool = True,
     has_paralelas: bool = True,
+    user: dict = Depends(get_current_user),
 ):
-    profile  = load_profile()
+    profile  = load_profile(_uid(user))
     capped   = min(max(days, 2), 5)
     plan     = CALISTENIA_PLANS.get(capped, CALISTENIA_PLANS[3])
     day_list = []
@@ -1503,9 +1586,9 @@ def get_calistenia_routine(
 # ══════════════════════════════════════════════════════════════════════════════
 
 @app.get("/gamification/status", tags=["Gamificación"])
-def get_gamification_status():
+def get_gamification_status(user: dict = Depends(get_current_user)):
     """Devuelve el nivel, XP total, progreso al siguiente nivel y desglose de puntos."""
-    return gamification_status()
+    return gamification_status(_uid(user))
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1513,8 +1596,9 @@ def get_gamification_status():
 # ══════════════════════════════════════════════════════════════════════════════
 
 @app.get("/report/download", tags=["Informe"])
-def download_report_pdf():
+def download_report_pdf(user: dict = Depends(get_current_user)):
     """Genera y descarga el informe semanal en PDF."""
+    uid = _uid(user)
     from reportlab.lib.pagesizes import A4
     from reportlab.lib import colors
     from reportlab.lib.units import cm
@@ -1522,12 +1606,12 @@ def download_report_pdf():
     from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, HRFlowable, Table, TableStyle
     from reportlab.lib.enums import TA_CENTER
 
-    profile = load_profile()
+    profile = load_profile(uid)
     goal = profile["goal"]
-    ex_days, ex_kcal = _last_week_exercise()
-    prev_w, curr_w = _weight_change()
-    adherence = weekly_adherence()
-    survey = last_survey_scores()
+    ex_days, ex_kcal = _last_week_exercise(uid)
+    prev_w, curr_w = _weight_change(uid)
+    adherence = weekly_adherence(uid)
+    survey = last_survey_scores(uid)
     weight_change = round(curr_w - prev_w, 1) if prev_w and curr_w else None
     rec_raw = _recommendation(goal, adherence, ex_days, weight_change, survey)
     recommendations = [line.strip().lstrip("•").strip()
@@ -1731,32 +1815,32 @@ if _TRAINING_V2_AVAILABLE:
     # ══════════════════════════════════════════════════════════════════════════
 
     @app.get("/v2/training/routines", tags=["Training 2.0"])
-    async def v2_list_routines():
-        return list_routines()
+    async def v2_list_routines(user: dict = Depends(get_current_user)):
+        return list_routines(_uid(user))
 
     @app.get("/v2/training/routines/{routine_id}", tags=["Training 2.0"])
-    async def v2_get_routine(routine_id: str):
+    async def v2_get_routine(routine_id: str, user: dict = Depends(get_current_user)):
         try:
-            return get_routine(routine_id)
+            return get_routine(routine_id, _uid(user))
         except KeyError as e:
             raise HTTPException(404, str(e))
 
     @app.post("/v2/training/routines", tags=["Training 2.0"])
-    async def v2_create_routine(body: RoutineCreateModel):
-        return create_routine(body.model_dump())
+    async def v2_create_routine(body: RoutineCreateModel, user: dict = Depends(get_current_user)):
+        return create_routine(body.model_dump(), _uid(user))
 
     @app.put("/v2/training/routines/{routine_id}", tags=["Training 2.0"])
-    async def v2_update_routine(routine_id: str, body: RoutineUpdateModel):
+    async def v2_update_routine(routine_id: str, body: RoutineUpdateModel, user: dict = Depends(get_current_user)):
         data = {k: v for k, v in body.model_dump().items() if v is not None}
         try:
-            return update_routine(routine_id, data)
+            return update_routine(routine_id, data, _uid(user))
         except KeyError as e:
             raise HTTPException(404, str(e))
 
     @app.delete("/v2/training/routines/{routine_id}", tags=["Training 2.0"])
-    async def v2_delete_routine(routine_id: str):
+    async def v2_delete_routine(routine_id: str, user: dict = Depends(get_current_user)):
         try:
-            delete_routine(routine_id)
+            delete_routine(routine_id, _uid(user))
             return {"ok": True}
         except KeyError as e:
             raise HTTPException(404, str(e))
@@ -1766,45 +1850,46 @@ if _TRAINING_V2_AVAILABLE:
     # ══════════════════════════════════════════════════════════════════════════
 
     @app.post("/v2/training/workouts", tags=["Training 2.0"])
-    async def v2_start_workout(body: WorkoutStartModel):
+    async def v2_start_workout(body: WorkoutStartModel, user: dict = Depends(get_current_user)):
         try:
             return start_workout(
                 routine_id=body.routine_id,
                 routine_day_id=body.routine_day_id,
                 name=body.name,
                 training_block=body.training_block,
+                user_id=_uid(user),
             )
         except KeyError as e:
             raise HTTPException(404, str(e))
 
     @app.get("/v2/training/workouts/active", tags=["Training 2.0"])
-    async def v2_get_active_workout():
-        return get_active_workout()
+    async def v2_get_active_workout(user: dict = Depends(get_current_user)):
+        return get_active_workout(_uid(user))
 
     @app.get("/v2/training/workouts", tags=["Training 2.0"])
-    async def v2_list_workouts(limit: int = 20, offset: int = 0):
-        return list_workouts(limit=limit, offset=offset)
+    async def v2_list_workouts(limit: int = 20, offset: int = 0, user: dict = Depends(get_current_user)):
+        return list_workouts(limit=limit, offset=offset, user_id=_uid(user))
 
     @app.get("/v2/training/workouts/{workout_id}", tags=["Training 2.0"])
-    async def v2_get_workout(workout_id: str):
+    async def v2_get_workout(workout_id: str, user: dict = Depends(get_current_user)):
         try:
-            return get_workout(workout_id)
+            return get_workout(workout_id, _uid(user))
         except KeyError as e:
             raise HTTPException(404, str(e))
 
     @app.post("/v2/training/workouts/{workout_id}/exercises", tags=["Training 2.0"])
-    async def v2_add_exercise(workout_id: str, body: WorkoutAddExerciseModel):
+    async def v2_add_exercise(workout_id: str, body: WorkoutAddExerciseModel, user: dict = Depends(get_current_user)):
         try:
-            return add_exercise_to_workout(workout_id, body.exercise_id)
+            return add_exercise_to_workout(workout_id, body.exercise_id, _uid(user))
         except KeyError as e:
             raise HTTPException(404, str(e))
         except ValueError as e:
             raise HTTPException(400, str(e))
 
     @app.delete("/v2/training/workouts/{workout_id}/exercises/{exercise_entry_id}", tags=["Training 2.0"])
-    async def v2_remove_exercise(workout_id: str, exercise_entry_id: str):
+    async def v2_remove_exercise(workout_id: str, exercise_entry_id: str, user: dict = Depends(get_current_user)):
         try:
-            remove_exercise_from_workout(workout_id, exercise_entry_id)
+            remove_exercise_from_workout(workout_id, exercise_entry_id, _uid(user))
             return {"ok": True}
         except KeyError as e:
             raise HTTPException(404, str(e))
@@ -1812,28 +1897,28 @@ if _TRAINING_V2_AVAILABLE:
             raise HTTPException(400, str(e))
 
     @app.post("/v2/training/workouts/{workout_id}/exercises/{exercise_entry_id}/sets", tags=["Training 2.0"])
-    async def v2_add_set(workout_id: str, exercise_entry_id: str):
+    async def v2_add_set(workout_id: str, exercise_entry_id: str, user: dict = Depends(get_current_user)):
         try:
-            return add_set(workout_id, exercise_entry_id)
+            return add_set(workout_id, exercise_entry_id, _uid(user))
         except KeyError as e:
             raise HTTPException(404, str(e))
         except ValueError as e:
             raise HTTPException(400, str(e))
 
     @app.put("/v2/training/workouts/{workout_id}/exercises/{exercise_entry_id}/sets/{set_id}", tags=["Training 2.0"])
-    async def v2_update_set(workout_id: str, exercise_entry_id: str, set_id: str, body: WorkoutUpdateSetModel):
+    async def v2_update_set(workout_id: str, exercise_entry_id: str, set_id: str, body: WorkoutUpdateSetModel, user: dict = Depends(get_current_user)):
         data = {k: v for k, v in body.model_dump().items() if v is not None}
         try:
-            return update_set(workout_id, exercise_entry_id, set_id, data)
+            return update_set(workout_id, exercise_entry_id, set_id, data, _uid(user))
         except KeyError as e:
             raise HTTPException(404, str(e))
         except ValueError as e:
             raise HTTPException(400, str(e))
 
     @app.delete("/v2/training/workouts/{workout_id}/exercises/{exercise_entry_id}/sets/{set_id}", tags=["Training 2.0"])
-    async def v2_delete_set(workout_id: str, exercise_entry_id: str, set_id: str):
+    async def v2_delete_set(workout_id: str, exercise_entry_id: str, set_id: str, user: dict = Depends(get_current_user)):
         try:
-            delete_set(workout_id, exercise_entry_id, set_id)
+            delete_set(workout_id, exercise_entry_id, set_id, _uid(user))
             return {"ok": True}
         except KeyError as e:
             raise HTTPException(404, str(e))
@@ -1841,18 +1926,18 @@ if _TRAINING_V2_AVAILABLE:
             raise HTTPException(400, str(e))
 
     @app.post("/v2/training/workouts/{workout_id}/finish", tags=["Training 2.0"])
-    async def v2_finish_workout(workout_id: str, body: WorkoutFinishModel):
+    async def v2_finish_workout(workout_id: str, body: WorkoutFinishModel, user: dict = Depends(get_current_user)):
         try:
-            return finish_workout(workout_id, notes=body.notes or "")
+            return finish_workout(workout_id, notes=body.notes or "", user_id=_uid(user))
         except KeyError as e:
             raise HTTPException(404, str(e))
         except ValueError as e:
             raise HTTPException(400, str(e))
 
     @app.post("/v2/training/workouts/{workout_id}/discard", tags=["Training 2.0"])
-    async def v2_discard_workout(workout_id: str):
+    async def v2_discard_workout(workout_id: str, user: dict = Depends(get_current_user)):
         try:
-            discard_workout(workout_id)
+            discard_workout(workout_id, _uid(user))
             return {"ok": True}
         except KeyError as e:
             raise HTTPException(404, str(e))
@@ -1864,21 +1949,21 @@ if _TRAINING_V2_AVAILABLE:
     # ══════════════════════════════════════════════════════════════════════════
 
     @app.get("/v2/training/analytics/exercise/{exercise_id}", tags=["Training 2.0"])
-    async def v2_exercise_stats(exercise_id: str):
-        return get_exercise_stats(exercise_id)
+    async def v2_exercise_stats(exercise_id: str, user: dict = Depends(get_current_user)):
+        return get_exercise_stats(exercise_id, _uid(user))
 
     @app.get("/v2/training/analytics/muscle-volume", tags=["Training 2.0"])
-    async def v2_muscle_volume(days: int = 7):
-        return get_muscle_volume(days=days)
+    async def v2_muscle_volume(days: int = 7, user: dict = Depends(get_current_user)):
+        return get_muscle_volume(days=days, user_id=_uid(user))
 
     @app.get("/v2/training/analytics/weekly", tags=["Training 2.0"])
-    async def v2_weekly_stats(weeks: int = 4):
-        return get_weekly_stats(weeks=weeks)
+    async def v2_weekly_stats(weeks: int = 4, user: dict = Depends(get_current_user)):
+        return get_weekly_stats(weeks=weeks, user_id=_uid(user))
 
     @app.get("/v2/training/analytics/calendar", tags=["Training 2.0"])
-    async def v2_calendar(year: int = 2026, month: int = 3):
-        return get_calendar(year=year, month=month)
+    async def v2_calendar(year: int = 2026, month: int = 3, user: dict = Depends(get_current_user)):
+        return get_calendar(year=year, month=month, user_id=_uid(user))
 
     @app.get("/v2/training/analytics/prs", tags=["Training 2.0"])
-    async def v2_recent_prs(limit: int = 20):
-        return get_recent_prs(limit=limit)
+    async def v2_recent_prs(limit: int = 20, user: dict = Depends(get_current_user)):
+        return get_recent_prs(limit=limit, user_id=_uid(user))

@@ -2,11 +2,14 @@
 Encuesta semanal de sensaciones subjetivas (inspirado en INDYA).
 Se hace una vez por semana al arrancar el programa.
 Evalúa 4 áreas en escala 1-5: energía, hambre, adherencia percibida, sueño.
+
+Soporte multi-usuario: user_id opcional en todas las funciones.
 """
 
 import json
 import os
 from datetime import date
+from pathlib import Path
 from data_dir import DATA_DIR
 
 SURVEY_FILE = DATA_DIR / "survey_history.json"
@@ -27,10 +30,25 @@ def _use_db():
         return False
 
 
-def _load() -> list:
+def _user_dir(user_id: str | None) -> Path:
+    if user_id:
+        d = DATA_DIR / user_id
+        d.mkdir(parents=True, exist_ok=True)
+        return d
+    return DATA_DIR
+
+
+def _survey_file(user_id: str | None) -> Path:
+    return _user_dir(user_id) / "survey_history.json"
+
+
+def _load(user_id: str | None = None) -> list:
     if _use_db():
         from database import fetchall
-        rows = fetchall("SELECT * FROM survey_history ORDER BY date")
+        if user_id:
+            rows = fetchall("SELECT * FROM survey_history WHERE user_id = %s ORDER BY date", (user_id,))
+        else:
+            rows = fetchall("SELECT * FROM survey_history ORDER BY date")
         return [
             {
                 "date": str(r["date"]),
@@ -44,31 +62,39 @@ def _load() -> list:
             for r in rows
         ]
 
-    if not os.path.exists(SURVEY_FILE):
+    sf = _survey_file(user_id)
+    if not os.path.exists(sf):
         return []
-    with open(SURVEY_FILE, "r", encoding="utf-8") as f:
+    with open(sf, "r", encoding="utf-8") as f:
         return json.load(f)
 
 
-def _save(history: list) -> None:
+def _save(history: list, user_id: str | None = None) -> None:
     if _use_db():
-        return  # Las escrituras van directas a la DB
+        return
 
-    with open(SURVEY_FILE, "w", encoding="utf-8") as f:
+    sf = _survey_file(user_id)
+    with open(sf, "w", encoding="utf-8") as f:
         json.dump(history, f, indent=2, ensure_ascii=False)
 
 
-def needs_survey() -> bool:
+def needs_survey(user_id: str | None = None) -> bool:
     """True si no hay encuesta de esta semana."""
     if _use_db():
         from database import fetchone
-        row = fetchone(
-            "SELECT week FROM survey_history WHERE week = %s",
-            (date.today().strftime("%G-W%V"),)
-        )
+        if user_id:
+            row = fetchone(
+                "SELECT week FROM survey_history WHERE user_id = %s AND week = %s",
+                (user_id, date.today().strftime("%G-W%V"))
+            )
+        else:
+            row = fetchone(
+                "SELECT week FROM survey_history WHERE week = %s",
+                (date.today().strftime("%G-W%V"),)
+            )
         return row is None
 
-    history = _load()
+    history = _load(user_id)
     if not history:
         return True
     last_week = history[-1].get("week")
@@ -145,11 +171,14 @@ def print_survey_history(n_weeks: int = 4) -> None:
     print("="*52)
 
 
-def last_survey_scores() -> dict:
+def last_survey_scores(user_id: str | None = None) -> dict:
     """Devuelve las puntuaciones de la última encuesta o dict vacío."""
     if _use_db():
         from database import fetchone
-        row = fetchone("SELECT * FROM survey_history ORDER BY date DESC LIMIT 1")
+        if user_id:
+            row = fetchone("SELECT * FROM survey_history WHERE user_id = %s ORDER BY date DESC LIMIT 1", (user_id,))
+        else:
+            row = fetchone("SELECT * FROM survey_history ORDER BY date DESC LIMIT 1")
         if row:
             return {
                 "date": str(row["date"]),
@@ -162,5 +191,5 @@ def last_survey_scores() -> dict:
             }
         return {}
 
-    history = _load()
+    history = _load(user_id)
     return history[-1] if history else {}

@@ -2,11 +2,14 @@
 Seguimiento de adherencia al plan dietético diario.
 El usuario marca qué comidas del día ha cumplido.
 Los datos se guardan en adherence_log.json o PostgreSQL.
+
+Soporte multi-usuario: user_id opcional en todas las funciones.
 """
 
 import json
 import os
 from datetime import date, timedelta
+from pathlib import Path
 from data_dir import DATA_DIR
 
 ADHERENCE_FILE = DATA_DIR / "adherence_log.json"
@@ -29,14 +32,28 @@ def _use_db():
         return False
 
 
-def _load() -> dict:
+def _user_dir(user_id: str | None) -> Path:
+    if user_id:
+        d = DATA_DIR / user_id
+        d.mkdir(parents=True, exist_ok=True)
+        return d
+    return DATA_DIR
+
+
+def _adherence_file(user_id: str | None) -> Path:
+    return _user_dir(user_id) / "adherence_log.json"
+
+
+def _load(user_id: str | None = None) -> dict:
     if _use_db():
         from database import fetchall
-        rows = fetchall("SELECT * FROM adherence_log ORDER BY date")
+        if user_id:
+            rows = fetchall("SELECT * FROM adherence_log WHERE user_id = %s ORDER BY date", (user_id,))
+        else:
+            rows = fetchall("SELECT * FROM adherence_log ORDER BY date")
         result = {}
         for row in rows:
             d = str(row["date"])
-            # Cargar comidas individuales
             from database import fetchall as fa
             meals_rows = fa(
                 "SELECT meal_key, followed FROM adherence_meals WHERE adherence_id = %s",
@@ -52,17 +69,19 @@ def _load() -> dict:
         return result
 
     # Fallback: JSON
-    if not os.path.exists(ADHERENCE_FILE):
+    af = _adherence_file(user_id)
+    if not os.path.exists(af):
         return {}
-    with open(ADHERENCE_FILE, "r", encoding="utf-8") as f:
+    with open(af, "r", encoding="utf-8") as f:
         return json.load(f)
 
 
-def _save(log: dict) -> None:
+def _save(log: dict, user_id: str | None = None) -> None:
     if _use_db():
-        return  # Las escrituras se hacen directamente en la DB
+        return
 
-    with open(ADHERENCE_FILE, "w", encoding="utf-8") as f:
+    af = _adherence_file(user_id)
+    with open(af, "w", encoding="utf-8") as f:
         json.dump(log, f, indent=2, ensure_ascii=False)
 
 
@@ -119,20 +138,26 @@ def log_adherence(day_data: dict) -> dict:
     return {"meals": result, "pct": pct}
 
 
-def weekly_adherence() -> float:
+def weekly_adherence(user_id: str | None = None) -> float:
     """Calcula el % de adherencia medio de los últimos 7 días."""
     if _use_db():
         from database import fetchall
         today = date.today()
         week_ago = today - timedelta(days=6)
-        rows = fetchall(
-            "SELECT pct FROM adherence_log WHERE date >= %s AND date <= %s",
-            (week_ago.isoformat(), today.isoformat())
-        )
+        if user_id:
+            rows = fetchall(
+                "SELECT pct FROM adherence_log WHERE user_id = %s AND date >= %s AND date <= %s",
+                (user_id, week_ago.isoformat(), today.isoformat())
+            )
+        else:
+            rows = fetchall(
+                "SELECT pct FROM adherence_log WHERE date >= %s AND date <= %s",
+                (week_ago.isoformat(), today.isoformat())
+            )
         pcts = [r["pct"] for r in rows]
         return round(sum(pcts) / len(pcts)) if pcts else 0
 
-    log   = _load()
+    log   = _load(user_id)
     today = date.today()
     pcts  = []
     for i in range(7):

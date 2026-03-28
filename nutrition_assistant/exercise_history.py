@@ -2,11 +2,14 @@
 Historial de ejercicio diario.
 Guarda el registro de cada día en exercise_history.json o PostgreSQL.
 Permite ver resumen semanal: días entrenados, kcal totales, racha.
+
+Soporte multi-usuario: user_id opcional en todas las funciones.
 """
 
 import json
 import os
 from datetime import date, timedelta
+from pathlib import Path
 from data_dir import DATA_DIR
 
 HISTORY_FILE = DATA_DIR / "exercise_history.json"
@@ -20,26 +23,45 @@ def _use_db():
         return False
 
 
-def _load() -> dict:
+def _user_dir(user_id: str | None) -> Path:
+    if user_id:
+        d = DATA_DIR / user_id
+        d.mkdir(parents=True, exist_ok=True)
+        return d
+    return DATA_DIR
+
+
+def _history_file(user_id: str | None) -> Path:
+    return _user_dir(user_id) / "exercise_history.json"
+
+
+def _load(user_id: str | None = None) -> dict:
     if _use_db():
         from database import fetchall
-        rows = fetchall("""
-            SELECT eh.date, eh.burned_kcal, eh.adjustment_kcal, eh.duration_min,
-                   eh.session_type, eh.sources, eh.health_data, eh.gym_detail
-            FROM exercise_history eh
-            ORDER BY eh.date
-        """)
+        if user_id:
+            rows = fetchall("""
+                SELECT eh.date, eh.burned_kcal, eh.adjustment_kcal, eh.duration_min,
+                       eh.session_type, eh.sources, eh.health_data, eh.gym_detail
+                FROM exercise_history eh
+                WHERE eh.user_id = %s
+                ORDER BY eh.date
+            """, (user_id,))
+        else:
+            rows = fetchall("""
+                SELECT eh.date, eh.burned_kcal, eh.adjustment_kcal, eh.duration_min,
+                       eh.session_type, eh.sources, eh.health_data, eh.gym_detail
+                FROM exercise_history eh
+                ORDER BY eh.date
+            """)
         result = {}
         for row in rows:
             d = str(row["date"])
-            # Cargar ejercicios individuales
             from database import fetchall as fa
             entries = fa(
                 "SELECT exercise_key, name, minutes, burned_kcal FROM exercise_entries WHERE history_id = %s",
                 (row.get("id") if "id" in row else None,)
             ) if "id" in row else []
 
-            # Construir entrada compatible con el formato JSON original
             entry = {
                 "burned_kcal": row["burned_kcal"],
                 "adjustment_kcal": row["adjustment_kcal"],
@@ -65,23 +87,23 @@ def _load() -> dict:
         return result
 
     # Fallback: JSON
-    if not os.path.exists(HISTORY_FILE):
+    hf = _history_file(user_id)
+    if not os.path.exists(hf):
         return {}
-    with open(HISTORY_FILE, "r", encoding="utf-8") as f:
+    with open(hf, "r", encoding="utf-8") as f:
         return json.load(f)
 
 
-def _save(history: dict) -> None:
+def _save(history: dict, user_id: str | None = None) -> None:
     if _use_db():
-        # En modo DB, cada operación de escritura se hace directamente,
-        # no se usa _save() global. Ver record_today().
         return
 
-    with open(HISTORY_FILE, "w", encoding="utf-8") as f:
+    hf = _history_file(user_id)
+    with open(hf, "w", encoding="utf-8") as f:
         json.dump(history, f, indent=2, ensure_ascii=False)
 
 
-def record_today(exercise_data: dict) -> None:
+def record_today(exercise_data: dict, user_id: str | None = None) -> None:
     """Guarda el ejercicio del día actual en el historial."""
     today_iso = date.today().isoformat()
 
@@ -96,21 +118,39 @@ def record_today(exercise_data: dict) -> None:
         gym_detail = exercise_data.get("gym_detail")
 
         with get_cursor() as cur:
-            cur.execute("""
-                INSERT INTO exercise_history (date, burned_kcal, adjustment_kcal,
-                                              sources, health_data, gym_detail)
-                VALUES (%s, %s, %s, %s, %s, %s)
-                ON CONFLICT (date) DO UPDATE SET
-                    burned_kcal = EXCLUDED.burned_kcal,
-                    adjustment_kcal = EXCLUDED.adjustment_kcal,
-                    sources = EXCLUDED.sources,
-                    health_data = EXCLUDED.health_data,
-                    gym_detail = EXCLUDED.gym_detail
-                RETURNING id
-            """, (today_iso, burned, adj,
-                  sources if sources else [],
-                  Json(health_data) if health_data else None,
-                  Json(gym_detail) if gym_detail else None))
+            if user_id:
+                cur.execute("""
+                    INSERT INTO exercise_history (date, burned_kcal, adjustment_kcal,
+                                                  sources, health_data, gym_detail, user_id)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                    ON CONFLICT (user_id, date) DO UPDATE SET
+                        burned_kcal = EXCLUDED.burned_kcal,
+                        adjustment_kcal = EXCLUDED.adjustment_kcal,
+                        sources = EXCLUDED.sources,
+                        health_data = EXCLUDED.health_data,
+                        gym_detail = EXCLUDED.gym_detail
+                    RETURNING id
+                """, (today_iso, burned, adj,
+                      sources if sources else [],
+                      Json(health_data) if health_data else None,
+                      Json(gym_detail) if gym_detail else None,
+                      user_id))
+            else:
+                cur.execute("""
+                    INSERT INTO exercise_history (date, burned_kcal, adjustment_kcal,
+                                                  sources, health_data, gym_detail)
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                    ON CONFLICT (date) DO UPDATE SET
+                        burned_kcal = EXCLUDED.burned_kcal,
+                        adjustment_kcal = EXCLUDED.adjustment_kcal,
+                        sources = EXCLUDED.sources,
+                        health_data = EXCLUDED.health_data,
+                        gym_detail = EXCLUDED.gym_detail
+                    RETURNING id
+                """, (today_iso, burned, adj,
+                      sources if sources else [],
+                      Json(health_data) if health_data else None,
+                      Json(gym_detail) if gym_detail else None))
 
             history_id = cur.fetchone()[0]
 
@@ -125,9 +165,9 @@ def record_today(exercise_data: dict) -> None:
         return
 
     # Fallback: JSON
-    history = _load()
+    history = _load(user_id)
     history[today_iso] = exercise_data
-    _save(history)
+    _save(history, user_id)
 
 
 def _current_streak(history: dict) -> int:

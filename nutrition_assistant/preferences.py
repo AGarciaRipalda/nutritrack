@@ -3,10 +3,13 @@ Gestión de preferencias alimentarias:
   - excluded : palabras clave de ingredientes a evitar (intolerancias)
   - favorites: palabras clave de platos que se prefieren (×3 probabilidad)
   - disliked : palabras clave de platos que no gustan (excluidos como ingredientes)
+
+Soporte multi-usuario: user_id opcional en todas las funciones.
 """
 
 import json
 import os
+from pathlib import Path
 from data_dir import DATA_DIR
 
 PREFERENCES_FILE = DATA_DIR / "preferences.json"
@@ -20,10 +23,25 @@ def _use_db():
         return False
 
 
-def _load() -> dict:
+def _user_dir(user_id: str | None) -> Path:
+    if user_id:
+        d = DATA_DIR / user_id
+        d.mkdir(parents=True, exist_ok=True)
+        return d
+    return DATA_DIR
+
+
+def _preferences_file(user_id: str | None) -> Path:
+    return _user_dir(user_id) / "preferences.json"
+
+
+def _load(user_id: str | None = None) -> dict:
     if _use_db():
         from database import fetchone
-        row = fetchone("SELECT excluded, favorites, disliked FROM food_preferences ORDER BY id LIMIT 1")
+        if user_id:
+            row = fetchone("SELECT excluded, favorites, disliked FROM food_preferences WHERE user_id = %s LIMIT 1", (user_id,))
+        else:
+            row = fetchone("SELECT excluded, favorites, disliked FROM food_preferences ORDER BY id LIMIT 1")
         if row:
             return {
                 "excluded": list(row.get("excluded") or []),
@@ -32,19 +50,23 @@ def _load() -> dict:
             }
         return {"excluded": [], "favorites": [], "disliked": []}
 
-    if not os.path.exists(PREFERENCES_FILE):
+    pf = _preferences_file(user_id)
+    if not os.path.exists(pf):
         return {"excluded": [], "favorites": [], "disliked": []}
-    with open(PREFERENCES_FILE, "r", encoding="utf-8") as f:
+    with open(pf, "r", encoding="utf-8") as f:
         data = json.load(f)
     data.setdefault("favorites", [])
     data.setdefault("disliked", [])
     return data
 
 
-def _save(data: dict) -> None:
+def _save(data: dict, user_id: str | None = None) -> None:
     if _use_db():
         from database import fetchone, execute
-        row = fetchone("SELECT id FROM food_preferences ORDER BY id LIMIT 1")
+        if user_id:
+            row = fetchone("SELECT id FROM food_preferences WHERE user_id = %s LIMIT 1", (user_id,))
+        else:
+            row = fetchone("SELECT id FROM food_preferences ORDER BY id LIMIT 1")
         if row:
             execute("""
                 UPDATE food_preferences SET
@@ -55,26 +77,36 @@ def _save(data: dict) -> None:
                   sorted(data.get("disliked", [])),
                   row["id"]))
         else:
-            execute("""
-                INSERT INTO food_preferences (excluded, favorites, disliked)
-                VALUES (%s, %s, %s)
-            """, (sorted(data.get("excluded", [])),
-                  sorted(data.get("favorites", [])),
-                  sorted(data.get("disliked", []))))
+            if user_id:
+                execute("""
+                    INSERT INTO food_preferences (excluded, favorites, disliked, user_id)
+                    VALUES (%s, %s, %s, %s)
+                """, (sorted(data.get("excluded", [])),
+                      sorted(data.get("favorites", [])),
+                      sorted(data.get("disliked", [])),
+                      user_id))
+            else:
+                execute("""
+                    INSERT INTO food_preferences (excluded, favorites, disliked)
+                    VALUES (%s, %s, %s)
+                """, (sorted(data.get("excluded", [])),
+                      sorted(data.get("favorites", [])),
+                      sorted(data.get("disliked", []))))
         return
 
-    with open(PREFERENCES_FILE, "w", encoding="utf-8") as f:
+    pf = _preferences_file(user_id)
+    with open(pf, "w", encoding="utf-8") as f:
         json.dump({k: sorted(v) for k, v in data.items()},
                   f, indent=2, ensure_ascii=False)
 
 
-def load_excluded() -> set:
-    d = _load()
+def load_excluded(user_id: str | None = None) -> set:
+    d = _load(user_id)
     return set(d["excluded"]) | set(d["disliked"])
 
 
-def load_favorites() -> set:
-    return set(_load()["favorites"])
+def load_favorites(user_id: str | None = None) -> set:
+    return set(_load(user_id)["favorites"])
 
 
 def manage_preferences() -> set:

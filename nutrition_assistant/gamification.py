@@ -1,11 +1,14 @@
 """
 Sistema de gamificación — calcula XP acumulado y nivel del usuario
 a partir de los datos existentes (ejercicio, adherencia, peso, encuestas).
+
+Soporte multi-usuario: user_id opcional en todas las funciones.
 """
 
 import json
 import os
 from datetime import date
+from pathlib import Path
 from data_dir import DATA_DIR
 
 # ── Niveles ───────────────────────────────────────────────────────────────────
@@ -32,7 +35,15 @@ XP_STREAK_WEEK     = 50   # por cada bloque de 7 días consecutivos entrenados
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
-def _load(path) -> dict | list:
+def _user_dir(user_id: str | None) -> Path:
+    if user_id:
+        d = DATA_DIR / user_id
+        d.mkdir(parents=True, exist_ok=True)
+        return d
+    return DATA_DIR
+
+
+def _load_file(path) -> dict | list:
     if not os.path.exists(path):
         return {}
     with open(path, encoding="utf-8") as f:
@@ -41,11 +52,12 @@ def _load(path) -> dict | list:
 
 # ── Cálculo de XP ─────────────────────────────────────────────────────────────
 
-def compute_xp() -> dict:
-    exercise_history = _load(DATA_DIR / "exercise_history.json")   # {date: {...}}
-    adherence_log    = _load(DATA_DIR / "adherence_log.json")       # {date: {pct, ...}}
-    weight_history   = _load(DATA_DIR / "weight_history.json")      # list of {date, weight_kg}
-    surveys          = _load(DATA_DIR / "survey_history.json")      # list of {date, ...}
+def compute_xp(user_id: str | None = None) -> dict:
+    base = _user_dir(user_id)
+    exercise_history = _load_file(base / "exercise_history.json")
+    adherence_log    = _load_file(base / "adherence_log.json")
+    weight_history   = _load_file(base / "weight_history.json")
+    surveys          = _load_file(base / "survey_history.json")
 
     xp = 0
     breakdown = {
@@ -154,7 +166,7 @@ def get_level_info(xp: int) -> dict:
     }
 
 
-def gamification_status() -> dict:
-    result     = compute_xp()
+def gamification_status(user_id: str | None = None) -> dict:
+    result     = compute_xp(user_id)
     level_info = get_level_info(result["total_xp"])
     return {**level_info, "breakdown": result["breakdown"]}

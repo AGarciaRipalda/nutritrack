@@ -4,11 +4,14 @@ Planificación nutricional para eventos y competiciones.
 - La semana previa al evento: avisa y sugiere aumentar carbohidratos +15%.
 - El día del evento: plan ligero (fácil digestión, bajo en fibra).
 - Datos guardados en competition.json o PostgreSQL.
+
+Soporte multi-usuario: user_id opcional en todas las funciones.
 """
 
 import json
 import os
 from datetime import date, timedelta
+from pathlib import Path
 from data_dir import DATA_DIR
 
 COMPETITION_FILE = DATA_DIR / "competition.json"
@@ -22,35 +25,61 @@ def _use_db():
         return False
 
 
-def _load() -> dict:
+def _user_dir(user_id: str | None) -> Path:
+    if user_id:
+        d = DATA_DIR / user_id
+        d.mkdir(parents=True, exist_ok=True)
+        return d
+    return DATA_DIR
+
+
+def _competition_file(user_id: str | None) -> Path:
+    return _user_dir(user_id) / "competition.json"
+
+
+def _load(user_id: str | None = None) -> dict:
     if _use_db():
         from database import fetchone
-        row = fetchone("SELECT name, date FROM events WHERE date >= %s ORDER BY date LIMIT 1",
-                       (date.today().isoformat(),))
+        if user_id:
+            row = fetchone(
+                "SELECT name, date FROM events WHERE user_id = %s AND date >= %s ORDER BY date LIMIT 1",
+                (user_id, date.today().isoformat())
+            )
+        else:
+            row = fetchone(
+                "SELECT name, date FROM events WHERE date >= %s ORDER BY date LIMIT 1",
+                (date.today().isoformat(),)
+            )
         if row:
             return {"name": row["name"], "date": str(row["date"])}
         return {}
 
-    if not os.path.exists(COMPETITION_FILE):
+    cf = _competition_file(user_id)
+    if not os.path.exists(cf):
         return {}
-    with open(COMPETITION_FILE, "r", encoding="utf-8") as f:
+    with open(cf, "r", encoding="utf-8") as f:
         return json.load(f)
 
 
-def _save(data: dict) -> None:
+def _save(data: dict, user_id: str | None = None) -> None:
     if _use_db():
         from database import execute
-        execute("INSERT INTO events (name, date) VALUES (%s, %s)",
-                (data.get("name", "Evento"), data["date"]))
+        if user_id:
+            execute("INSERT INTO events (name, date, user_id) VALUES (%s, %s, %s)",
+                    (data.get("name", "Evento"), data["date"], user_id))
+        else:
+            execute("INSERT INTO events (name, date) VALUES (%s, %s)",
+                    (data.get("name", "Evento"), data["date"]))
         return
 
-    with open(COMPETITION_FILE, "w", encoding="utf-8") as f:
+    cf = _competition_file(user_id)
+    with open(cf, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
 
 
-def get_event() -> dict | None:
+def get_event(user_id: str | None = None) -> dict | None:
     """Devuelve el próximo evento registrado, o None si no hay ninguno vigente."""
-    data = _load()
+    data = _load(user_id)
     if not data or "date" not in data:
         return None
     event_date = date.fromisoformat(data["date"])
@@ -59,9 +88,9 @@ def get_event() -> dict | None:
     return data
 
 
-def days_to_event() -> int | None:
+def days_to_event(user_id: str | None = None) -> int | None:
     """Días hasta el próximo evento, o None si no hay."""
-    event = get_event()
+    event = get_event(user_id)
     if not event:
         return None
     return (date.fromisoformat(event["date"]) - date.today()).days
@@ -99,13 +128,13 @@ def register_event() -> dict:
     return data
 
 
-def event_calorie_adjustment(base_target: int) -> tuple[int, str]:
+def event_calorie_adjustment(base_target: int, user_id: str | None = None) -> tuple[int, str]:
     """
     Calcula el ajuste calórico según la proximidad al evento.
     Devuelve (kcal_ajustadas, mensaje_informativo).
     """
-    days = days_to_event()
-    event = get_event()
+    days = days_to_event(user_id)
+    event = get_event(user_id)
 
     if days is None:
         return base_target, ""

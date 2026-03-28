@@ -2,6 +2,8 @@
 Informe semanal automático.
 Se muestra cada lunes al arrancar o con la opción I del menú.
 Combina: ejercicio, peso, adherencia y sensaciones para dar una recomendación.
+
+Soporte multi-usuario: user_id opcional en todas las funciones.
 """
 
 import json
@@ -23,9 +25,9 @@ def _use_db():
         return False
 
 
-def _last_week_exercise() -> tuple[int, int]:
+def _last_week_exercise(user_id: str | None = None) -> tuple[int, int]:
     """Devuelve (días_entrenados, kcal_totales) de los últimos 7 días."""
-    history = load_exercise_history()
+    history = load_exercise_history(user_id)
     today   = date.today()
     days, kcal = 0, 0
     for i in range(7):
@@ -37,9 +39,9 @@ def _last_week_exercise() -> tuple[int, int]:
     return days, kcal
 
 
-def _weight_change() -> tuple[float | None, float | None]:
+def _weight_change(user_id: str | None = None) -> tuple[float | None, float | None]:
     """Devuelve (peso_hace_7_dias, peso_hoy) o (None, None) si no hay datos."""
-    history = load_weight_hist()
+    history = load_weight_hist(user_id)
     if not history or not isinstance(history, list):
         return None, None
     today = date.today()
@@ -101,13 +103,16 @@ def _recommendation(goal: str, adherence: int, ex_days: int,
     return "\n".join(f"  • {t}" for t in tips)
 
 
-def needs_weekly_report() -> bool:
+def needs_weekly_report(user_id: str | None = None) -> bool:
     """True si hoy es lunes y aún no se ha mostrado el informe esta semana."""
     week = date.today().strftime("%G-W%V")
 
     if _use_db():
         from database import fetchone
-        row = fetchone("SELECT week FROM weekly_report_marks WHERE week = %s", (week,))
+        if user_id:
+            row = fetchone("SELECT week FROM weekly_report_marks WHERE user_id = %s AND week = %s", (user_id, week))
+        else:
+            row = fetchone("SELECT week FROM weekly_report_marks WHERE week = %s", (week,))
         return row is None and date.today().weekday() == 0
 
     report_flag = str(DATA_DIR / "weekly_report_shown.json")
@@ -118,15 +123,21 @@ def needs_weekly_report() -> bool:
     return shown != week and date.today().weekday() == 0
 
 
-def mark_report_shown() -> None:
+def mark_report_shown(user_id: str | None = None) -> None:
     week = date.today().strftime("%G-W%V")
 
     if _use_db():
         from database import execute
-        execute("""
-            INSERT INTO weekly_report_marks (week) VALUES (%s)
-            ON CONFLICT (week) DO NOTHING
-        """, (week,))
+        if user_id:
+            execute("""
+                INSERT INTO weekly_report_marks (week, user_id) VALUES (%s, %s)
+                ON CONFLICT (user_id, week) DO NOTHING
+            """, (week, user_id))
+        else:
+            execute("""
+                INSERT INTO weekly_report_marks (week) VALUES (%s)
+                ON CONFLICT (week) DO NOTHING
+            """, (week,))
         return
 
     report_flag = str(DATA_DIR / "weekly_report_shown.json")
