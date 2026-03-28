@@ -5,8 +5,8 @@ const config: CapacitorConfig = {
   appName: "Metabolic",
   webDir: "out",
   server: {
-    androidScheme: "http",
-    cleartext: true,
+    androidScheme: "https",
+    cleartext: false,
   },
 }
 

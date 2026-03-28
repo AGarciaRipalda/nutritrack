@@ -9,6 +9,10 @@ __pycache__/
 # Local env and logs
 .DS_Store
 *.log
+*.env
+*.env.*
+!.env.example
+!.env.production.example
 
 # Backend local/runtime state
 nutrition_assistant/venv/
@@ -29,3 +33,4 @@ nutrition_assistant/prs.json
 # Secrets
 *.key
 *.pem
+.vercel
