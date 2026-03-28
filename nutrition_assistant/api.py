@@ -5,10 +5,7 @@ Documentación automática en: http://localhost:8000/docs
 """
 
 import os, json
-from collections import deque
 from datetime import date, timedelta
-from threading import Lock
-from time import monotonic
 from typing import Optional, List
 import zoneinfo
 
@@ -22,15 +19,24 @@ import tempfile
 import urllib.request
 import urllib.parse
 
-from fastapi import FastAPI, HTTPException, Request, Header, Query, Depends
+from fastapi import FastAPI, HTTPException, Request, Header, Query, Depends, Response
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, model_validator
 
 from auth import (
-    RegisterModel, LoginModel, TokenResponse, ManagedUserModel,
-    register_user, login_user, get_current_user, get_current_admin,
+    RegisterModel, LoginModel, TokenResponse, ManagedUserModel, RefreshTokenModel, LogoutModel,
+    ChangePasswordModel, PasswordResetRequestModel, PasswordResetConfirmModel, PasswordResetLinkResponse,
+    register_user, login_user, refresh_session, revoke_session, change_password,
+    request_password_reset, create_password_reset_link, confirm_password_reset,
+    get_current_user, get_current_admin,
     list_users, update_user_role, delete_user,
+)
+from security_store import (
+    RateLimitExceeded,
+    enforce_persistent_rate_limit,
+    list_security_events,
+    log_security_event,
 )
 
 # ── Módulos del proyecto ──────────────────────────────────────────────────────
@@ -107,6 +113,7 @@ from pdf_export import export_week_plan_pdf
 APP_ENV = os.environ.get("APP_ENV", os.environ.get("ENVIRONMENT", "development")).strip().lower()
 IS_PRODUCTION = APP_ENV == "production"
 ENABLE_API_DOCS = os.environ.get("ENABLE_API_DOCS", "").strip().lower() in {"1", "true", "yes"}
+FRONTEND_BASE_URL = os.environ.get("FRONTEND_BASE_URL", "https://www.metabolic.es").strip() or "https://www.metabolic.es"
 
 # ── App ───────────────────────────────────────────────────────────────────────
 app = FastAPI(
@@ -134,28 +141,20 @@ app.add_middleware(
     allow_headers=["Authorization", "Content-Type", "X-User-Timezone", "ngrok-skip-browser-warning"],
 )
 
-_RATE_LIMIT_BUCKETS: dict[str, deque[float]] = {}
-_RATE_LIMIT_LOCK = Lock()
-
-
 def _client_ip(request: Request) -> str:
     return request.client.host if request.client else "unknown"
 
 
 def _enforce_rate_limit(scope: str, key: str, limit: int, window_seconds: int) -> None:
-    now = monotonic()
-    bucket_key = f"{scope}:{key}"
-    window_start = now - window_seconds
-
-    with _RATE_LIMIT_LOCK:
-        bucket = _RATE_LIMIT_BUCKETS.setdefault(bucket_key, deque())
-        while bucket and bucket[0] <= window_start:
-            bucket.popleft()
-
-        if len(bucket) >= limit:
-            raise HTTPException(status_code=429, detail="Demasiados intentos. Intentalo mas tarde.")
-
-        bucket.append(now)
+    try:
+        enforce_persistent_rate_limit(scope, key, limit, window_seconds)
+    except RateLimitExceeded as exc:
+        log_security_event(
+            "security.rate_limit_blocked",
+            severity="warning",
+            details={"scope": scope, "key": key, "limit": limit, "window_seconds": window_seconds},
+        )
+        raise HTTPException(status_code=429, detail=str(exc)) from exc
 
 
 @app.middleware("http")
@@ -180,9 +179,27 @@ def auth_register(data: RegisterModel, request: Request):
     email_key = f"{client_ip}:{data.email.strip().lower()}"
     _enforce_rate_limit("auth-register-ip", client_ip, 10, 300)
     _enforce_rate_limit("auth-register-email", email_key, 5, 300)
-    user = register_user(data.email, data.password, data.name)
-    result = login_user(data.email, data.password)
-    return TokenResponse(access_token=result["access_token"], user=result["user"])
+    try:
+        user = register_user(data.email, data.password, data.name)
+        result = login_user(data.email, data.password)
+    except HTTPException as exc:
+        log_security_event(
+            "auth.register_failed",
+            severity="warning",
+            target_email=data.email.strip().lower(),
+            ip=client_ip,
+            details={"status_code": exc.status_code},
+        )
+        raise
+    log_security_event(
+        "auth.register_succeeded",
+        actor_user_id=user["id"],
+        actor_email=user["email"],
+        target_user_id=user["id"],
+        target_email=user["email"],
+        ip=client_ip,
+    )
+    return TokenResponse(**result)
 
 
 @app.post("/auth/login", tags=["Auth"], response_model=TokenResponse)
@@ -192,8 +209,113 @@ def auth_login(data: LoginModel, request: Request):
     email_key = f"{client_ip}:{data.email.strip().lower()}"
     _enforce_rate_limit("auth-login-ip", client_ip, 20, 300)
     _enforce_rate_limit("auth-login-email", email_key, 8, 300)
-    result = login_user(data.email, data.password)
-    return TokenResponse(access_token=result["access_token"], user=result["user"])
+    try:
+        result = login_user(data.email, data.password)
+    except HTTPException as exc:
+        log_security_event(
+            "auth.login_failed",
+            severity="warning",
+            target_email=data.email.strip().lower(),
+            ip=client_ip,
+            details={"status_code": exc.status_code},
+        )
+        raise
+    log_security_event(
+        "auth.login_succeeded",
+        actor_user_id=result["user"]["id"],
+        actor_email=result["user"]["email"],
+        target_user_id=result["user"]["id"],
+        target_email=result["user"]["email"],
+        ip=client_ip,
+    )
+    return TokenResponse(**result)
+
+
+@app.post("/auth/refresh", tags=["Auth"], response_model=TokenResponse)
+def auth_refresh(data: RefreshTokenModel, request: Request):
+    """Rota el refresh token y devuelve una nueva sesión corta."""
+    client_ip = _client_ip(request)
+    _enforce_rate_limit("auth-refresh-ip", client_ip, 60, 300)
+    try:
+        result = refresh_session(data.refresh_token)
+    except HTTPException as exc:
+        log_security_event(
+            "auth.refresh_failed",
+            severity="warning",
+            ip=client_ip,
+            details={"status_code": exc.status_code},
+        )
+        raise
+    log_security_event(
+        "auth.refresh_succeeded",
+        actor_user_id=result["user"]["id"],
+        actor_email=result["user"]["email"],
+        target_user_id=result["user"]["id"],
+        target_email=result["user"]["email"],
+        ip=client_ip,
+    )
+    return TokenResponse(**result)
+
+
+@app.post("/auth/logout", tags=["Auth"], status_code=204)
+def auth_logout(
+    data: LogoutModel | None = None,
+    authorization: str | None = Header(default=None),
+):
+    """Revoca la sesión actual."""
+    access_token = None
+    if authorization and authorization.lower().startswith("bearer "):
+        access_token = authorization[7:].strip() or None
+    revoke_session(
+        access_token=access_token,
+        refresh_token=data.refresh_token if data else None,
+    )
+    log_security_event(
+        "auth.logout",
+        severity="info",
+        details={"has_access_token": bool(access_token), "has_refresh_token": bool(data and data.refresh_token)},
+    )
+    return Response(status_code=204)
+
+
+@app.post("/auth/change-password", tags=["Auth"], response_model=TokenResponse)
+def auth_change_password(body: ChangePasswordModel, user: dict = Depends(get_current_user)):
+    result = change_password(user["id"], body.current_password, body.new_password)
+    return TokenResponse(**result)
+
+
+@app.post("/auth/reset-password/request", tags=["Auth"])
+def auth_request_password_reset(body: PasswordResetRequestModel, request: Request):
+    client_ip = _client_ip(request)
+    email_key = f"{client_ip}:{body.email.strip().lower()}"
+    _enforce_rate_limit("auth-reset-request-ip", client_ip, 10, 300)
+    _enforce_rate_limit("auth-reset-request-email", email_key, 5, 300)
+    request_password_reset(body.email)
+    log_security_event(
+        "auth.password_reset_request_received",
+        target_email=body.email.strip().lower(),
+        ip=client_ip,
+    )
+    return {
+        "ok": True,
+        "message": "Si existe una cuenta para ese correo, ya hay un proceso de reseteo en marcha.",
+    }
+
+
+@app.post("/auth/reset-password/confirm", tags=["Auth"], response_model=TokenResponse)
+def auth_confirm_password_reset(body: PasswordResetConfirmModel, request: Request):
+    client_ip = _client_ip(request)
+    _enforce_rate_limit("auth-reset-confirm-ip", client_ip, 20, 300)
+    result = confirm_password_reset(body.token, body.new_password)
+    log_security_event(
+        "auth.password_reset_login",
+        actor_user_id=result["user"]["id"],
+        actor_email=result["user"]["email"],
+        target_user_id=result["user"]["id"],
+        target_email=result["user"]["email"],
+        ip=client_ip,
+    )
+    return TokenResponse(**result)
 
 
 @app.get("/auth/me", tags=["Auth"])
@@ -213,14 +335,36 @@ class AdminUpdateUserRoleModel(BaseModel):
     role: str
 
 
+class SecurityEventModel(BaseModel):
+    id: str
+    timestamp: str
+    event_type: str
+    severity: str
+    actor_user_id: str | None = None
+    actor_email: str | None = None
+    target_user_id: str | None = None
+    target_email: str | None = None
+    ip: str | None = None
+    details: dict = {}
+
+
 @app.get("/admin/users", tags=["Admin"], response_model=list[ManagedUserModel])
 def admin_list_users(_admin: dict = Depends(get_current_admin)):
     return list_users()
 
 
 @app.post("/admin/users", tags=["Admin"], response_model=ManagedUserModel)
-def admin_create_user(data: AdminCreateUserModel, _admin: dict = Depends(get_current_admin)):
-    return register_user(data.email, data.password, data.name, role=data.role)
+def admin_create_user(data: AdminCreateUserModel, admin: dict = Depends(get_current_admin)):
+    user = register_user(data.email, data.password, data.name, role=data.role)
+    log_security_event(
+        "admin.user_created",
+        actor_user_id=admin["id"],
+        actor_email=admin["email"],
+        target_user_id=user["id"],
+        target_email=user["email"],
+        details={"role": user["role"]},
+    )
+    return user
 
 
 @app.put("/admin/users/{user_id}/role", tags=["Admin"], response_model=ManagedUserModel)
@@ -229,12 +373,44 @@ def admin_update_user_role(
     data: AdminUpdateUserRoleModel,
     admin: dict = Depends(get_current_admin),
 ):
-    return update_user_role(user_id, data.role, admin["id"])
+    updated = update_user_role(user_id, data.role, admin["id"])
+    log_security_event(
+        "admin.user_role_updated",
+        actor_user_id=admin["id"],
+        actor_email=admin["email"],
+        target_user_id=updated["id"],
+        target_email=updated["email"],
+        details={"role": updated["role"]},
+    )
+    return updated
 
 
 @app.delete("/admin/users/{user_id}", tags=["Admin"], status_code=204)
 def admin_delete_user(user_id: str, admin: dict = Depends(get_current_admin)):
+    target = next((entry for entry in list_users() if entry["id"] == user_id), None)
     delete_user(user_id, admin["id"])
+    log_security_event(
+        "admin.user_deleted",
+        actor_user_id=admin["id"],
+        actor_email=admin["email"],
+        target_user_id=user_id,
+        target_email=target["email"] if target else None,
+    )
+
+
+@app.post("/admin/users/{user_id}/reset-password", tags=["Admin"], response_model=PasswordResetLinkResponse)
+def admin_create_password_reset_link(user_id: str, admin: dict = Depends(get_current_admin)):
+    result = create_password_reset_link(
+        user_id,
+        requested_by_user_id=admin["id"],
+        frontend_base_url=FRONTEND_BASE_URL,
+    )
+    return PasswordResetLinkResponse(**result)
+
+
+@app.get("/admin/security-events", tags=["Admin"], response_model=list[SecurityEventModel])
+def admin_list_security_events(limit: int = Query(100, ge=1, le=500), _admin: dict = Depends(get_current_admin)):
+    return list_security_events(limit)
 
 
 # ── Helper para extraer user_id de la dependencia ───────────────────────────
