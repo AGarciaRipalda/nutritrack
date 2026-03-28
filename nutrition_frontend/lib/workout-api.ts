@@ -27,7 +27,7 @@ import {
   filterFallbackExercises,
 } from "./workout-fallback"
 import { API_BASE } from "./api-base"
-import { clearActiveSession, getAccessToken } from "./auth"
+import { authorizedFetch } from "./auth"
 
 // â”€â”€ Config â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
@@ -43,21 +43,6 @@ class ApiError extends Error {
   }
 }
 
-function getHeaders(extra?: Record<string, string>): Record<string, string> {
-  const headers: Record<string, string> = {
-    "X-User-Timezone": Intl.DateTimeFormat().resolvedOptions().timeZone,
-    ...extra,
-  }
-  if (API_BASE.includes("ngrok")) {
-    headers["ngrok-skip-browser-warning"] = "true"
-  }
-  const accessToken = getAccessToken()
-  if (accessToken) {
-    headers.Authorization = `Bearer ${accessToken}`
-  }
-  return headers
-}
-
 async function readError(res: Response, fallback: string) {
   const payload = (await res.json().catch(() => null)) as { detail?: unknown } | null
   const detail = payload?.detail
@@ -66,16 +51,12 @@ async function readError(res: Response, fallback: string) {
 
 async function ensureOk(res: Response, fallback: string) {
   if (res.ok) return
-  if (res.status === 401) {
-    clearActiveSession()
-  }
   throw new ApiError(await readError(res, fallback), res.status)
 }
 
 async function get<T>(path: string, signal?: AbortSignal): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
+  const res = await authorizedFetch(`${API_BASE}${path}`, {
     cache: "no-store",
-    headers: getHeaders(),
     signal,
   })
   await ensureOk(res, `GET ${path} failed`)
@@ -83,11 +64,9 @@ async function get<T>(path: string, signal?: AbortSignal): Promise<T> {
 }
 
 async function post<T>(path: string, body?: unknown): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
+  const res = await authorizedFetch(`${API_BASE}${path}`, {
     method: "POST",
-    headers: body
-      ? getHeaders({ "Content-Type": "application/json" })
-      : getHeaders(),
+    headers: body ? { "Content-Type": "application/json" } : undefined,
     body: body ? JSON.stringify(body) : undefined,
   })
   await ensureOk(res, `POST ${path} failed`)
@@ -95,9 +74,9 @@ async function post<T>(path: string, body?: unknown): Promise<T> {
 }
 
 async function put<T>(path: string, body: unknown): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
+  const res = await authorizedFetch(`${API_BASE}${path}`, {
     method: "PUT",
-    headers: getHeaders({ "Content-Type": "application/json" }),
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   })
   await ensureOk(res, `PUT ${path} failed`)
@@ -105,9 +84,8 @@ async function put<T>(path: string, body: unknown): Promise<T> {
 }
 
 async function del(path: string): Promise<void> {
-  const res = await fetch(`${API_BASE}${path}`, {
+  const res = await authorizedFetch(`${API_BASE}${path}`, {
     method: "DELETE",
-    headers: getHeaders(),
   })
   await ensureOk(res, `DELETE ${path} failed`)
 }

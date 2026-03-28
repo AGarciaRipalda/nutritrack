@@ -2,6 +2,7 @@ import { API_BASE } from "./api-base"
 
 export const SESSION_STORAGE_KEY = "metabolic-session"
 const AUTH_CHANGE_EVENT = "metabolic-auth-change"
+const ACCESS_REFRESH_MARGIN_MS = 60_000
 
 export interface AuthUser {
   id: string
@@ -12,16 +13,23 @@ export interface AuthUser {
 
 export interface ActiveSession {
   accessToken: string
+  refreshToken: string
   user: AuthUser
   expiresAt: string
+  refreshExpiresAt: string
   loggedInAt: string
 }
 
 interface LoginResponse {
   access_token: string
+  refresh_token: string
   token_type: string
+  access_expires_at?: string
+  refresh_expires_at?: string
   user: AuthUser
 }
+
+let refreshPromise: Promise<ActiveSession | null> | null = null
 
 function emitAuthChange() {
   if (typeof window === "undefined") return
@@ -54,8 +62,8 @@ function parseTokenExpiry(accessToken: string) {
   }
 }
 
-function isExpired(expiresAt: string) {
-  return Date.parse(expiresAt) <= Date.now()
+function isExpired(expiresAt: string, marginMs = 0) {
+  return Date.parse(expiresAt) <= Date.now() + marginMs
 }
 
 function parseErrorMessage(payload: unknown, fallback: string) {
@@ -74,6 +82,99 @@ function writeActiveSession(session: ActiveSession, notify = true) {
   }
 }
 
+function normalizeSession(raw: unknown): ActiveSession | null {
+  if (!raw || typeof raw !== "object") return null
+  const session = raw as Partial<ActiveSession>
+  if (
+    typeof session.accessToken !== "string" ||
+    typeof session.refreshToken !== "string" ||
+    typeof session.expiresAt !== "string" ||
+    typeof session.refreshExpiresAt !== "string" ||
+    typeof session.loggedInAt !== "string" ||
+    !session.user
+  ) {
+    return null
+  }
+  return {
+    accessToken: session.accessToken,
+    refreshToken: session.refreshToken,
+    user: session.user,
+    expiresAt: session.expiresAt,
+    refreshExpiresAt: session.refreshExpiresAt,
+    loggedInAt: session.loggedInAt,
+  }
+}
+
+function sessionFromPayload(payload: LoginResponse, previous?: ActiveSession | null): ActiveSession {
+  const expiresAt = payload.access_expires_at || parseTokenExpiry(payload.access_token)
+  const refreshExpiresAt = payload.refresh_expires_at
+
+  if (!expiresAt || !refreshExpiresAt) {
+    throw new Error("La respuesta de autenticación es inválida.")
+  }
+
+  return {
+    accessToken: payload.access_token,
+    refreshToken: payload.refresh_token,
+    user: payload.user,
+    expiresAt,
+    refreshExpiresAt,
+    loggedInAt: previous?.loggedInAt ?? new Date().toISOString(),
+  }
+}
+
+function isLoginResponse(payload: unknown): payload is LoginResponse {
+  return Boolean(
+    payload &&
+      typeof payload === "object" &&
+      "access_token" in payload &&
+      typeof (payload as LoginResponse).access_token === "string" &&
+      "refresh_token" in payload &&
+      typeof (payload as LoginResponse).refresh_token === "string"
+  )
+}
+
+function buildHeaders(initHeaders?: HeadersInit, accessToken?: string) {
+  const headers = new Headers(initHeaders ?? {})
+  if (API_BASE.includes("ngrok")) {
+    headers.set("ngrok-skip-browser-warning", "true")
+  }
+  if (typeof Intl !== "undefined") {
+    headers.set("X-User-Timezone", Intl.DateTimeFormat().resolvedOptions().timeZone)
+  }
+  if (accessToken) {
+    headers.set("Authorization", `Bearer ${accessToken}`)
+  }
+  return headers
+}
+
+async function parseJsonSafely<T>(response: Response) {
+  return (await response.json().catch(() => null)) as T | null
+}
+
+async function performRefresh(session: ActiveSession): Promise<ActiveSession | null> {
+  if (isExpired(session.refreshExpiresAt)) {
+    clearActiveSession()
+    return null
+  }
+
+  const response = await fetch(`${API_BASE}/auth/refresh`, {
+    method: "POST",
+    headers: buildHeaders({ Accept: "application/json", "Content-Type": "application/json" }),
+    body: JSON.stringify({ refresh_token: session.refreshToken }),
+  })
+
+  const payload = await parseJsonSafely<LoginResponse | { detail?: unknown }>(response)
+  if (!response.ok || !payload || !("access_token" in payload) || !("refresh_token" in payload)) {
+    clearActiveSession()
+    return null
+  }
+
+  const refreshed = sessionFromPayload(payload, session)
+  writeActiveSession(refreshed)
+  return refreshed
+}
+
 export function readActiveSession(): ActiveSession | null {
   if (typeof window === "undefined") return null
 
@@ -81,10 +182,16 @@ export function readActiveSession(): ActiveSession | null {
   if (!raw) return null
 
   try {
-    const session = JSON.parse(raw) as ActiveSession
-    if (!session.accessToken || !session.expiresAt || isExpired(session.expiresAt)) {
-      clearActiveSession()
-      return null
+    const session = normalizeSession(JSON.parse(raw))
+    if (
+      !session ||
+      isExpired(session.refreshExpiresAt) ||
+      isExpired(session.expiresAt, ACCESS_REFRESH_MARGIN_MS)
+    ) {
+      if (!session || isExpired(session.refreshExpiresAt)) {
+        clearActiveSession()
+        return null
+      }
     }
     return session
   } catch {
@@ -130,43 +237,98 @@ export function subscribeToAuthChanges(callback: () => void) {
 }
 
 export async function login(email: string, password: string) {
-  const res = await fetch(`${API_BASE}/auth/login`, {
+  const response = await fetch(`${API_BASE}/auth/login`, {
+    method: "POST",
+    headers: buildHeaders({
+      Accept: "application/json",
+      "Content-Type": "application/json",
+    }),
+    body: JSON.stringify({ email, password }),
+  })
+
+  const payload = await parseJsonSafely<LoginResponse | { detail?: unknown }>(response)
+
+  if (!response.ok) {
+    throw new Error(parseErrorMessage(payload, "No se pudo iniciar sesión."))
+  }
+
+  if (!isLoginResponse(payload)) {
+    throw new Error("La respuesta de autenticación es inválida.")
+  }
+
+  const session = sessionFromPayload(payload)
+  writeActiveSession(session)
+  return session
+}
+
+export async function changePassword(currentPassword: string, newPassword: string) {
+  const response = await authorizedFetch(`${API_BASE}/auth/change-password`, {
     method: "POST",
     headers: {
       Accept: "application/json",
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify({
+      current_password: currentPassword,
+      new_password: newPassword,
+    }),
   })
 
-  const payload = (await res.json().catch(() => null)) as
-    | LoginResponse
-    | { detail?: unknown }
-    | null
-
-  if (!res.ok) {
-    throw new Error(parseErrorMessage(payload, "No se pudo iniciar sesión."))
+  const payload = await parseJsonSafely<LoginResponse | { detail?: unknown }>(response)
+  if (!response.ok) {
+    throw new Error(parseErrorMessage(payload, "No se pudo cambiar la contraseña."))
   }
-
-  if (
-    !payload ||
-    !("access_token" in payload) ||
-    typeof payload.access_token !== "string"
-  ) {
+  if (!isLoginResponse(payload)) {
     throw new Error("La respuesta de autenticación es inválida.")
   }
 
-  const expiresAt = parseTokenExpiry(payload.access_token)
-  if (!expiresAt) {
-    throw new Error("No se pudo validar el token recibido.")
+  const session = sessionFromPayload(payload, readActiveSession())
+  writeActiveSession(session)
+  return session
+}
+
+export async function requestPasswordReset(email: string) {
+  const response = await fetch(`${API_BASE}/auth/reset-password/request`, {
+    method: "POST",
+    headers: buildHeaders({
+      Accept: "application/json",
+      "Content-Type": "application/json",
+    }),
+    body: JSON.stringify({ email }),
+  })
+
+  const payload = await parseJsonSafely<{ detail?: unknown; message?: unknown }>(response)
+  if (!response.ok) {
+    throw new Error(parseErrorMessage(payload, "No se pudo solicitar el reseteo."))
   }
 
-  const session: ActiveSession = {
-    accessToken: payload.access_token,
-    user: payload.user,
-    expiresAt,
-    loggedInAt: new Date().toISOString(),
+  return typeof payload?.message === "string"
+    ? payload.message
+    : "Si existe una cuenta para ese correo, ya hay un proceso de reseteo en marcha."
+}
+
+export async function confirmPasswordReset(token: string, newPassword: string) {
+  const response = await fetch(`${API_BASE}/auth/reset-password/confirm`, {
+    method: "POST",
+    headers: buildHeaders({
+      Accept: "application/json",
+      "Content-Type": "application/json",
+    }),
+    body: JSON.stringify({
+      token,
+      new_password: newPassword,
+    }),
+  })
+
+  const payload = await parseJsonSafely<LoginResponse | { detail?: unknown }>(response)
+  if (!response.ok) {
+    throw new Error(parseErrorMessage(payload, "No se pudo restablecer la contraseña."))
   }
+  if (!isLoginResponse(payload)) {
+    throw new Error("La respuesta de autenticación es inválida.")
+  }
+
+  const session = sessionFromPayload(payload)
   writeActiveSession(session)
   return session
 }
@@ -174,23 +336,37 @@ export async function login(email: string, password: string) {
 export async function fetchCurrentUser(accessToken = getAccessToken()) {
   if (!accessToken) return null
 
-  const res = await fetch(`${API_BASE}/auth/me`, {
-    headers: {
-      Accept: "application/json",
-      Authorization: `Bearer ${accessToken}`,
-    },
+  const response = await fetch(`${API_BASE}/auth/me`, {
+    headers: buildHeaders({ Accept: "application/json" }, accessToken),
     cache: "no-store",
   })
 
-  if (!res.ok) {
+  if (!response.ok) {
     throw new Error("La sesión no es válida.")
   }
 
-  return (await res.json()) as AuthUser
+  return (await response.json()) as AuthUser
+}
+
+export async function refreshAccessSession(force = false) {
+  const session = readActiveSession()
+  if (!session) return null
+
+  if (!force && !isExpired(session.expiresAt, ACCESS_REFRESH_MARGIN_MS)) {
+    return session
+  }
+
+  if (!refreshPromise) {
+    refreshPromise = performRefresh(session).finally(() => {
+      refreshPromise = null
+    })
+  }
+
+  return refreshPromise
 }
 
 export async function refreshActiveSession() {
-  const session = readActiveSession()
+  const session = await refreshAccessSession()
   if (!session) return null
 
   try {
@@ -204,7 +380,80 @@ export async function refreshActiveSession() {
     writeActiveSession(refreshed, false)
     return refreshed
   } catch {
+    const retried = await refreshAccessSession(true)
+    if (!retried) {
+      clearActiveSession()
+      return null
+    }
+
+    try {
+      const user = await fetchCurrentUser(retried.accessToken)
+      if (!user) {
+        clearActiveSession()
+        return null
+      }
+      const refreshed: ActiveSession = { ...retried, user }
+      writeActiveSession(refreshed, false)
+      return refreshed
+    } catch {
+      clearActiveSession()
+      return null
+    }
+  }
+}
+
+export async function authorizedFetch(
+  input: string | URL,
+  init?: RequestInit,
+  options?: { retryOnUnauthorized?: boolean },
+) {
+  const retryOnUnauthorized = options?.retryOnUnauthorized ?? true
+  let session = await refreshAccessSession()
+  const requestInit: RequestInit = {
+    ...init,
+    headers: buildHeaders(init?.headers, session?.accessToken),
+  }
+
+  let response = await fetch(input, requestInit)
+  if (response.status !== 401 || !retryOnUnauthorized) {
+    return response
+  }
+
+  session = await refreshAccessSession(true)
+  if (!session) {
     clearActiveSession()
-    return null
+    return response
+  }
+
+  response = await fetch(input, {
+    ...init,
+    headers: buildHeaders(init?.headers, session.accessToken),
+  })
+
+  if (response.status === 401) {
+    clearActiveSession()
+  }
+
+  return response
+}
+
+export async function logout() {
+  const session = readActiveSession()
+  try {
+    if (session) {
+      await fetch(`${API_BASE}/auth/logout`, {
+        method: "POST",
+        headers: buildHeaders(
+          {
+            Accept: "application/json",
+            "Content-Type": "application/json",
+          },
+          session.accessToken,
+        ),
+        body: JSON.stringify({ refresh_token: session.refreshToken }),
+      })
+    }
+  } finally {
+    clearActiveSession()
   }
 }

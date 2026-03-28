@@ -1,5 +1,5 @@
 import { API_BASE } from "./api-base"
-import { clearActiveSession, getAccessToken } from "./auth"
+import { authorizedFetch } from "./auth"
 
 export interface FoodSearchResult {
   name: string
@@ -197,20 +197,12 @@ function scoreProduct(product: OpenFoodFactsProduct, query: string, name: string
 }
 
 async function requestBackendProxy(query: string): Promise<FoodSearchResult[]> {
-  const headers: Record<string, string> = { Accept: 'application/json' }
-  const accessToken = getAccessToken()
-  if (accessToken) {
-    headers.Authorization = `Bearer ${accessToken}`
-  }
-  const res = await fetch(`${API_BASE}/food/search?q=${encodeURIComponent(query)}`, {
-    headers,
+  const res = await authorizedFetch(`${API_BASE}/food/search?q=${encodeURIComponent(query)}`, {
+    headers: { Accept: 'application/json' },
     cache: 'no-store',
   })
 
   if (!res.ok) {
-    if (res.status === 401) {
-      clearActiveSession()
-    }
     throw new Error(`Backend proxy returned ${res.status}`)
   }
 

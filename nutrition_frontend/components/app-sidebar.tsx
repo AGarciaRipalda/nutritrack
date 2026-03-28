@@ -25,9 +25,9 @@ import { ThemeToggle } from "@/components/theme-toggle"
 import type { GamificationStatus } from "@/lib/api"
 import { fetchGamification } from "@/lib/api"
 import {
-  clearActiveSession,
   getCurrentSessionUser,
   isAdminUser,
+  logout,
   subscribeToAuthChanges,
 } from "@/lib/auth"
 
@@ -181,9 +181,11 @@ function SidebarContent({
             collapsed ? "justify-center px-2" : "justify-start"
           }`}
           onClick={() => {
-            clearActiveSession()
-            onClose?.()
-            router.push("/login")
+            void (async () => {
+              await logout()
+              onClose?.()
+              router.push("/login")
+            })()
           }}
         >
           <LogOut className={`h-5 w-5 shrink-0 ${collapsed ? "" : "mr-3"}`} />

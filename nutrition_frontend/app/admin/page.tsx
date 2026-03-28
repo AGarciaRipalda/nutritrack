@@ -24,9 +24,13 @@ import {
 } from "@/components/ui/table"
 import {
   createManagedUser,
+  createManagedUserPasswordResetLink,
   deleteManagedUser,
   fetchAdminUsers,
+  fetchSecurityEvents,
   type ManagedUser,
+  type PasswordResetLink,
+  type SecurityEvent,
   updateManagedUserRole,
 } from "@/lib/api"
 import { getCurrentSessionUser, isAdminUser } from "@/lib/auth"
@@ -63,8 +67,12 @@ export default function AdminUsersPage() {
   const [creating, setCreating] = useState(false)
   const [pendingRoleUserId, setPendingRoleUserId] = useState<string | null>(null)
   const [pendingDeleteUserId, setPendingDeleteUserId] = useState<string | null>(null)
+  const [pendingResetUserId, setPendingResetUserId] = useState<string | null>(null)
   const [status, setStatus] = useState<string | null>(null)
   const [roleDrafts, setRoleDrafts] = useState<Record<string, UserRole>>({})
+  const [resetLink, setResetLink] = useState<PasswordResetLink | null>(null)
+  const [resetLinkUserEmail, setResetLinkUserEmail] = useState<string | null>(null)
+  const [securityEvents, setSecurityEvents] = useState<SecurityEvent[]>([])
 
   const currentUser = getCurrentSessionUser()
   const currentUserId = currentUser?.id ?? null
@@ -82,9 +90,13 @@ export default function AdminUsersPage() {
       setLoading(true)
       setError(null)
       try {
-        const response = await fetchAdminUsers()
+        const [response, events] = await Promise.all([
+          fetchAdminUsers(),
+          fetchSecurityEvents(50),
+        ])
         if (cancelled) return
         setUsers(response)
+        setSecurityEvents(events)
         setRoleDrafts(
           Object.fromEntries(response.map((user) => [user.id, user.role])),
         )
@@ -133,6 +145,7 @@ export default function AdminUsersPage() {
         }),
       )
       setRoleDrafts((current) => ({ ...current, [created.id]: created.role }))
+      setSecurityEvents(await fetchSecurityEvents(50))
       setForm(initialForm)
       setStatus(`Usuario creado: ${created.email}`)
     } catch (err) {
@@ -155,6 +168,7 @@ export default function AdminUsersPage() {
     try {
       const updated = await updateManagedUserRole(user.id, nextRole)
       upsertUser(updated)
+      setSecurityEvents(await fetchSecurityEvents(50))
       setStatus(
         `Rol actualizado: ${updated.email} ahora es ${formatRoleLabel(updated.role)}.`,
       )
@@ -178,6 +192,7 @@ export default function AdminUsersPage() {
     try {
       await deleteManagedUser(user.id)
       setUsers((current) => current.filter((entry) => entry.id !== user.id))
+      setSecurityEvents(await fetchSecurityEvents(50))
       setStatus(`Usuario eliminado: ${user.email}`)
     } catch (err) {
       setError(
@@ -187,6 +202,42 @@ export default function AdminUsersPage() {
       setPendingDeleteUserId(null)
     }
   }
+
+  const handleCreateResetLink = async (user: ManagedUser) => {
+    setPendingResetUserId(user.id)
+    setError(null)
+    setStatus(null)
+
+    try {
+      const created = await createManagedUserPasswordResetLink(user.id)
+      setResetLink(created)
+      setResetLinkUserEmail(user.email)
+      setStatus(`Enlace de reseteo generado para ${user.email}`)
+      setSecurityEvents(await fetchSecurityEvents(50))
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "No se pudo generar el enlace de reseteo.",
+      )
+    } finally {
+      setPendingResetUserId(null)
+    }
+  }
+
+  const handleCopyResetLink = async () => {
+    if (!resetLink?.reset_url) return
+    try {
+      await navigator.clipboard.writeText(resetLink.reset_url)
+      setStatus("Enlace copiado al portapapeles.")
+    } catch {
+      setError("No se pudo copiar el enlace.")
+    }
+  }
+
+  const formatEventLabel = (value: string) =>
+    value
+      .replaceAll(".", " · ")
+      .replaceAll("_", " ")
+      .replace(/\b\w/g, (letter) => letter.toUpperCase())
 
   if (!hasAdminAccess) {
     return (
@@ -308,6 +359,28 @@ export default function AdminUsersPage() {
               <p className="mt-4 text-sm text-emerald-500">{status}</p>
             ) : null}
             {error ? <p className="mt-4 text-sm text-red-500">{error}</p> : null}
+
+            {resetLink ? (
+              <div className="mt-6 rounded-2xl border border-emerald-400/30 bg-emerald-500/10 p-4">
+                <p className="text-sm font-medium text-foreground">
+                  Enlace de reseteo listo para {resetLinkUserEmail}
+                </p>
+                <p className="mt-1 break-all text-xs text-muted-foreground">
+                  {resetLink.reset_url}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Expira: {formatDate(resetLink.expires_at)}
+                </p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="mt-3 w-full"
+                  onClick={() => void handleCopyResetLink()}
+                >
+                  Copiar enlace
+                </Button>
+              </div>
+            ) : null}
           </Card>
 
           <Card className="rounded-3xl border border-black/20 bg-black/5 p-6 backdrop-blur-xl dark:border-white/20 dark:bg-white/10">
@@ -392,6 +465,16 @@ export default function AdminUsersPage() {
                             <Button
                               variant="outline"
                               size="sm"
+                              onClick={() => void handleCreateResetLink(user)}
+                              disabled={pendingResetUserId === user.id}
+                            >
+                              {pendingResetUserId === user.id
+                                ? "Generando..."
+                                : "Resetear contraseña"}
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
                               onClick={() => void handleRoleUpdate(user)}
                               disabled={
                                 pendingRoleUserId === user.id ||
@@ -437,6 +520,59 @@ export default function AdminUsersPage() {
             )}
           </Card>
         </div>
+
+        <Card className="rounded-3xl border border-black/20 bg-black/5 p-6 backdrop-blur-xl dark:border-white/20 dark:bg-white/10">
+          <div className="mb-5 flex items-center justify-between gap-4">
+            <div>
+              <h3 className="text-xl font-semibold text-foreground">
+                Auditoría de seguridad
+              </h3>
+              <p className="text-sm text-muted-foreground">
+                Últimos eventos administrativos y de autenticación.
+              </p>
+            </div>
+            <Button
+              variant="outline"
+              onClick={() => void fetchSecurityEvents(50).then(setSecurityEvents).catch(() => null)}
+            >
+              Recargar
+            </Button>
+          </div>
+
+          <div className="space-y-3">
+            {securityEvents.map((event) => (
+              <div
+                key={event.id}
+                className="rounded-2xl border border-black/10 bg-background/70 p-4 dark:border-white/10"
+              >
+                <div className="flex flex-wrap items-center gap-3">
+                  <Badge variant={event.severity === "warning" ? "destructive" : "secondary"}>
+                    {event.severity}
+                  </Badge>
+                  <span className="text-sm font-medium text-foreground">
+                    {formatEventLabel(event.event_type)}
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    {formatDate(event.timestamp)}
+                  </span>
+                </div>
+                <div className="mt-2 text-sm text-muted-foreground">
+                  Actor: {event.actor_email ?? "Sistema"} | Objetivo: {event.target_email ?? "N/A"}
+                </div>
+                {event.ip ? (
+                  <div className="mt-1 text-xs text-muted-foreground">
+                    IP: {event.ip}
+                  </div>
+                ) : null}
+              </div>
+            ))}
+            {securityEvents.length === 0 ? (
+              <div className="py-8 text-center text-muted-foreground">
+                No hay eventos registrados todavía.
+              </div>
+            ) : null}
+          </div>
+        </Card>
       </div>
     </AppLayout>
   )

@@ -1,6 +1,6 @@
 import { searchFood as searchFoodClient, type FoodSearchResult } from "./food-search"
 import { API_BASE } from "./api-base"
-import { clearActiveSession, getAccessToken } from "./auth"
+import { authorizedFetch } from "./auth"
 export type { FoodSearchResult } from "./food-search"
 
 // â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -15,24 +15,6 @@ export class ApiError extends Error {
   }
 }
 
-function getHeaders(extra?: Record<string, string>): Record<string, string> {
-  const base: Record<string, string> = {}
-  if (API_BASE.includes("ngrok")) {
-    base["ngrok-skip-browser-warning"] = "true"
-  }
-  if (typeof Intl !== "undefined") {
-    base["X-User-Timezone"] = Intl.DateTimeFormat().resolvedOptions().timeZone
-  }
-  const accessToken = getAccessToken()
-  if (accessToken) {
-    base.Authorization = `Bearer ${accessToken}`
-  }
-  return {
-    ...base,
-    ...extra,
-  }
-}
-
 async function readError(res: Response, fallback: string) {
   const payload = (await res.json().catch(() => null)) as { detail?: unknown } | null
   const detail = payload?.detail
@@ -41,18 +23,12 @@ async function readError(res: Response, fallback: string) {
 
 async function ensureOk(res: Response, fallback: string) {
   if (res.ok) return
-
-  if (res.status === 401) {
-    clearActiveSession()
-  }
-
   throw new ApiError(await readError(res, fallback), res.status)
 }
 
 async function get<T>(path: string, signal?: AbortSignal): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
+  const res = await authorizedFetch(`${API_BASE}${path}`, {
     cache: "no-store",
-    headers: getHeaders(),
     signal,
   })
   await ensureOk(res, `GET ${path} failed`)
@@ -60,11 +36,9 @@ async function get<T>(path: string, signal?: AbortSignal): Promise<T> {
 }
 
 async function post<T>(path: string, body?: unknown): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
+  const res = await authorizedFetch(`${API_BASE}${path}`, {
     method: "POST",
-    headers: body
-      ? getHeaders({ "Content-Type": "application/json" })
-      : getHeaders(),
+    headers: body ? { "Content-Type": "application/json" } : undefined,
     body: body ? JSON.stringify(body) : undefined,
   })
   await ensureOk(res, `POST ${path} failed`)
@@ -72,9 +46,9 @@ async function post<T>(path: string, body?: unknown): Promise<T> {
 }
 
 async function put<T>(path: string, body: unknown): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
+  const res = await authorizedFetch(`${API_BASE}${path}`, {
     method: "PUT",
-    headers: getHeaders({ "Content-Type": "application/json" }),
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   })
   await ensureOk(res, `PUT ${path} failed`)
@@ -82,14 +56,13 @@ async function put<T>(path: string, body: unknown): Promise<T> {
 }
 
 async function del(path: string): Promise<void> {
-  const res = await fetch(`${API_BASE}${path}`, { method: "DELETE", headers: getHeaders() })
+  const res = await authorizedFetch(`${API_BASE}${path}`, { method: "DELETE" })
   await ensureOk(res, `DELETE ${path} failed`)
 }
 
 async function getBlob(path: string): Promise<Blob> {
-  const res = await fetch(`${API_BASE}${path}`, {
+  const res = await authorizedFetch(`${API_BASE}${path}`, {
     cache: "no-store",
-    headers: getHeaders(),
   })
   await ensureOk(res, `GET ${path} failed`)
   return res.blob()
@@ -296,6 +269,25 @@ export interface ManagedUser {
   name: string
   role: "user" | "admin"
   created_at?: string | null
+}
+
+export interface PasswordResetLink {
+  reset_token: string
+  reset_url: string
+  expires_at: string
+}
+
+export interface SecurityEvent {
+  id: string
+  timestamp: string
+  event_type: string
+  severity: string
+  actor_user_id?: string | null
+  actor_email?: string | null
+  target_user_id?: string | null
+  target_email?: string | null
+  ip?: string | null
+  details?: Record<string, unknown>
 }
 
 export interface SettingsData {
@@ -984,6 +976,16 @@ export async function updateManagedUserRole(
 
 export async function deleteManagedUser(userId: string): Promise<void> {
   await del(`/admin/users/${userId}`)
+}
+
+export async function createManagedUserPasswordResetLink(
+  userId: string,
+): Promise<PasswordResetLink> {
+  return post<PasswordResetLink>(`/admin/users/${userId}/reset-password`)
+}
+
+export async function fetchSecurityEvents(limit = 100): Promise<SecurityEvent[]> {
+  return get<SecurityEvent[]>(`/admin/security-events?limit=${limit}`)
 }
 
 export async function fetchFavoriteCarbs(): Promise<FavoriteCarb[]> {

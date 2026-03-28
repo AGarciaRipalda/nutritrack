@@ -162,6 +162,7 @@ export default function LoginPage() {
           <div className="mt-6 flex items-center justify-between text-sm">
             <button
               type="button"
+              onClick={() => router.push("/reset-password")}
               className="text-muted-foreground transition-colors hover:text-foreground"
             >
               ¿Olvidaste tu contraseña?

@@ -24,6 +24,7 @@ import {
 import type { SettingsData, UserProfile, FoodPreferences, UpcomingEvent } from "@/lib/api"
 import { fetchSettings, updateProfile, updateFoodPreferences, saveEvent, deleteEvent } from "@/lib/api"
 import { AppearanceSettings } from "@/components/appearance-settings"
+import { changePassword } from "@/lib/auth"
 
 const SETTINGS_TEXT = {
   title: `Configuraci${String.fromCharCode(243)}n`,
@@ -71,6 +72,14 @@ export default function SettingsPage() {
   const [preferences, setPreferences] = useState<FoodPreferences | null>(null)
   const [newTag, setNewTag] = useState({ excluded: "", favorites: "", disliked: "" })
   const [newEvent, setNewEvent] = useState({ name: "", date: "" })
+  const [passwordForm, setPasswordForm] = useState({
+    currentPassword: "",
+    newPassword: "",
+    confirmPassword: "",
+  })
+  const [passwordSaving, setPasswordSaving] = useState(false)
+  const [passwordStatus, setPasswordStatus] = useState<"idle" | "saved" | "error">("idle")
+  const [passwordError, setPasswordError] = useState<string | null>(null)
 
   useEffect(() => {
     fetchSettings()
@@ -168,6 +177,35 @@ export default function SettingsPage() {
     }
   }
 
+  const handleChangePassword = async () => {
+    if (
+      !passwordForm.currentPassword ||
+      !passwordForm.newPassword ||
+      passwordForm.newPassword !== passwordForm.confirmPassword
+    ) {
+      setPasswordError("Revisa las contraseñas introducidas.")
+      setPasswordStatus("error")
+      return
+    }
+
+    setPasswordSaving(true)
+    setPasswordError(null)
+    setPasswordStatus("idle")
+
+    try {
+      await changePassword(passwordForm.currentPassword, passwordForm.newPassword)
+      setPasswordForm({ currentPassword: "", newPassword: "", confirmPassword: "" })
+      setPasswordStatus("saved")
+    } catch (err) {
+      setPasswordError(
+        err instanceof Error ? err.message : "No se pudo cambiar la contraseña.",
+      )
+      setPasswordStatus("error")
+    } finally {
+      setPasswordSaving(false)
+    }
+  }
+
   if (loading || !profile || !preferences || !data) {
     return (
       <AppLayout>
@@ -196,7 +234,7 @@ export default function SettingsPage() {
 
         {/* Tabs */}
         <Tabs defaultValue="profile" className="min-w-0 space-y-6 overflow-x-hidden">
-          <TabsList className="grid h-auto min-w-0 w-full grid-cols-1 gap-2 overflow-hidden border border-black/20 bg-black/5 p-2 dark:border-white/20 dark:bg-white/10 sm:grid-cols-3">
+          <TabsList className="grid h-auto min-w-0 w-full grid-cols-1 gap-2 overflow-hidden border border-black/20 bg-black/5 p-2 dark:border-white/20 dark:bg-white/10 sm:grid-cols-4">
             <TabsTrigger value="profile" className="flex min-w-0 items-start justify-start gap-2 whitespace-normal break-words px-3 py-2 text-left text-foreground/70 data-[state=active]:bg-black/10 data-[state=active]:text-foreground dark:data-[state=active]:bg-white/20 sm:items-center sm:justify-center sm:text-center">
               <User className="mt-0.5 h-4 w-4 shrink-0 sm:mt-0" />
               <span className="min-w-0 break-words">Perfil</span>
@@ -204,6 +242,10 @@ export default function SettingsPage() {
             <TabsTrigger value="preferences" className="flex min-w-0 items-start justify-start gap-2 whitespace-normal break-words px-3 py-2 text-left text-foreground/70 data-[state=active]:bg-black/10 data-[state=active]:text-foreground dark:data-[state=active]:bg-white/20 sm:items-center sm:justify-center sm:text-center">
               <UtensilsCrossed className="mt-0.5 h-4 w-4 shrink-0 sm:mt-0" />
               <span className="min-w-0 break-words">Preferencias alimentarias</span>
+            </TabsTrigger>
+            <TabsTrigger value="security" className="flex min-w-0 items-start justify-start gap-2 whitespace-normal break-words px-3 py-2 text-left text-foreground/70 data-[state=active]:bg-black/10 data-[state=active]:text-foreground dark:data-[state=active]:bg-white/20 sm:items-center sm:justify-center sm:text-center">
+              <Settings className="mt-0.5 h-4 w-4 shrink-0 sm:mt-0" />
+              <span className="min-w-0 break-words">Seguridad</span>
             </TabsTrigger>
             <TabsTrigger value="events" className="flex min-w-0 items-start justify-start gap-2 whitespace-normal break-words px-3 py-2 text-left text-foreground/70 data-[state=active]:bg-black/10 data-[state=active]:text-foreground dark:data-[state=active]:bg-white/20 sm:items-center sm:justify-center sm:text-center">
               <Calendar className="mt-0.5 h-4 w-4 shrink-0 sm:mt-0" />
@@ -496,6 +538,89 @@ export default function SettingsPage() {
                     Error al guardar
                   </span>
                 )}
+              </div>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="security">
+            <Card className="backdrop-blur-xl bg-black/5 dark:bg-white/10 border border-black/20 dark:border-white/20 rounded-3xl p-6">
+              <h3 className="text-xl font-semibold text-foreground mb-6">Seguridad de la cuenta</h3>
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label className="text-foreground/80">Contraseña actual</Label>
+                  <Input
+                    type="password"
+                    value={passwordForm.currentPassword}
+                    onChange={(e) =>
+                      setPasswordForm((current) => ({
+                        ...current,
+                        currentPassword: e.target.value,
+                      }))
+                    }
+                    autoComplete="current-password"
+                    className="bg-black/5 dark:bg-white/5 border-black/20 dark:border-white/20 text-foreground"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-foreground/80">Nueva contraseña</Label>
+                  <Input
+                    type="password"
+                    value={passwordForm.newPassword}
+                    onChange={(e) =>
+                      setPasswordForm((current) => ({
+                        ...current,
+                        newPassword: e.target.value,
+                      }))
+                    }
+                    autoComplete="new-password"
+                    minLength={8}
+                    className="bg-black/5 dark:bg-white/5 border-black/20 dark:border-white/20 text-foreground"
+                  />
+                </div>
+                <div className="space-y-2 md:col-span-2">
+                  <Label className="text-foreground/80">Repite la nueva contraseña</Label>
+                  <Input
+                    type="password"
+                    value={passwordForm.confirmPassword}
+                    onChange={(e) =>
+                      setPasswordForm((current) => ({
+                        ...current,
+                        confirmPassword: e.target.value,
+                      }))
+                    }
+                    autoComplete="new-password"
+                    minLength={8}
+                    className="bg-black/5 dark:bg-white/5 border-black/20 dark:border-white/20 text-foreground"
+                  />
+                </div>
+              </div>
+
+              <div className="mt-6 flex items-center gap-4">
+                <Button
+                  onClick={handleChangePassword}
+                  disabled={
+                    passwordSaving ||
+                    passwordForm.currentPassword.length < 8 ||
+                    passwordForm.newPassword.length < 8 ||
+                    passwordForm.confirmPassword.length < 8
+                  }
+                  className="bg-emerald-500 hover:bg-emerald-600 text-white"
+                >
+                  <Save className="mr-2 h-4 w-4" />
+                  {passwordSaving ? "Actualizando..." : "Cambiar contraseña"}
+                </Button>
+                {passwordStatus === "saved" ? (
+                  <span className="flex items-center gap-1.5 text-emerald-400 text-sm font-medium">
+                    <CheckCircle2 className="h-4 w-4" />
+                    Contraseña actualizada
+                  </span>
+                ) : null}
+                {passwordStatus === "error" && passwordError ? (
+                  <span className="flex items-center gap-1.5 text-red-400 text-sm font-medium">
+                    <AlertCircle className="h-4 w-4" />
+                    {passwordError}
+                  </span>
+                ) : null}
               </div>
             </Card>
           </TabsContent>
