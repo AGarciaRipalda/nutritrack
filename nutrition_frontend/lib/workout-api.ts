@@ -26,39 +26,50 @@ import {
   FALLBACK_MUSCLES,
   filterFallbackExercises,
 } from "./workout-fallback"
+import { API_BASE } from "./api-base"
+import { clearActiveSession, getAccessToken } from "./auth"
 
 // â”€â”€ Config â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-const DEFAULT_REMOTE_API_BASE = "https://api.metabolic.es"
-const DEFAULT_LOCAL_API_BASE = "http://localhost:8000"
-
-function resolveApiBase() {
-  const configured = process.env.NEXT_PUBLIC_API_URL?.trim()
-  if (configured) return configured.replace(/\/+$/, "")
-
-  if (typeof window !== "undefined") {
-    const { protocol, hostname } = window.location
-    if (
-      protocol === "http:" &&
-      (hostname === "localhost" || hostname === "127.0.0.1")
-    ) {
-      return DEFAULT_LOCAL_API_BASE
-    }
-  }
-
-  return DEFAULT_REMOTE_API_BASE
-}
-
-const API_BASE = resolveApiBase()
-
 // â”€â”€ Helpers (same pattern as lib/api.ts) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
+class ApiError extends Error {
+  status: number
+
+  constructor(message: string, status: number) {
+    super(message)
+    this.name = "ApiError"
+    this.status = status
+  }
+}
+
 function getHeaders(extra?: Record<string, string>): Record<string, string> {
-  return {
-    "ngrok-skip-browser-warning": "true",
+  const headers: Record<string, string> = {
     "X-User-Timezone": Intl.DateTimeFormat().resolvedOptions().timeZone,
     ...extra,
   }
+  if (API_BASE.includes("ngrok")) {
+    headers["ngrok-skip-browser-warning"] = "true"
+  }
+  const accessToken = getAccessToken()
+  if (accessToken) {
+    headers.Authorization = `Bearer ${accessToken}`
+  }
+  return headers
+}
+
+async function readError(res: Response, fallback: string) {
+  const payload = (await res.json().catch(() => null)) as { detail?: unknown } | null
+  const detail = payload?.detail
+  return typeof detail === "string" && detail.trim() ? detail : fallback
+}
+
+async function ensureOk(res: Response, fallback: string) {
+  if (res.ok) return
+  if (res.status === 401) {
+    clearActiveSession()
+  }
+  throw new ApiError(await readError(res, fallback), res.status)
 }
 
 async function get<T>(path: string, signal?: AbortSignal): Promise<T> {
@@ -67,7 +78,7 @@ async function get<T>(path: string, signal?: AbortSignal): Promise<T> {
     headers: getHeaders(),
     signal,
   })
-  if (!res.ok) throw new Error(`GET ${path} failed: ${res.status}`)
+  await ensureOk(res, `GET ${path} failed`)
   return res.json()
 }
 
@@ -79,7 +90,7 @@ async function post<T>(path: string, body?: unknown): Promise<T> {
       : getHeaders(),
     body: body ? JSON.stringify(body) : undefined,
   })
-  if (!res.ok) throw new Error(`POST ${path} failed: ${res.status}`)
+  await ensureOk(res, `POST ${path} failed`)
   return res.json()
 }
 
@@ -89,7 +100,7 @@ async function put<T>(path: string, body: unknown): Promise<T> {
     headers: getHeaders({ "Content-Type": "application/json" }),
     body: JSON.stringify(body),
   })
-  if (!res.ok) throw new Error(`PUT ${path} failed: ${res.status}`)
+  await ensureOk(res, `PUT ${path} failed`)
   return res.json()
 }
 
@@ -98,7 +109,7 @@ async function del(path: string): Promise<void> {
     method: "DELETE",
     headers: getHeaders(),
   })
-  if (!res.ok) throw new Error(`DELETE ${path} failed: ${res.status}`)
+  await ensureOk(res, `DELETE ${path} failed`)
 }
 
 // â”€â”€ Exercise Library â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€

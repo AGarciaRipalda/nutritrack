@@ -5,6 +5,7 @@ const nextConfig = {
   output: "export",
   trailingSlash: true,
   outputFileTracingRoot: path.join(__dirname),
+  poweredByHeader: false,
   experimental: {
     webpackBuildWorker: false,
   },

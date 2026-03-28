@@ -1,3 +1,6 @@
+import { API_BASE } from "./api-base"
+import { clearActiveSession, getAccessToken } from "./auth"
+
 export interface FoodSearchResult {
   name: string
   kcal_100g: number
@@ -21,8 +24,6 @@ interface OpenFoodFactsProduct {
   image_url?: string
   nutriments?: Record<string, unknown>
 }
-
-const API_BASE = (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000').replace(/\/+$/, '')
 
 const FALLBACK_FOODS: FoodSearchResult[] = [
   { name: 'Arroz blanco cocido', kcal_100g: 130, image: null },
@@ -196,12 +197,20 @@ function scoreProduct(product: OpenFoodFactsProduct, query: string, name: string
 }
 
 async function requestBackendProxy(query: string): Promise<FoodSearchResult[]> {
+  const headers: Record<string, string> = { Accept: 'application/json' }
+  const accessToken = getAccessToken()
+  if (accessToken) {
+    headers.Authorization = `Bearer ${accessToken}`
+  }
   const res = await fetch(`${API_BASE}/food/search?q=${encodeURIComponent(query)}`, {
-    headers: { Accept: 'application/json' },
+    headers,
     cache: 'no-store',
   })
 
   if (!res.ok) {
+    if (res.status === 401) {
+      clearActiveSession()
+    }
     throw new Error(`Backend proxy returned ${res.status}`)
   }
 

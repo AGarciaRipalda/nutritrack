@@ -21,7 +21,7 @@ import {
   Download,
 } from "lucide-react"
 import type { WeeklyReportData } from "@/lib/api"
-import { fetchWeeklyReport, submitSensationsSurvey, getReportPdfUrl } from "@/lib/api"
+import { downloadReportPdf, fetchWeeklyReport, submitSensationsSurvey } from "@/lib/api"
 
 const sensationLabels = {
   energy: ["Muy baja", "Baja", "Moderada", "Alta", "Muy alta"],
@@ -41,6 +41,7 @@ export default function ReportPage() {
   })
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
+  const [downloadingPdf, setDownloadingPdf] = useState(false)
 
   useEffect(() => {
     fetchWeeklyReport()
@@ -63,6 +64,23 @@ export default function ReportPage() {
     }
     setSubmitted(true)
     setSubmitting(false)
+  }
+
+  const handleDownloadPdf = async () => {
+    setDownloadingPdf(true)
+    try {
+      const blob = await downloadReportPdf()
+      const url = window.URL.createObjectURL(blob)
+      const link = document.createElement("a")
+      link.href = url
+      link.download = "informe-semanal.pdf"
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      window.URL.revokeObjectURL(url)
+    } finally {
+      setDownloadingPdf(false)
+    }
   }
 
   if (loading) {
@@ -100,15 +118,15 @@ export default function ReportPage() {
                 <p className="text-muted-foreground">Resumen de tu rendimiento esta semana</p>
               </div>
             </div>
-            <a
-              href={getReportPdfUrl()}
-              target="_blank"
-              rel="noopener noreferrer"
+            <button
+              type="button"
+              onClick={handleDownloadPdf}
+              disabled={downloadingPdf}
               className="flex items-center gap-2 px-4 py-2 bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-400/30 rounded-xl text-emerald-300 text-sm font-medium transition-colors"
             >
               <Download className="h-4 w-4" />
-              Descargar PDF
-            </a>
+              {downloadingPdf ? "Descargando..." : "Descargar PDF"}
+            </button>
           </div>
         </Card>
 
